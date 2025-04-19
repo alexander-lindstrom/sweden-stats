@@ -29,7 +29,6 @@ async def proxy_scb_post(path: str, request: Request):
                 headers={"Content-Type": "application/json"},
                 timeout=30.0,
             )
-
-        return response.text  # or response.json() if it's JSON
+        return response.json()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
