@@ -1,0 +1,35 @@
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import httpx
+
+app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+BASE_SCB_URL = "https://api.scb.se/OV0104/v1/doris/sv/ssd"
+
+@app.post("/api/scb/{path:path}")
+async def proxy_scb_post(path: str, request: Request):
+    """
+    Proxies a POST request to the SCB API.
+    Example path: START/PR/PR0101/PR0101A/KPICOI80MN
+    """
+    try:
+        body = await request.json()
+        url = f"{BASE_SCB_URL}/{path}"
+
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                url,
+                json=body,
+                headers={"Content-Type": "application/json"},
+                timeout=30.0,
+            )
+
+        return response.text  # or response.json() if it's JSON
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
