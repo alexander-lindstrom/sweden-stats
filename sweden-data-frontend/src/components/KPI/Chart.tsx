@@ -59,9 +59,8 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Clear existing chart
     d3.select(svgRef.current).selectAll('*').remove();
 
-    // Setup dimensions - reduced width to accommodate legend
     const margin = { top: 20, right: 30, bottom: 50, left: 60 };
-    const width = 680 - margin.left - margin.right; // Reduced from 800 to make room for legend
+    const width = 800 - margin.left - margin.right;
     const height = 400 - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
@@ -128,7 +127,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
       .style('text-anchor', 'middle')
       .text('Index');
 
-    // Create line generator
+    // Create line generator with proper typing
     const line = d3.line<{ parsedDate: Date, value: number }>()
       .x(d => xScale(d.parsedDate))
       .y(d => yScale(d.value))
@@ -147,7 +146,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
         .attr('fill', 'none')
         .attr('stroke', colorScale(category.categoryCode) as string)
         .attr('stroke-width', 2)
-        .attr('d', line as any);
+        .attr('d', line(timePointsWithDates));
     });
 
     // Create tooltip overlay
@@ -218,11 +217,11 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
         .attr('x2', mouseX)
         .style('opacity', 1);
 
-      // Show tooltip - positioned to the east (right) of cursor and closer
+      // Show tooltip - positioned directly to the east of cursor
       const formatValue = d3.format(",.2f");
       const tooltipHTML = `
         <div>
-          <strong>Date: ${tooltipData[0]?.date || ''}</strong>
+          <strong>Datum: ${tooltipData[0]?.date || ''}</strong>
           <ul style="padding-left: 20px; margin: 5px 0;">
             ${tooltipData.map(d => `
               <li style="list-style: none; margin: 3px 0;">
@@ -234,10 +233,12 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
         </div>
       `;
 
+      const [pointerX, pointerY] = d3.pointer(event, svg.node());
+
       tooltip
         .html(tooltipHTML)
-        .style('left', `${event.pageX + 10}px`) // Closer to cursor (10px vs 15px)
-        .style('top', `${event.pageY - 10}px`) // More directly east (less shift to south)
+        .style('left', `${pointerX + 100}px`)
+        .style('top', `${pointerY - 50}px`)
         .style('opacity', 1);
     });
 
@@ -252,44 +253,40 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
 
   return (
     <div className="kpi-chart-container">
-      <div className="chart-title text-lg font-bold mb-4">{data.metadata.title}</div>
+      <div className="chart-title text-lg font-bold mb-2">{data.metadata.title}</div>
       
-      <div className="flex">
-        {/* Chart area */}
-        <div className="chart-container relative flex-grow">
-          <svg ref={svgRef}></svg>
-          <div ref={tooltipRef} className="tooltip"></div>
-        </div>
-        
-        {/* Legend with checkboxes */}
-        <div className="legend-container ml-4 w-48">
-          <div className="font-medium mb-2">Legend:</div>
-          <div className="flex flex-col max-h-80 overflow-y-auto">
-            {data.byCategory.map(category => (
-              <label 
-                key={category.categoryCode} 
-                className="flex items-center cursor-pointer mb-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  className="mr-2"
-                  checked={selectedCategories[category.categoryCode] || false}
-                  onChange={() => toggleCategory(category.categoryCode)}
-                />
-                <span 
-                  className="color-dot inline-block w-3 h-3 rounded-full mr-2"
-                  style={{ backgroundColor: colorScale(category.categoryCode) as string }}
-                ></span>
-                <span className="truncate">{category.categoryName}</span>
-              </label>
-            ))}
-          </div>
-        </div>
+      <div className="legend-container mb-2 flex flex-wrap gap-2">
+        {data.byCategory.map(category => (
+          <button
+            key={category.categoryCode}
+            onClick={() => toggleCategory(category.categoryCode)}
+            className={`
+              px-2 py-1 rounded-md text-sm flex items-center transition-all
+              ${selectedCategories[category.categoryCode] 
+                ? 'bg-gray-100 shadow-sm' 
+                : 'bg-gray-50 opacity-50'}
+            `}
+          >
+            <span 
+              className="inline-block w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: colorScale(category.categoryCode) as string }}
+            ></span>
+            <span className="truncate">{category.categoryName}</span>
+          </button>
+        ))}
+      </div>
+      
+      {/* Chart area */}
+      <div className="chart-container relative">
+        <svg ref={svgRef}></svg>
+        <div ref={tooltipRef} className="tooltip"></div>
       </div>
       
       <div className="chart-footer text-sm text-gray-600 mt-4">
         <div>Källa: {data.metadata.source}</div>
-        <div>Uppdaterad: {data.metadata.updated}</div>
+        <div>
+          Uppdaterad: {new Intl.DateTimeFormat('sv-SE').format(new Date(data.metadata.updated))}
+        </div>
       </div>
     </div>
   );

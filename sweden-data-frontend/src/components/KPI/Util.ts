@@ -17,6 +17,10 @@ const getCategoryIndex = (categoryCode: string) => {
   return parsed - adjustment;
 };
 
+const capitalizeFirstLetter = (text: string) => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
 
 export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
   const categoryLabels = apiData.dimension.VaruTjanstegrupp.category.label;
@@ -48,7 +52,7 @@ export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
     
     byCategory.push({
       categoryCode,
-      categoryName,
+      categoryName: capitalizeFirstLetter(categoryName),
       timePoints
     });
   });
@@ -67,7 +71,7 @@ export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
       if (valueIndex < values.length) {
         flattened.push({
           categoryCode,
-          categoryName,
+          categoryName: capitalizeFirstLetter(categoryName),
           date: timeKey,
           timeLabel: timeKey,
           timeIndex: timeIndex,

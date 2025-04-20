@@ -16,7 +16,7 @@ export default function EconomicIndicators() {
     <main className="flex h-screen">
       {/* Sidebar */}
       <aside className="w-64 bg-gray-100 p-6 border-r">
-        <h1 className="text-2xl font-bold mb-6">Economic Indicators</h1>
+        <h1 className="text-2xl font-bold mb-6">Ekonomi</h1>
         <nav className="space-y-2">
           {tabs.map(tab => (
             <Button
