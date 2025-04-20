@@ -57,7 +57,6 @@ export default function KPI() {
 
   return (
     <div className="dashboard-container">
-      <h1>Swedish Consumer Price Index (KPI)</h1>
       
       {loading && <p>Loading data...</p>}
       {error && <p className="error-message">{error}</p>}

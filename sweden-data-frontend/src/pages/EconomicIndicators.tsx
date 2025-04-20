@@ -36,7 +36,6 @@ export default function EconomicIndicators() {
         {activeTab === "kpi" && (
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Consumer price index</h2>
               <KPI />
             </CardContent>
           </Card>

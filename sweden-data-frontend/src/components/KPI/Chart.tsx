@@ -8,8 +8,6 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
   const [isInitialized, setIsInitialized] = useState(false);
 
-  console.log(data)
-
   // Initialize selected categories on first render
   useEffect(() => {
     if (!isInitialized && data.byCategory.length > 0) {
@@ -61,9 +59,9 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Clear existing chart
     d3.select(svgRef.current).selectAll('*').remove();
 
-    // Setup dimensions
-    const margin = { top: 20, right: 80, bottom: 50, left: 60 };
-    const width = 800 - margin.left - margin.right;
+    // Setup dimensions - reduced width to accommodate legend
+    const margin = { top: 20, right: 30, bottom: 50, left: 60 };
+    const width = 680 - margin.left - margin.right; // Reduced from 800 to make room for legend
     const height = 400 - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
@@ -119,7 +117,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
       .attr('x', width / 2)
       .attr('y', height + margin.bottom - 5)
       .style('text-anchor', 'middle')
-      .text('Time');
+      .text('Datum');
 
     // Add Y axis label
     svg.append('text')
@@ -128,7 +126,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
       .attr('x', -height / 2)
       .attr('y', -margin.left + 15)
       .style('text-anchor', 'middle')
-      .text('Value');
+      .text('Index');
 
     // Create line generator
     const line = d3.line<{ parsedDate: Date, value: number }>()
@@ -160,7 +158,8 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
       .style('border', '1px solid #ddd')
       .style('border-radius', '4px')
       .style('padding', '10px')
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'none')
+      .style('box-shadow', '0 2px 5px rgba(0,0,0,0.1)');
 
     // Create a vertical line for hover
     const verticalLine = svg.append('line')
@@ -219,7 +218,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
         .attr('x2', mouseX)
         .style('opacity', 1);
 
-      // Show tooltip
+      // Show tooltip - positioned to the east (right) of cursor and closer
       const formatValue = d3.format(",.2f");
       const tooltipHTML = `
         <div>
@@ -237,8 +236,8 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
 
       tooltip
         .html(tooltipHTML)
-        .style('left', `${event.pageX + 15}px`)
-        .style('top', `${event.pageY - 28}px`)
+        .style('left', `${event.pageX + 10}px`) // Closer to cursor (10px vs 15px)
+        .style('top', `${event.pageY - 10}px`) // More directly east (less shift to south)
         .style('opacity', 1);
     });
 
@@ -247,48 +246,50 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
       verticalLine.style('opacity', 0);
     });
 
-    // Add title
-    svg.append('text')
-      .attr('x', width / 2)
-      .attr('y', -margin.top / 2)
-      .attr('text-anchor', 'middle')
-      .style('font-size', '16px')
-      .style('font-weight', 'bold')
-      .text(data.metadata.title);
-
   }, [data, selectedCategories, isInitialized]);
+
+  const colorScale = getColorScale();
 
   return (
     <div className="kpi-chart-container">
       <div className="chart-title text-lg font-bold mb-4">{data.metadata.title}</div>
       
-      <div className="category-selector mb-4">
-        <div className="font-medium mb-2">Categories:</div>
-        <div className="flex flex-wrap gap-2">
-          {data.byCategory.map(category => (
-            <button
-              key={category.categoryCode}
-              className={`px-3 py-1 text-sm rounded-full border ${
-                selectedCategories[category.categoryCode] 
-                  ? 'bg-blue-500 text-white border-blue-600'
-                  : 'bg-gray-100 text-gray-800 border-gray-300'
-              }`}
-              onClick={() => toggleCategory(category.categoryCode)}
-            >
-              {category.categoryName}
-            </button>
-          ))}
+      <div className="flex">
+        {/* Chart area */}
+        <div className="chart-container relative flex-grow">
+          <svg ref={svgRef}></svg>
+          <div ref={tooltipRef} className="tooltip"></div>
+        </div>
+        
+        {/* Legend with checkboxes */}
+        <div className="legend-container ml-4 w-48">
+          <div className="font-medium mb-2">Legend:</div>
+          <div className="flex flex-col max-h-80 overflow-y-auto">
+            {data.byCategory.map(category => (
+              <label 
+                key={category.categoryCode} 
+                className="flex items-center cursor-pointer mb-2 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  className="mr-2"
+                  checked={selectedCategories[category.categoryCode] || false}
+                  onChange={() => toggleCategory(category.categoryCode)}
+                />
+                <span 
+                  className="color-dot inline-block w-3 h-3 rounded-full mr-2"
+                  style={{ backgroundColor: colorScale(category.categoryCode) as string }}
+                ></span>
+                <span className="truncate">{category.categoryName}</span>
+              </label>
+            ))}
+          </div>
         </div>
       </div>
       
-      <div className="chart-container relative">
-        <svg ref={svgRef} className="w-full"></svg>
-        <div ref={tooltipRef} className="tooltip"></div>
-      </div>
-      
       <div className="chart-footer text-sm text-gray-600 mt-4">
-        <div>Source: {data.metadata.source}</div>
-        <div>Updated: {data.metadata.updated}</div>
+        <div>Källa: {data.metadata.source}</div>
+        <div>Uppdaterad: {data.metadata.updated}</div>
       </div>
     </div>
   );
