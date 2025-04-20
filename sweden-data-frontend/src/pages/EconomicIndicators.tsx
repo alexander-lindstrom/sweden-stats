@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import KPI from "@/components/KPI/KPI";
 
 const tabs = [
-  { id: "kpi", label: "KPI Subcategories" },
+  { id: "kpi", label: "KPI" },
   { id: "placeholder1", label: "Placeholder Tab 1" },
   { id: "placeholder2", label: "Placeholder Tab 2" },
 ];
@@ -36,7 +36,7 @@ export default function EconomicIndicators() {
         {activeTab === "kpi" && (
           <Card>
             <CardContent className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Key Performance Indicator</h2>
+              <h2 className="text-xl font-semibold mb-4">Consumer price index</h2>
               <KPI />
             </CardContent>
           </Card>

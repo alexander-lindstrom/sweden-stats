@@ -1,7 +1,8 @@
 import { fetchScbData } from "@/api/scbApi";
 import { useEffect, useState } from "react";
 import Chart from "./Chart";
-import { KPIApiResponse } from "./types";
+import { KPIApiResponse, TransformedKPIData } from "./KpiTypes";
+import { transformKPIData } from "./Util";
 
 const body = {
   query: [
@@ -30,6 +31,7 @@ const body = {
 
 export default function KPI() {
   const [data, setData] = useState<KPIApiResponse | null>(null);
+  const [transformedData, setTransformedData] = useState<TransformedKPIData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ export default function KPI() {
         setLoading(true);
         const responseData = await fetchScbData("START/PR/PR0101/PR0101A/KPICOI80MN", body);
         setData(responseData);
+        setTransformedData(transformKPIData(responseData));
         setError(null);
       } catch (err) {
         console.error("Error fetching KPI data:", err);
@@ -55,36 +58,16 @@ export default function KPI() {
   return (
     <div className="dashboard-container">
       <h1>Swedish Consumer Price Index (KPI)</h1>
-      <p className="description">
-        This visualization shows the Consumer Price Index (KPI) for different categories of goods and services over time.
-        The KPI measures the average price development for the entire private domestic consumption.
-      </p>
       
       {loading && <p>Loading data...</p>}
       {error && <p className="error-message">{error}</p>}
       
       <div className="chart-container">
-        {data && (
+        {data && transformedData && (
           <Chart 
-            apiData={data} 
-            width={1000} 
-            height={600} 
+            data={transformedData} 
           />
         )}
-      </div>
-      
-      <div className="insights">
-        <h2>Key Insights</h2>
-        <ul>
-          <li>Click on category names in the legend to show/hide individual categories</li>
-          <li>Hover over the chart to see detailed values for each category at specific points in time</li>
-          <li>Compare inflation rates across different categories of goods and services</li>
-        </ul>
-      </div>
-      
-      <div className="data-source">
-        <p>Source: Statistics Sweden (SCB)</p>
-        <p>Last updated: {data ? new Date(data.updated).toLocaleDateString() : 'Unknown'}</p>
       </div>
     </div>
   );

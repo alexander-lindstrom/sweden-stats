@@ -41,7 +41,7 @@ export interface KPIApiResponse {
   }
   
   export interface CategoryTimePoint {
-    date: Date;
+    date: string;
     timeLabel: string;
     value: number;
   }
@@ -55,7 +55,7 @@ export interface KPIApiResponse {
   export interface FlattenedDataPoint {
     categoryCode: string;
     categoryName: string;
-    date: Date;
+    date: string;
     timeLabel: string;
     timeIndex: number;
     value: number; 
@@ -65,8 +65,8 @@ export interface KPIApiResponse {
     byCategory: CategoryTimeSeries[];
     flattened: FlattenedDataPoint[];
     timespan: {
-      start: Date;
-      end: Date;
+      start: string;
+      end: string;
     };
     metadata: {
       title: string;

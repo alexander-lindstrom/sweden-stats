@@ -1,39 +1,45 @@
-import { CategoryTimePoint, CategoryTimeSeries, FlattenedDataPoint, KPIApiResponse, TransformedKPIData } from "./types";
+import { CategoryTimePoint, CategoryTimeSeries, FlattenedDataPoint, KPIApiResponse, TransformedKPIData } from "./KpiTypes";
+
+const getValueIndex = (timeIndex: number, dataPoints: number, categoryIndex: number) => {
+  return timeIndex + (categoryIndex - 1) * dataPoints;
+}
+
+const getCategoryIndex = (categoryCode: string) => {
+  const missingCategories = new Set(['10']);
+  const parsed = parseInt(categoryCode, 10);
+
+  let adjustment = 0;
+  for (const missing of missingCategories) {
+    if (parseInt(missing, 10) < parsed) {
+      adjustment++;
+    }
+  }
+  return parsed - adjustment;
+};
+
 
 export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
   const categoryLabels = apiData.dimension.VaruTjanstegrupp.category.label;
   const timeIndices = apiData.dimension.Tid.category.index;
   const values = apiData.value;
-  const categoryCount = apiData.size[0];
+  const dataPoints = apiData.size[2];
   
-  // Process time information from the API
   const timeKeys = Object.keys(timeIndices);
-  const sortedTimeKeys = timeKeys.sort((a, b) => timeIndices[a] - timeIndices[b]);
   
-  // Parse the date strings into Date objects
-  const dateSeries: Date[] = sortedTimeKeys.map(timeKey => {
-    // Format is YYYYMXX where YYYY is year, M is a literal 'M', and XX is month number
-    const year = parseInt(timeKey.substring(0, 4), 10);
-    const month = parseInt(timeKey.substring(5, 7), 10) - 1; // JavaScript months are 0-indexed
-    return new Date(year, month, 1);
-  });
-  
-  // Create category time series
   const byCategory: CategoryTimeSeries[] = [];
   
   Object.entries(categoryLabels).forEach(([categoryCode, categoryName]) => {
-    const categoryIndex = parseInt(categoryCode, 10) - 1;
-    if (categoryIndex < 0 || categoryIndex >= categoryCount) return;
+    const categoryIndex = getCategoryIndex(categoryCode);
     
     const timePoints: CategoryTimePoint[] = [];
     
-    // For each time point
-    sortedTimeKeys.forEach((timeKey, timeIndex) => {
-      const valueIndex = categoryIndex + (timeIndices[timeKey] * categoryCount);
+    timeKeys.forEach((timeKey) => {
+      const timeIndex = timeIndices[timeKey];
+      const valueIndex = getValueIndex(timeIndex, dataPoints, categoryIndex);
       
       if (valueIndex < values.length) {
         timePoints.push({
-          date: dateSeries[timeIndex],
+          date: timeKey,
           timeLabel: timeKey,
           value: values[valueIndex]
         });
@@ -51,20 +57,20 @@ export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
   const flattened: FlattenedDataPoint[] = [];
   
   Object.entries(categoryLabels).forEach(([categoryCode, categoryName]) => {
-    const categoryIndex = parseInt(categoryCode, 10) - 1;
-    if (categoryIndex < 0 || categoryIndex >= categoryCount) return;
+    const categoryIndex = getCategoryIndex(categoryCode);
     
     // For each time point
-    sortedTimeKeys.forEach((timeKey, timeIndex) => {
-      const valueIndex = categoryIndex + (timeIndices[timeKey] * categoryCount);
+    timeKeys.forEach((timeKey) => {
+      const timeIndex = timeIndices[timeKey];
+      const valueIndex = getValueIndex(timeIndex, dataPoints, categoryIndex);
       
       if (valueIndex < values.length) {
         flattened.push({
           categoryCode,
           categoryName,
-          date: dateSeries[timeIndex],
+          date: timeKey,
           timeLabel: timeKey,
-          timeIndex: timeIndices[timeKey],
+          timeIndex: timeIndex,
           value: values[valueIndex]
         });
       }
@@ -75,8 +81,8 @@ export function transformKPIData(apiData: KPIApiResponse): TransformedKPIData {
     byCategory,
     flattened,
     timespan: {
-      start: dateSeries[0],
-      end: dateSeries[dateSeries.length - 1]
+      start: timeKeys[0],
+      end: timeKeys[timeKeys.length - 1]
     },
     metadata: {
       title: apiData.label,
