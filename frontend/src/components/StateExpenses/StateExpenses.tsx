@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { SunburstChart, SunburstNode } from "./SunburstChart";
 import { fetchAllExpenses } from "@/api/StateExpensesApi";
+import SunburstChart, { SunburstNode } from "./SunburstChart";
 
 export default function StateExpenses() {
   const [expensesData, setExpensesData] = useState<Record<string, SunburstNode> | null>(null);
