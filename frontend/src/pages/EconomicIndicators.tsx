@@ -15,7 +15,6 @@ export default function EconomicIndicators() {
 
   return (
     <main className="flex h-screen">
-      {/* Sidebar */}
       <aside className="w-64 bg-gray-100 p-6 border-r">
         <h1 className="text-2xl font-bold mb-6">Ekonomi</h1>
         <nav className="space-y-2">
@@ -32,27 +31,30 @@ export default function EconomicIndicators() {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <section className="flex-1 p-8 overflow-y-auto">
-        {activeTab === "kpi" && (
-          <Card>
-            <CardContent className="p-6">
-              <KPI />
+        <div className="h-full">
+          <Card className="h-full">
+            <CardContent className="p-6 h-full">
+              {activeTab === "kpi" && (
+                <div className="h-full">
+                  <KPI />
+                </div>
+              )}
+
+              {activeTab === "state_expenses" && (
+                <div className="h-full">
+                  <StateExpenses />
+                </div>
+              )}
+
+              {activeTab === "placeholder2" && (
+                <div className="h-full flex items-center justify-center text-gray-500 text-lg">
+                  Placeholder content for Tab 2
+                </div>
+              )}
             </CardContent>
           </Card>
-        )}
-
-        {activeTab === "state_expenses" && (
-          <Card>
-          <CardContent className="p-6">
-            <StateExpenses />
-          </CardContent>
-         </Card>
-        )}
-
-        {activeTab === "placeholder2" && (
-          <div className="text-gray-500 text-lg">Placeholder content for Tab 2</div>
-        )}
+        </div>
       </section>
     </main>
   );
