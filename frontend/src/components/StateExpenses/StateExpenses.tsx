@@ -21,6 +21,8 @@ export default function StateExpenses() {
         dataByYear={expensesData} 
         title="Statens Utgifter"
         unit="miljoner SEK"
+        width={800}
+        height={800}
       />
     </div>
   );

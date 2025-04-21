@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { TransformedKPIData } from './KpiTypes';
 
-export default function KPILineChart({ data }: { data: TransformedKPIData }) {
+export default function KpiLineChart({ data }: { data: TransformedKPIData }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
@@ -59,13 +59,13 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Clear existing chart
     d3.select(svgRef.current).selectAll('*').remove();
 
-    const margin = { top: 20, right: 30, bottom: 50, left: 60 };
-    const width = 800 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const margin = { top: 40, right: 40, bottom: 60, left: 60 };
+    const adjustedWidth = 800 - margin.left - margin.right;
+    const adjustedHeight = 400 - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
-      .attr('width', width + margin.left + margin.right)
-      .attr('height', height + margin.top + margin.bottom)
+      .attr('width', adjustedWidth + margin.left + margin.right)
+      .attr('height', adjustedHeight + margin.top + margin.bottom)
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -80,11 +80,11 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Create scales
     const xScale = d3.scaleTime()
       .domain(d3.extent(allTimePoints, d => d.parsedDate) as [Date, Date])
-      .range([0, width]);
+      .range([0, adjustedWidth]);
 
     const yScale = d3.scaleLinear()
       .domain([0, d3.max(allTimePoints, d => d.value) as number])
-      .range([height, 0])
+      .range([adjustedHeight, 0])
       .nice();
 
     const colorScale = getColorScale();
@@ -99,7 +99,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Add X axis
     svg.append('g')
       .attr('class', 'x-axis')
-      .attr('transform', `translate(0,${height})`)
+      .attr('transform', `translate(0,${adjustedHeight})`)
       .call(xAxis)
       .selectAll('text')
       .attr('transform', 'rotate(-45)')
@@ -113,8 +113,8 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     // Add X axis label
     svg.append('text')
       .attr('class', 'x-axis-label')
-      .attr('x', width / 2)
-      .attr('y', height + margin.bottom - 5)
+      .attr('x', adjustedWidth / 2)
+      .attr('y', adjustedHeight + margin.bottom - 5)
       .style('text-anchor', 'middle')
       .text('Datum');
 
@@ -122,7 +122,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     svg.append('text')
       .attr('class', 'y-axis-label')
       .attr('transform', 'rotate(-90)')
-      .attr('x', -height / 2)
+      .attr('x', -adjustedHeight / 2)
       .attr('y', -margin.left + 15)
       .style('text-anchor', 'middle')
       .text('Index');
@@ -164,15 +164,15 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     const verticalLine = svg.append('line')
       .attr('class', 'hover-line')
       .attr('y1', 0)
-      .attr('y2', height)
+      .attr('y2', adjustedHeight)
       .style('stroke', '#999')
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0);
 
     // Create overlay for mouse tracking
     const overlay = svg.append('rect')
-      .attr('width', width)
-      .attr('height', height)
+      .attr('width', adjustedWidth)
+      .attr('height', adjustedHeight)
       .style('fill', 'none')
       .style('pointer-events', 'all');
 
@@ -183,7 +183,7 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
     overlay.on('mousemove', function(event) {
       const mouseX = d3.pointer(event)[0];
       
-      if (mouseX < 0 || mouseX > width) {
+      if (mouseX < 0 || mouseX > adjustedWidth) {
         tooltip.style('opacity', 0);
         verticalLine.style('opacity', 0);
         return;
@@ -276,7 +276,6 @@ export default function KPILineChart({ data }: { data: TransformedKPIData }) {
         ))}
       </div>
       
-      {/* Chart area */}
       <div className="chart-container relative">
         <svg ref={svgRef}></svg>
         <div ref={tooltipRef} className="tooltip"></div>

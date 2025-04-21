@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import KPI from "@/components/KPI/KPI";
 import StateExpenses from "@/components/StateExpenses/StateExpenses";
+import Kpi from "@/components/Kpi/Kpi";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
@@ -37,7 +37,7 @@ export default function EconomicIndicators() {
             <CardContent className="p-6 h-full">
               {activeTab === "kpi" && (
                 <div className="h-full">
-                  <KPI />
+                  <Kpi />
                 </div>
               )}
 
