@@ -1,8 +1,8 @@
-import { fetchScbData } from "@/api/scbApi";
 import { useEffect, useState } from "react";
 import Chart from "./Chart";
 import { KPIApiResponse, TransformedKPIData } from "./KpiTypes";
 import { transformKPIData } from "./Util";
+import { fetchScbData } from "@/api/scbApi";
 
 const body = {
   query: [

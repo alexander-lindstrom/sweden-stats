@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import KPI from "@/components/KPI/KPI";
+import StateExpenses from "@/components/StateExpenses/StateExpenses";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
-  { id: "placeholder1", label: "Placeholder Tab 1" },
+  { id: "state_expenses", label: "Statens utgifter" },
   { id: "placeholder2", label: "Placeholder Tab 2" },
 ];
 
@@ -41,8 +42,12 @@ export default function EconomicIndicators() {
           </Card>
         )}
 
-        {activeTab === "placeholder1" && (
-          <div className="text-gray-500 text-lg">Placeholder content for Tab 1</div>
+        {activeTab === "state_expenses" && (
+          <Card>
+          <CardContent className="p-6">
+            <StateExpenses />
+          </CardContent>
+         </Card>
         )}
 
         {activeTab === "placeholder2" && (
