@@ -8,13 +8,19 @@ def make_sunburst_structure(csv_path):
     with open(csv_path, encoding='utf-8') as f:
         reader = csv.DictReader(f, delimiter=';')
         for row in reader:
+            # Skip rows with no "Utgiftsområde" — these are not standard budget rows
+            if not row["Utgiftsområde"].strip():
+                continue
+
             year = row["År"]
             area = row["Utgiftsområdesnamn"]
             category = row["Anslagsnamn"]
+
             try:
                 amount = float(row["Utfall"].replace(',', '.'))
             except:
                 continue
+
             data_per_year[year][area][category] += amount
 
     sunburst_per_year = {}

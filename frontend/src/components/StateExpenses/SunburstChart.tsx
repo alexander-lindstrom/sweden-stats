@@ -23,7 +23,7 @@ type HierarchyNodeWithCurrent = d3.HierarchyRectangularNode<SunburstNode> & {
 const SunburstChart: React.FC<Props> = ({
     dataByYear,
     title,
-    width = 928,
+    width = 800,
     height = width
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);

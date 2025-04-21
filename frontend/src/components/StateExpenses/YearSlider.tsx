@@ -24,7 +24,7 @@ const YearSlider: React.FC<YearSliderProps> = ({ years, selectedYear, onYearChan
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }}>
-      <label htmlFor="year-slider">Year: {selectedYear}</label>
+      <label htmlFor="year-slider">År: {selectedYear}</label>
       <input
         type="range"
         id="year-slider"
