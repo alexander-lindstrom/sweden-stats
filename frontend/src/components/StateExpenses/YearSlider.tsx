@@ -33,11 +33,8 @@ const YearSlider: React.FC<YearSliderProps> = ({ years, selectedYear, onYearChan
         value={selectedIndex}
         onChange={handleSliderChange}
         step="1"
-        style={{ flexGrow: 1 }} // Allow slider to take up space
+        style={{ flexGrow: 1 }}
       />
-       {/* Optional: Display min/max years */}
-       {/* <span>{years[0]}</span>
-       <span>{years[years.length - 1]}</span> */}
     </div>
   );
 };

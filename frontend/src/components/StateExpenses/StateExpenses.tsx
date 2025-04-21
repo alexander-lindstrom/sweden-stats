@@ -17,7 +17,11 @@ export default function StateExpenses() {
 
   return (
     <div className="p-4">
-      <SunburstChart dataByYear={expensesData} title="Statens Utgifter" />
+      <SunburstChart 
+        dataByYear={expensesData} 
+        title="Statens Utgifter"
+        unit="miljoner SEK"
+      />
     </div>
   );
 }

@@ -11,6 +11,7 @@ export type SunburstNode = {
 type Props = {
   dataByYear: Record<string, SunburstNode>;
   title: string;
+  unit: string;
   width?: number;
   height?: number;
 };
@@ -23,6 +24,7 @@ type HierarchyNodeWithCurrent = d3.HierarchyRectangularNode<SunburstNode> & {
 const SunburstChart: React.FC<Props> = ({
     dataByYear,
     title,
+    unit,
     width = 800,
     height = width
 }) => {
@@ -83,17 +85,21 @@ const SunburstChart: React.FC<Props> = ({
         .style("color", "white")
         .style("padding", "5px 10px")
         .style("border-radius", "3px")
-        .style("pointer-events", "none") // Important!
+        .style("pointer-events", "none")
         .style("font-size", "12px");
 
     const format = d3.format(",d");
 
     const mouseover = (event: MouseEvent, d: HierarchyNodeWithCurrent) => {
         tooltip.transition().duration(200).style("opacity", 0.9);
-        const pathString = d.ancestors().map(anc => anc.data.name).reverse().join(" / ");
-        const valueString = d.value ? format(d.value) : 'N/A';
-        tooltip.html(`${pathString}<br>Value: ${valueString}`)
-               .style("left", (event.pageX + 15) + "px") // Offset from cursor
+    
+        // Remove the root (last in the ancestors list before reversing)
+        const pathString = d.ancestors().slice(0, -1).reverse().map(anc => anc.data.name).join(" / ");
+    
+        const valueString = d.value ? `${format(d.value)} ${unit}` : `N/A`;
+    
+        tooltip.html(`${pathString}<br>${valueString}`)
+               .style("left", (event.pageX + 15) + "px")
                .style("top", (event.pageY - 10) + "px");
     };
 
@@ -134,7 +140,7 @@ const SunburstChart: React.FC<Props> = ({
       .data(root.descendants().slice(1))
       .join("text")
         .attr("dy", "0.35em")
-        .attr("fill", "#333") // Make labels more visible
+        .attr("fill", "#333")
         .attr("fill-opacity", d => +labelVisible(d.current!))
         .attr("transform", d => labelTransform(d.current!))
         .text(d => d.data.name.length > 15 ? d.data.name.substring(0,12)+"..." : d.data.name);
