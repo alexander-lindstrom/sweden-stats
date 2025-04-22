@@ -1,8 +1,27 @@
 import { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { TransformedKPIData } from './KpiTypes';
+import ResponsiveChartWrapper from '../charts/ResponseChartWrapper';
 
 export default function KpiLineChart({ data }: { data: TransformedKPIData }) {
+  return (
+    <ResponsiveChartWrapper aspectRatio={0.4} minHeight={250}>
+      {({ width, height }) => (
+        <KpiLineChartInner data={data} width={width} height={height} />
+      )}
+    </ResponsiveChartWrapper>
+  );
+}
+
+function KpiLineChartInner({ 
+  data, 
+  width, 
+  height 
+}: { 
+  data: TransformedKPIData;
+  width: number;
+  height: number;
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
@@ -60,8 +79,8 @@ export default function KpiLineChart({ data }: { data: TransformedKPIData }) {
     d3.select(svgRef.current).selectAll('*').remove();
 
     const margin = { top: 40, right: 40, bottom: 60, left: 60 };
-    const adjustedWidth = 800 - margin.left - margin.right;
-    const adjustedHeight = 400 - margin.top - margin.bottom;
+    const adjustedWidth = width - margin.left - margin.right;
+    const adjustedHeight = height - margin.top - margin.bottom;
 
     const svg = d3.select(svgRef.current)
       .attr('width', adjustedWidth + margin.left + margin.right)
@@ -247,7 +266,7 @@ export default function KpiLineChart({ data }: { data: TransformedKPIData }) {
       verticalLine.style('opacity', 0);
     });
 
-  }, [data, selectedCategories, isInitialized]);
+  }, [data, selectedCategories, isInitialized, width, height]);
 
   const colorScale = getColorScale();
 
