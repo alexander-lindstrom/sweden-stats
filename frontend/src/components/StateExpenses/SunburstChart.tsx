@@ -20,6 +20,40 @@ type HierarchyNodeWithCurrent = d3.HierarchyRectangularNode<SunburstNode> & {
     target?: { x0: number; x1: number; y0: number; y1: number };
 };
 
+function truncateLabel(name: string, limit = 12): string {
+  if (name.length < limit) return name;
+
+  const words = name.split(" ");
+  if (words.length === 1) {
+    return name.substring(0, limit - 3) + "...";
+  }
+
+  let result = "";
+  let currentLength = 0;
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const space = i > 0 ? 1 : 0;
+    
+    if (currentLength === 0 && word.length + space > limit) {
+      // Special case: first word is too long, truncate it
+      return word.substring(0, limit - 3) + "...";
+    }
+    
+    if (currentLength + word.length + space <= limit) {
+      result += (space ? " " : "") + word;
+      currentLength += word.length + space;
+    } else {
+      break;
+    }
+  }
+
+  // Remove trailing comma, if any
+  result = result.replace(/,\s*$/, "");
+
+  return result;
+}
+
 const SunburstChart: React.FC<Props> = ({
     data,
     unit,
@@ -144,9 +178,10 @@ const SunburstChartInner: React.FC<Props> = ({
       .join("text")
         .attr("dy", "0.35em")
         .attr("fill", "#333")
+        .style("font-size", "12px")
         .attr("fill-opacity", d => +labelVisible(d.current!))
         .attr("transform", d => labelTransform(d.current!))
-        .text(d => d.data.name.length > 15 ? d.data.name.substring(0,12)+"..." : d.data.name);
+        .text(d => truncateLabel(d.data.name))
 
     // --- Add the Center Circle for Zooming Out ---
     const parent = g.append("circle")
