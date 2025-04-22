@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import YearSlider from './YearSlider';
 import ResponsiveChartWrapper from '../charts/ResponsiveChartWrapper';
 
 export type SunburstNode = {
@@ -10,8 +9,7 @@ export type SunburstNode = {
 };
 
 type Props = {
-  dataByYear: Record<string, SunburstNode>;
-  title: string;
+  data: SunburstNode;
   unit: string;
   width?: number;
   height?: number;
@@ -23,16 +21,14 @@ type HierarchyNodeWithCurrent = d3.HierarchyRectangularNode<SunburstNode> & {
 };
 
 const SunburstChart: React.FC<Props> = ({
-    dataByYear,
-    title,
+    data,
     unit,
 }) => {
   return (
     <ResponsiveChartWrapper aspectRatio={1} minHeight={400}>
       {({ width, height }) => (
         <SunburstChartInner
-          dataByYear={dataByYear}
-          title={title}
+          data={data}
           unit={unit}
           width={width}
           height={height}
@@ -43,35 +39,21 @@ const SunburstChart: React.FC<Props> = ({
 };
 
 const SunburstChartInner: React.FC<Props> = ({
-    dataByYear,
-    title,
+    data,
     unit,
     width = 600,
     height = 600
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const years = Object.keys(dataByYear).sort();
-  const [selectedYear, setSelectedYear] = useState<string>(years[0] || '');
-
+  
   useEffect(() => {
-    if (!svgRef.current || !dataByYear[selectedYear]) {
-        // Clear previous chart if data is missing for the selected year
-        if (svgRef.current) {
-             d3.select(svgRef.current).selectAll("*").remove();
-        }
-        return;
-    }
-
-    const data = dataByYear[selectedYear];
     const radius = width / 6;
 
     // Clear previous SVG contents
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();
 
-
-    // Create the color scale.
     const color = d3.scaleOrdinal(d3.quantize(d3.interpolateRainbow, (data.children || []).length + 1));
 
     // Compute the layout.
@@ -232,27 +214,10 @@ const SunburstChartInner: React.FC<Props> = ({
           .attrTween("transform", d => () => labelTransform((d as HierarchyNodeWithCurrent).current!));
     }
 
-  }, [dataByYear, selectedYear, width, height]);
-
-
-  if (years.length === 0) {
-    return <div>{title} - No data available.</div>;
-  }
-   if (!dataByYear[selectedYear]) {
-       return (
-           <div>
-               <h2>{title}</h2>
-               <YearSlider years={years} selectedYear={selectedYear} onYearChange={setSelectedYear} />
-               <div>No data available for year {selectedYear}.</div>
-               <div ref={tooltipRef}></div>
-           </div>
-       );
-   }
+  }, [width, height, data, unit]);
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', maxWidth: `${width}px`, margin: 'auto' }}>
-      <h2>{title}</h2>
-      <YearSlider years={years} selectedYear={selectedYear} onYearChange={setSelectedYear} />
       <svg 
         ref={svgRef} 
         viewBox={`0 0 ${width} ${height}`}
