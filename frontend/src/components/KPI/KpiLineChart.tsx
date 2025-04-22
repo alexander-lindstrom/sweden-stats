@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { TransformedKPIData } from './KpiTypes';
-import ResponsiveChartWrapper from '../charts/ResponseChartWrapper';
+import ResponsiveChartWrapper from '../charts/ResponsiveChartWrapper';
 
 export default function KpiLineChart({ data }: { data: TransformedKPIData }) {
   return (
@@ -164,7 +164,7 @@ function KpiLineChartInner({
         .attr('class', `line-${category.categoryCode}`)
         .attr('fill', 'none')
         .attr('stroke', colorScale(category.categoryCode) as string)
-        .attr('stroke-width', 2)
+        .attr('stroke-width', 3)
         .attr('d', line(timePointsWithDates));
     });
 

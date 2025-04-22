@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import YearSlider from './YearSlider';
-import ResponsiveChartWrapper from '../charts/ResponseChartWrapper';
+import ResponsiveChartWrapper from '../charts/ResponsiveChartWrapper';
 
 export type SunburstNode = {
   name: string;
@@ -26,8 +26,6 @@ const SunburstChart: React.FC<Props> = ({
     dataByYear,
     title,
     unit,
-    width: _width,
-    height: _height
 }) => {
   return (
     <ResponsiveChartWrapper aspectRatio={1} minHeight={400}>
@@ -48,8 +46,8 @@ const SunburstChartInner: React.FC<Props> = ({
     dataByYear,
     title,
     unit,
-    width,
-    height
+    width = 600,
+    height = 600
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
