@@ -71,6 +71,10 @@ export default function StateExpenses() {
           </div>
         )}
       </div>
+      <div>Källa: ESV</div>
+        <div>
+          Uppdaterad: 2025
+        </div>
     </div>
   );
 }

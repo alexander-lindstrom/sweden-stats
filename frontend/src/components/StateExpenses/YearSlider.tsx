@@ -4,9 +4,15 @@ type YearSliderProps = {
   years: string[];
   selectedYear: string;
   onYearChange: (year: string) => void;
+  label?: string;
 };
 
-const YearSlider: React.FC<YearSliderProps> = ({ years, selectedYear, onYearChange }) => {
+const YearSlider: React.FC<YearSliderProps> = ({ 
+  years, 
+  selectedYear, 
+  onYearChange, 
+  label 
+}) => {
   if (!years || years.length === 0) {
     return <div>No year data available.</div>;
   }
@@ -24,7 +30,11 @@ const YearSlider: React.FC<YearSliderProps> = ({ years, selectedYear, onYearChan
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }}>
-      <label htmlFor="year-slider">År: {selectedYear}</label>
+      {label && (
+        <label htmlFor="year-slider">
+          {label}: {selectedYear}
+        </label>
+      )}
       <input
         type="range"
         id="year-slider"

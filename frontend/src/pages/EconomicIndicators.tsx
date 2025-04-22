@@ -7,7 +7,7 @@ import Kpi from "@/components/Kpi/Kpi";
 const tabs = [
   { id: "kpi", label: "KPI" },
   { id: "state_expenses", label: "Statens utgifter" },
-  { id: "placeholder2", label: "Placeholder Tab 2" },
+  { id: "state_income", label: "Statens inkomster" },
 ];
 
 export default function EconomicIndicators() {
@@ -49,7 +49,7 @@ export default function EconomicIndicators() {
 
               {activeTab === "placeholder2" && (
                 <div className="h-full flex items-center justify-center text-gray-500 text-lg">
-                  Placeholder content for Tab 2
+                  Statens inkomster
                 </div>
               )}
             </CardContent>
