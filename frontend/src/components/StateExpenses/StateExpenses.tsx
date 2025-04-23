@@ -63,7 +63,7 @@ export default function StateExpenses() {
         {currentExpensesData ? (
           <SunburstChart 
             data={currentExpensesData} 
-            unit="miljoner SEK"
+            unit="mnkr"
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">

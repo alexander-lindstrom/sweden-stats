@@ -54,6 +54,18 @@ function truncateLabel(name: string, limit = 12): string {
   return result;
 }
 
+function sumSecondOrderChildrenValues(root: SunburstNode): number {
+  if (!root.children) return 0;
+
+  return root.children.reduce((sum, child) => {
+    const grandchildren = child.children ?? [];
+    const grandchildrenSum = grandchildren.reduce((subSum, grandchild) => {
+      return subSum + (grandchild.value ?? 0);
+    }, 0);
+    return sum + grandchildrenSum;
+  }, 0);
+}
+
 const SunburstChart: React.FC<Props> = ({
     data,
     unit,
@@ -80,6 +92,7 @@ const SunburstChartInner: React.FC<Props> = ({
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const totalExpenses = sumSecondOrderChildrenValues(data);
   
   useEffect(() => {
     const radius = width / 6;
@@ -133,7 +146,9 @@ const SunburstChartInner: React.FC<Props> = ({
         // Remove the root (last in the ancestors list before reversing)
         const pathString = d.ancestors().slice(0, -1).reverse().map(anc => anc.data.name).join(" / ");
     
-        const valueString = d.value ? `${format(d.value)} ${unit}` : `N/A`;
+        const valueString = d.value
+          ? `${format(d.value)} ${unit} / ${((d.value / totalExpenses) * 100).toFixed(1)}%`
+          : `N/A`;
     
         tooltip.html(`${pathString}<br>${valueString}`)
                .style("left", (event.pageX + 15) + "px")

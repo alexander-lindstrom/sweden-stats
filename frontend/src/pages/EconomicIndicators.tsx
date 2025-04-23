@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import StateExpenses from "@/components/StateExpenses/StateExpenses";
 import Kpi from "@/components/Kpi/Kpi";
+import BackButton from "@/components/BackButton";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
@@ -16,21 +17,28 @@ export default function EconomicIndicators() {
   return (
     <main className="flex h-screen">
       <aside className="w-64 bg-gray-100 p-6 border-r">
-        <h1 className="text-2xl font-bold mb-6">Ekonomi</h1>
-        <nav className="space-y-2">
-          {tabs.map(tab => (
-            <Button
-              key={tab.id}
-              variant={activeTab === tab.id ? "default" : "ghost"}
-              className="w-full justify-start"
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-            </Button>
+        <div className="mb-6">
+          <BackButton to="/" label="Home" />
+          <h1 className="text-2xl font-bold mt-4">Ekonomi</h1>
+        </div>
+        <nav>
+          {tabs.map((tab, index) => (
+            <div key={tab.id}>
+              <Button
+                variant={activeTab === tab.id ? "default" : "ghost"}
+                className="w-full justify-start"
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </Button>
+              {index < tabs.length - 1 && (
+                <div className="h-px bg-gray-200 my-2" />
+              )}
+            </div>
           ))}
         </nav>
       </aside>
-
+  
       <section className="flex-1 p-8 overflow-y-auto">
         <div className="h-full">
           <Card className="h-full">
@@ -40,14 +48,14 @@ export default function EconomicIndicators() {
                   <Kpi />
                 </div>
               )}
-
+  
               {activeTab === "state_expenses" && (
                 <div className="h-full">
                   <StateExpenses />
                 </div>
               )}
-
-              {activeTab === "placeholder2" && (
+  
+              {activeTab === "state_income" && (
                 <div className="h-full flex items-center justify-center text-gray-500 text-lg">
                   Statens inkomster
                 </div>
