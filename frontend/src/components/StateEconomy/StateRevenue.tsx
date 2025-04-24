@@ -64,6 +64,7 @@ export default function StateRevenues() {
           <SunburstChart 
             data={currentRevenuesData} 
             unit="mnkr"
+            maxChildren={3}
           />
         ) : (
           <div className="flex items-center justify-center h-full text-gray-500">

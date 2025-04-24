@@ -50,7 +50,6 @@ def make_revenue_sunburst_structure(csv_path):
 
     return sunburst_per_year
 
-# Example usage:
 output = make_revenue_sunburst_structure("data/esv/inkomster_2006_2024.csv")
 with open("revenues_by_year.json", "w", encoding="utf-8") as out:
     json.dump(output, out, ensure_ascii=False, indent=2)

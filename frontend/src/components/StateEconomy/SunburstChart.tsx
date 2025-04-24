@@ -11,6 +11,7 @@ export type SunburstNode = {
 type Props = {
   data: SunburstNode;
   unit: string;
+  maxChildren: number;
   width?: number;
   height?: number;
 };
@@ -54,21 +55,10 @@ function truncateLabel(name: string, limit = 12): string {
   return result;
 }
 
-function sumSecondOrderChildrenValues(root: SunburstNode): number {
-  if (!root.children) return 0;
-
-  return root.children.reduce((sum, child) => {
-    const grandchildren = child.children ?? [];
-    const grandchildrenSum = grandchildren.reduce((subSum, grandchild) => {
-      return subSum + (grandchild.value ?? 0);
-    }, 0);
-    return sum + grandchildrenSum;
-  }, 0);
-}
-
 const SunburstChart: React.FC<Props> = ({
     data,
     unit,
+    maxChildren,
 }) => {
   return (
     <ResponsiveChartWrapper aspectRatio={1} minHeight={400}>
@@ -76,6 +66,7 @@ const SunburstChart: React.FC<Props> = ({
         <SunburstChartInner
           data={data}
           unit={unit}
+          maxChildren={maxChildren}
           width={width}
           height={height}
         />
@@ -87,15 +78,15 @@ const SunburstChart: React.FC<Props> = ({
 const SunburstChartInner: React.FC<Props> = ({
     data,
     unit,
+    maxChildren = 2,
     width = 600,
     height = 600
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const totalExpenses = sumSecondOrderChildrenValues(data);
   
   useEffect(() => {
-    const radius = width / 6;
+    const radius = width / (maxChildren * 3);
 
     // Clear previous SVG contents
     const svg = d3.select(svgRef.current);
@@ -113,6 +104,8 @@ const SunburstChartInner: React.FC<Props> = ({
     root.each(d => {
         (d as HierarchyNodeWithCurrent).current = d;
     });
+
+    const totalValue = root.value as number;
 
     // Create the arc generator.
     const arc = d3.arc<HierarchyNodeWithCurrent>()
@@ -147,7 +140,7 @@ const SunburstChartInner: React.FC<Props> = ({
         const pathString = d.ancestors().slice(0, -1).reverse().map(anc => anc.data.name).join(" / ");
     
         const valueString = d.value
-          ? `${format(d.value)} ${unit} / ${((d.value / totalExpenses) * 100).toFixed(1)}%`
+          ? `${format(d.value)} ${unit} / ${((d.value / totalValue) * 100).toFixed(1)}%`
           : `N/A`;
     
         tooltip.html(`${pathString}<br>${valueString}`)
@@ -207,12 +200,14 @@ const SunburstChartInner: React.FC<Props> = ({
         .style("cursor", "pointer")
         .on("click", (event, p) => clicked(event, p as HierarchyNodeWithCurrent));
 
-    function arcVisible(d: { y0: number; y1: number; x0: number; x1: number; }): boolean {
-      return d.y1 <= radius && d.y0 >= 0 && d.x1 > d.x0;
+    function arcVisible(d: { x0: number; x1: number; }): boolean {
+      return d.x1 > d.x0;
     }
 
     function labelVisible(d: { y0: number; y1: number; x0: number; x1: number; }): boolean {
-      return d.y1 <= 3 && d.y0 >= 1 && (d.y1 - d.y0) * (d.x1 - d.x0) > 0.03;
+      const angleWidth = d.x1 - d.x0;
+      const radiusHeight = d.y1 - d.y0;
+      return (radiusHeight * angleWidth) > 0.03;
     }
 
     function labelTransform(d: { x0: number; x1: number; y0: number; y1: number; }): string {
@@ -264,7 +259,7 @@ const SunburstChartInner: React.FC<Props> = ({
           .attrTween("transform", d => () => labelTransform((d as HierarchyNodeWithCurrent).current!));
     }
 
-  }, [width, height, data, unit]);
+  }, [width, height, data, unit, maxChildren]);
 
   return (
     <div style={{ fontFamily: 'sans-serif', width: '100%', maxWidth: `${width}px`, margin: 'auto' }}>
