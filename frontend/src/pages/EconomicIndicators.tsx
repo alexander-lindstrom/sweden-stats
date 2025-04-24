@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import StateExpenses from "@/components/StateExpenses/StateExpenses";
+import StateExpenses from "@/components/StateEconomy/StateExpenses";
 import Kpi from "@/components/Kpi/Kpi";
 import BackButton from "@/components/BackButton";
+import StateRevenues from "@/components/StateEconomy/StateRevenue";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
   { id: "state_expenses", label: "Statens utgifter" },
-  { id: "state_income", label: "Statens inkomster" },
+  { id: "state_revenue", label: "Statens inkomster" },
 ];
 
 export default function EconomicIndicators() {
@@ -55,9 +56,9 @@ export default function EconomicIndicators() {
                 </div>
               )}
   
-              {activeTab === "state_income" && (
-                <div className="h-full flex items-center justify-center text-gray-500 text-lg">
-                  Statens inkomster
+              {activeTab === "state_revenue" && (
+                <div className="h-full">
+                  <StateRevenues />
                 </div>
               )}
             </CardContent>
