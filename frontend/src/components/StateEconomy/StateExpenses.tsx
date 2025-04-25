@@ -47,7 +47,7 @@ export default function StateExpenses() {
           style={{ fontFamily: 'sans-serif' }}
           className="text-xl font-semibold mb-2 text-left"
         >
-          Statens Utgifter ({selectedYear}) 
+          Statens Utgifter efter kategori ({selectedYear}) 
         </h2> 
         
         <div className="max-w-md"> 

@@ -47,7 +47,7 @@ export default function StateRevenues() {
           style={{ fontFamily: 'sans-serif' }}
           className="text-xl font-semibold mb-2 text-left"
         >
-          Statens Inkomster ({selectedYear})
+          Statens Inkomster efter kategori ({selectedYear})
         </h2> 
         
         <div className="max-w-md"> 
@@ -73,6 +73,7 @@ export default function StateRevenues() {
         )}
       </div>
       <div>Källa: ESV</div>
+      <div>Kommentar: Avgifter och dylikt i grått</div>
       <div>Uppdaterad: 2025</div>
     </div>
   );

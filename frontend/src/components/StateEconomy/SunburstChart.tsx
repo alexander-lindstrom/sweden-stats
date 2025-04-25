@@ -19,6 +19,8 @@ type Props = {
 type HierarchyNodeWithCurrent = d3.HierarchyRectangularNode<SunburstNode> & {
     current?: d3.HierarchyRectangularNode<SunburstNode>;
     target?: { x0: number; x1: number; y0: number; y1: number };
+    isNegativeOnly?: boolean;
+    signedValue?: number;
 };
 
 function truncateLabel(name: string, limit = 12): string {
@@ -100,6 +102,28 @@ const SunburstChartInner: React.FC<Props> = ({
           .sum(d => Math.abs(d.value ?? 0))
           .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
+      hierarchy.eachAfter(node => {
+          const extendedNode = node as HierarchyNodeWithCurrent;
+          if (extendedNode.children && extendedNode.children.length > 0) {
+              // Parent node: Check children
+              let allChildrenNegativeOrZero = true;
+              let hasContributingChildren = false;
+
+              for (const child of extendedNode.children as HierarchyNodeWithCurrent[]) {
+                  if (child.value && child.value > 1e-6) {
+                       hasContributingChildren = true;
+                       if (!child.isNegativeOnly) {
+                           allChildrenNegativeOrZero = false;
+                           break;
+                       }
+                  }
+              }
+              extendedNode.isNegativeOnly = hasContributingChildren && allChildrenNegativeOrZero;
+          } else {
+              extendedNode.isNegativeOnly = (extendedNode.data.value !== undefined && extendedNode.data.value < 0);
+          }
+      });
+
       const root = d3.partition<SunburstNode>()
           .size([2 * Math.PI, hierarchy.height + 1])(hierarchy) as HierarchyNodeWithCurrent;
 
@@ -134,18 +158,14 @@ const SunburstChartInner: React.FC<Props> = ({
 
       const mouseover = (event: MouseEvent, d: HierarchyNodeWithCurrent) => {
           tooltip.transition().duration(200).style("opacity", 0.9);
-
           const pathString = d.ancestors().slice(0, -1).reverse().map(anc => anc.data.name).join(" / ");
-
           const originalValue = d.data.value;
           const displayValue = originalValue !== undefined
               ? `${format(originalValue)} ${unit}`
               : `${format(d.value ?? 0)} ${unit}`;
-
           const percentageString = (d.value && totalValue)
-              ? ` (${((d.value / totalValue) * 100).toFixed(1)}% of total)`
+              ? ` (${((d.value / totalValue) * 100).toFixed(1)}% av total)`
               : '';
-
           tooltip.html(`${pathString}<br>${displayValue}${percentageString}`)
                  .style("left", (event.pageX + 15) + "px")
                  .style("top", (event.pageY - 10) + "px");
@@ -165,12 +185,13 @@ const SunburstChartInner: React.FC<Props> = ({
           .data(root.descendants().slice(1))
           .join("path")
           .attr("fill", d => {
-              if (d.data.value !== undefined && d.data.value < 0) {
-                  return grayColor; // Use gray for negative leaves
+              const node = d as HierarchyNodeWithCurrent;
+              if (node.isNegativeOnly) {
+                  return grayColor;
               }
-              let ancestor = d;
+              let ancestor = node;
               while (ancestor.depth > 1 && ancestor.parent) {
-                  ancestor = ancestor.parent;
+                  ancestor = ancestor.parent as HierarchyNodeWithCurrent;
               }
               return color(ancestor.data.name);
           })
@@ -208,11 +229,12 @@ const SunburstChartInner: React.FC<Props> = ({
           .on("click", (event, p) => clicked(event, p as HierarchyNodeWithCurrent));
 
        g.append("text")
-          .attr("text-anchor", "middle")
-          .attr("dy", "0.35em")
-          .attr("fill", "#666")
-          .style("font-size", "11px")
-          .attr("pointer-events", "none");
+           .datum(root)
+           .attr("text-anchor", "middle")
+           .attr("dy", "0.35em")
+           .attr("fill", "#666")
+           .style("font-size", "11px")
+           .attr("pointer-events", "none");
 
 
       function arcVisible(d: { x0: number; x1: number; }): boolean {
@@ -236,7 +258,6 @@ const SunburstChartInner: React.FC<Props> = ({
 
       function clicked(_event: MouseEvent, p: HierarchyNodeWithCurrent) {
           parent.datum(p.parent || root);
-
 
           root.each((d) => {
               const node = d as HierarchyNodeWithCurrent;
