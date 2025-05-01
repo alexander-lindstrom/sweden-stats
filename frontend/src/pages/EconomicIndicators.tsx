@@ -5,11 +5,13 @@ import StateExpenses from "@/components/StateEconomy/StateExpenses";
 import Kpi from "@/components/Kpi/Kpi";
 import BackButton from "@/components/BackButton";
 import StateRevenues from "@/components/StateEconomy/StateRevenue";
+import { DashboardComponent } from "@/components/StateEconomy/StateExpenses2";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
   { id: "state_expenses", label: "Statens utgifter" },
   { id: "state_revenue", label: "Statens inkomster" },
+  { id: "state_expenses_2", label: "Statens inkomster" },
 ];
 
 export default function EconomicIndicators() {
@@ -59,6 +61,12 @@ export default function EconomicIndicators() {
               {activeTab === "state_revenue" && (
                 <div className="h-full">
                   <StateRevenues />
+                </div>
+              )}
+
+              {activeTab === "state_expenses_2" && (
+                <div className="h-full">
+                  <DashboardComponent />
                 </div>
               )}
             </CardContent>
