@@ -13,7 +13,6 @@ export const DashboardComponent: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch once on load
   useEffect(() => {
     fetchAllExpenses()
       .then(data => {
@@ -29,17 +28,14 @@ export const DashboardComponent: React.FC = () => {
       });
   }, []);
 
-  // Available years
   const years = useMemo(() => {
     return expensesData ? Object.keys(expensesData).sort((a, b) => parseInt(a) - parseInt(b)) : [];
   }, [expensesData]);
 
-  // Get raw data for selected year
   const fullData = useMemo(() => {
     return selectedYear && expensesData ? expensesData[selectedYear] : null;
   }, [selectedYear, expensesData]);
 
-  // Convert to d3.hierarchy
   const hierarchyData = useMemo(() => {
     if (!fullData) return null;
     return d3.hierarchy(fullData)
@@ -47,45 +43,38 @@ export const DashboardComponent: React.FC = () => {
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   }, [fullData]);
 
-  // Zooming state
   const [currentRootNode, setCurrentRootNode] = useState<HierarchyDataNode | null>(null);
 
-  // Reset zoom when data changes (year changes or initial load)
   useEffect(() => {
     if (hierarchyData) {
       setCurrentRootNode(hierarchyData);
     }
-  }, [hierarchyData]); // Run when the base hierarchy changes
+  }, [hierarchyData]);
 
-  // Color scale based on top-level categories
-  const colorScale = useMemo(() => {
-    // Ensure color scale is based on the *absolute* top level, not the current zoomed level
-    const topLevelNames = hierarchyData?.children?.map(d => d.data.name) || [];
+
+  const levelColorScale = useMemo(() => {
+    const colorRange = d3.schemeTableau10;
+    if (!currentRootNode || !currentRootNode.children) {
+        return d3.scaleOrdinal<string>().range(colorRange);
+    }
+    const currentChildrenNames = currentRootNode.children.map(d => d.data.name);
     return d3.scaleOrdinal<string>()
-      .domain(topLevelNames)
-      .range(d3.schemeCategory10);
-  }, [hierarchyData]); // Depend on the absolute hierarchy
+        .domain(currentChildrenNames)
+        .range(colorRange);
+  }, [currentRootNode]);
 
-  // Handler for zooming via Sunburst click
   const handleSunburstZoom = useCallback((node: HierarchyDataNode | null) => {
-    if (!node) return; // Should not happen with current Sunburst logic, but safe check
-    // If clicking the center node (which represents currentRootNode) and it has a parent, zoom out
-    // Note: The sunburst component itself now handles the logic to find the correct parent node
-    // So we just need to set the node passed from it.
+    if (!node) return;
      setCurrentRootNode(node);
      
-  }, []); // setCurrentRootNode is stable
+  }, []);
 
-  // --- ADDED: Handler for zooming via Bar Chart click ---
   const handleBarClick = useCallback((node: HierarchyDataNode) => {
-    // Bar chart click always means zooming *in*
     setCurrentRootNode(node);
-  }, []); // setCurrentRootNode is stable
-  // --- END ADDED ---
+  }, []);
 
 
   const barChartData = useMemo(() => {
-    // Always show children of the current root node
     return currentRootNode?.children || [];
   }, [currentRootNode]);
 
@@ -93,7 +82,6 @@ export const DashboardComponent: React.FC = () => {
     return <div className="text-red-500 p-4">{error}</div>;
   }
 
-  // Ensure currentRootNode is set before rendering charts
   if (!expensesData || !selectedYear || !hierarchyData || !currentRootNode) {
     return <div className="p-4">Loading...</div>;
   }
@@ -112,13 +100,10 @@ export const DashboardComponent: React.FC = () => {
       </div>
 
       <div className="chart-wrapper sunburst-wrapper">
-         {/* Pass the correct absolute root */}
         <h3>Sunburst View ({currentRootNode.data.name})</h3>
-         {/* Only show Reset Zoom if not already at the top level */}
         {currentRootNode !== hierarchyData && (
            <button onClick={() => setCurrentRootNode(hierarchyData)}>Reset Zoom</button>
          )}
-         {/* Only show Zoom Out if there's a parent */}
          {currentRootNode.parent && (
            <button onClick={() => currentRootNode.parent && setCurrentRootNode(currentRootNode.parent)}>
              Zoom Out
@@ -126,11 +111,11 @@ export const DashboardComponent: React.FC = () => {
          )}
         <SunburstChart
           rootNode={currentRootNode}
-          hierarchyData={hierarchyData} // Pass the absolute root for color/path finding
-          colorScale={colorScale}
+          hierarchyData={hierarchyData}
+          levelColorScale={levelColorScale}
           width={400}
           height={400}
-          onArcClick={handleSunburstZoom} // Use the specific sunburst handler
+          onArcClick={handleSunburstZoom}
         />
       </div>
 
@@ -138,10 +123,10 @@ export const DashboardComponent: React.FC = () => {
         <h3>Breakdown for {currentRootNode.data.name}</h3>
         <BarChart
           data={barChartData}
-          colorScale={colorScale}
+          levelColorScale={levelColorScale}
           width={500}
           height={400}
-          onBarClick={handleBarClick} // <-- ADDED: Pass the handler
+          onBarClick={handleBarClick}
         />
       </div>
 
