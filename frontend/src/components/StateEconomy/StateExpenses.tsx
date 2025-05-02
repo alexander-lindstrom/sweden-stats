@@ -2,9 +2,9 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import * as d3 from 'd3';
 
 import './css/StateExpenses.css';
-import { DataNode, HierarchyDataNode } from '../charts/SunburstWithBar/types';
-import { BarChart } from '../charts/SunburstWithBar/Bar';
-import { SunburstChart } from '../charts/SunburstWithBar/Sunburst';
+import { DataNode, HierarchyDataNode } from '../charts/sunBurstWithBar/types';
+import { BarChart } from '../charts/sunBurstWithBar/Bar';
+import { SunburstChart } from '../charts/sunBurstWithBar/Sunburst';
 import { fetchAllExpenses } from '@/api/StateExpensesApi';
 import YearSlider from './YearSlider';
 
@@ -50,31 +50,42 @@ export const DashboardComponent: React.FC = () => {
   // Zooming state
   const [currentRootNode, setCurrentRootNode] = useState<HierarchyDataNode | null>(null);
 
-  // Reset zoom when data changes
+  // Reset zoom when data changes (year changes or initial load)
   useEffect(() => {
     if (hierarchyData) {
       setCurrentRootNode(hierarchyData);
     }
-  }, [hierarchyData]);
+  }, [hierarchyData]); // Run when the base hierarchy changes
 
   // Color scale based on top-level categories
   const colorScale = useMemo(() => {
+    // Ensure color scale is based on the *absolute* top level, not the current zoomed level
     const topLevelNames = hierarchyData?.children?.map(d => d.data.name) || [];
     return d3.scaleOrdinal<string>()
       .domain(topLevelNames)
       .range(d3.schemeCategory10);
-  }, [hierarchyData]);
+  }, [hierarchyData]); // Depend on the absolute hierarchy
 
-  const handleZoom = useCallback((node: HierarchyDataNode | null) => {
-    if (!node || !hierarchyData) return;
-    if (node !== currentRootNode) {
-      setCurrentRootNode(node);
-    } else if (node === currentRootNode && node.parent) {
-      setCurrentRootNode(node.parent);
-    }
-  }, [currentRootNode, hierarchyData]);
+  // Handler for zooming via Sunburst click
+  const handleSunburstZoom = useCallback((node: HierarchyDataNode | null) => {
+    if (!node) return; // Should not happen with current Sunburst logic, but safe check
+    // If clicking the center node (which represents currentRootNode) and it has a parent, zoom out
+    // Note: The sunburst component itself now handles the logic to find the correct parent node
+    // So we just need to set the node passed from it.
+     setCurrentRootNode(node);
+     
+  }, []); // setCurrentRootNode is stable
+
+  // --- ADDED: Handler for zooming via Bar Chart click ---
+  const handleBarClick = useCallback((node: HierarchyDataNode) => {
+    // Bar chart click always means zooming *in*
+    setCurrentRootNode(node);
+  }, []); // setCurrentRootNode is stable
+  // --- END ADDED ---
+
 
   const barChartData = useMemo(() => {
+    // Always show children of the current root node
     return currentRootNode?.children || [];
   }, [currentRootNode]);
 
@@ -82,6 +93,7 @@ export const DashboardComponent: React.FC = () => {
     return <div className="text-red-500 p-4">{error}</div>;
   }
 
+  // Ensure currentRootNode is set before rendering charts
   if (!expensesData || !selectedYear || !hierarchyData || !currentRootNode) {
     return <div className="p-4">Loading...</div>;
   }
@@ -91,29 +103,34 @@ export const DashboardComponent: React.FC = () => {
       <div className="controls">
         <h2>Statens utgifter per kategori ({selectedYear})</h2>
         <div className="year-slider">
-          <YearSlider 
-            years={years} 
-            selectedYear={selectedYear} 
-            onYearChange={setSelectedYear} 
+          <YearSlider
+            years={years}
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
           />
         </div>
       </div>
 
       <div className="chart-wrapper sunburst-wrapper">
+         {/* Pass the correct absolute root */}
         <h3>Sunburst View ({currentRootNode.data.name})</h3>
+         {/* Only show Reset Zoom if not already at the top level */}
         {currentRootNode !== hierarchyData && (
-          <button onClick={() => setCurrentRootNode(hierarchyData)}>Reset Zoom</button>
-        )}
-        <button onClick={() => currentRootNode.parent && handleZoom(currentRootNode.parent)}>
-          Zoom Out
-        </button>
+           <button onClick={() => setCurrentRootNode(hierarchyData)}>Reset Zoom</button>
+         )}
+         {/* Only show Zoom Out if there's a parent */}
+         {currentRootNode.parent && (
+           <button onClick={() => currentRootNode.parent && setCurrentRootNode(currentRootNode.parent)}>
+             Zoom Out
+           </button>
+         )}
         <SunburstChart
           rootNode={currentRootNode}
-          hierarchyData={hierarchyData}
+          hierarchyData={hierarchyData} // Pass the absolute root for color/path finding
           colorScale={colorScale}
           width={400}
           height={400}
-          onArcClick={handleZoom}
+          onArcClick={handleSunburstZoom} // Use the specific sunburst handler
         />
       </div>
 
@@ -124,6 +141,7 @@ export const DashboardComponent: React.FC = () => {
           colorScale={colorScale}
           width={500}
           height={400}
+          onBarClick={handleBarClick} // <-- ADDED: Pass the handler
         />
       </div>
 

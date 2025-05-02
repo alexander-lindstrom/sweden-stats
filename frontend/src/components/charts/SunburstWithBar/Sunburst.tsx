@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 
 import '../../StateEconomy/css/Tooltip.css';
 import { DataNode, HierarchyDataNode } from './types';
+import { hideTooltip, setupTooltip, showTooltip } from '../util/Tooltip';
 
 interface SunburstChartProps {
     rootNode: HierarchyDataNode;
@@ -12,31 +13,6 @@ interface SunburstChartProps {
     height: number;
     onArcClick: (node: HierarchyDataNode) => void;
   }
-
-// Simple Tooltip State (could be more complex)
-let tooltipDiv: HTMLDivElement | null = null;
-
-const setupTooltip = () => {
-    if (!tooltipDiv) {
-        tooltipDiv = document.createElement('div');
-        tooltipDiv.className = 'chart-tooltip';
-        document.body.appendChild(tooltipDiv);
-    }
-};
-
-const showTooltip = (event: MouseEvent, content: string) => {
-    if (!tooltipDiv) return;
-    tooltipDiv.style.opacity = '1';
-    tooltipDiv.style.left = `${event.pageX + 10}px`;
-    tooltipDiv.style.top = `${event.pageY + 10}px`;
-    tooltipDiv.innerHTML = content;
-};
-
-const hideTooltip = () => {
-    if (!tooltipDiv) return;
-    tooltipDiv.style.opacity = '0';
-};
-
 
 export const SunburstChart: React.FC<SunburstChartProps> = ({
     rootNode,
