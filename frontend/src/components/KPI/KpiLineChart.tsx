@@ -26,7 +26,6 @@ function KpiLineChartInner({
   const tooltipRef = useRef<HTMLDivElement>(null);
   const [selectedCategories, setSelectedCategories] = useState<Record<string, boolean>>({});
   const [isInitialized, setIsInitialized] = useState(false);
-  console.log("ads")
 
   // Initialize selected categories on first render
   useEffect(() => {

@@ -64,10 +64,10 @@ export default function Kpi() {
       {loading && <p>Loading data...</p>}
       {error && <p className="error-message">{error}</p>}
       
-      <div className="chart-container">
+      <div className="chart-wrapper">
         {data && transformedData && (
           <KpiLineChart
-          data={transformedData}
+            data={transformedData}
           />
         )}
       </div>
