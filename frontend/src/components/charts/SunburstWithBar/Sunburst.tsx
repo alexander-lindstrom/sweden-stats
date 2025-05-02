@@ -36,7 +36,8 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .attr("transform", `translate(${width / 2},${height / 2})`);
 
     const resetHierarchy = d3.hierarchy(rootNode.data)
-      .sum(d => Math.abs(d.value || 0));
+      .sum(d => Math.abs(d.value || 0))
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
 
     const partition = d3.partition<DataNode>()
       .size([2 * Math.PI, radius]);
