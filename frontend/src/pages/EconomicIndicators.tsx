@@ -2,8 +2,8 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import BackButton from "@/components/BackButton";
-import { DashboardComponent } from "@/components/StateEconomy/StateExpenses2";
-import Kpi from "@/components/Kpi/KPI";
+import { DashboardComponent } from "@/components/StateEconomy/StateExpenses";
+import Kpi from "@/components/Kpi/Kpi";
 
 const tabs = [
   { id: "kpi", label: "KPI" },
