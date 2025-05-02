@@ -28,12 +28,17 @@ export default function EconomicIndicators() {
           {tabs.map((tab, index) => (
             <div key={tab.id}>
               <Button
-                variant={activeTab === tab.id ? "default" : "ghost"}
-                className="w-full justify-start"
+                variant="ghost"
+                className={`w-full justify-start text-left ${
+                  activeTab === tab.id
+                    ? "bg-blue-100 text-blue-800 font-semibold border-l-4 border-blue-500"
+                    : "text-gray-800"
+                }`}
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}
-              </Button>
+            </Button>
+
               {index < tabs.length - 1 && (
                 <div className="h-px bg-gray-200 my-2" />
               )}

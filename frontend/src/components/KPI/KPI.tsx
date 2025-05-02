@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import Chart from "./KpiLineChart";
 
 import { fetchScbData } from "@/api/ScbApi";
 import { transformKPIData } from "./Util";
 import { KPIApiResponse, TransformedKPIData } from "./KpiTypes";
+import KpiLineChart from "./KpiLineChart";
 
 const body = {
   query: [
@@ -36,6 +36,8 @@ export default function Kpi() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  console.log(data, transformedData)
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -64,8 +66,8 @@ export default function Kpi() {
       
       <div className="chart-container">
         {data && transformedData && (
-          <Chart 
-            data={transformedData}
+          <KpiLineChart
+          data={transformedData}
           />
         )}
       </div>

@@ -40,134 +40,147 @@ const hideTooltip = () => {
 
 export const SunburstChart: React.FC<SunburstChartProps> = ({
     rootNode,
-    hierarchyData, // <-- DESTRUCTURE PROP
+    hierarchyData,
     colorScale,
     width,
     height,
     onArcClick,
   }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const radius = Math.min(width, height) / 2 * 0.9; // Adjust radius calculation as needed
-
-  console.log(hierarchyData, rootNode)
-
-  // Function to get a consistent color based on top-level ancestor
-  const getColor = (d: HierarchyDataNode): string => {
+    const svgRef = useRef<SVGSVGElement>(null);
+    const radius = Math.min(width, height) / 2 * 0.9;
+  
+    // Function to get a consistent color based on top-level ancestor
+    const getColor = (d: HierarchyDataNode): string => {
       let current: HierarchyDataNode | null = d;
-      while (current?.parent && current.parent !== rootNode.parent) { // Go up until top level under root's parent
-           if(current.parent === hierarchyData) break; // Stop if we reach the absolute root if needed
-           current = current.parent;
-           if (!current?.parent) break; // Stop if we hit the very top
+      while (current?.parent && current.parent !== rootNode.parent) {
+        if (current.parent === hierarchyData) break;
+        current = current.parent;
+        if (!current?.parent) break;
       }
-       // If the node *is* a child of the absolute root, use its name directly
       if (d.parent === hierarchyData) {
-         return colorScale(d.data.name);
+        return colorScale(d.data.name);
       }
-      // Otherwise, use the ancestor's name found above
-      return colorScale(current?.data.name || d.data.name); // Fallback to own name
-  };
-
-
-  useEffect(() => {
+      return colorScale(current?.data.name || d.data.name);
+    };
+  
+    useEffect(() => {
       setupTooltip();
       if (!svgRef.current || !rootNode) return;
-
+  
       const svg = d3.select(svgRef.current);
-      svg.selectAll("*").remove(); // Clear previous render
-
+      svg.selectAll("*").remove();
+  
       const g = svg.append("g")
-                   .attr("transform", `translate(${width / 2},${height / 2})`);
-
+        .attr("transform", `translate(${width / 2},${height / 2})`);
+  
+      // Create a copy of the rootNode with reset depth values
+      // This is the key fix - we create a new hierarchy where the focused node becomes depth 0
+      const resetHierarchy = d3.hierarchy(rootNode.data)
+        .sum(d => Math.abs(d.value || 0));
+  
       // Define the partition layout
       const partition = d3.partition<DataNode>()
-                          .size([2 * Math.PI, radius]); // Angle, Radius
-
+        .size([2 * Math.PI, radius]);
+  
+      // Apply the partition layout to our reset hierarchy
+      const partitionedRoot = partition(resetHierarchy);
+  
+      // Find the current center node in the partitioned data
+      const centerData = partitionedRoot;
+  
       // Define the arc generator
-      // Use Math.abs(d.value) for radius/angle if negative values shouldn't shrink segments visually
-      // However, d3.partition uses value for angle, so summing abs value earlier might be better.
       const arc = d3.arc<d3.HierarchyRectangularNode<DataNode>>()
-                    .startAngle(d => d.x0)
-                    .endAngle(d => d.x1)
-                    .innerRadius(d => Math.max(0, d.y0)) // Ensure inner radius isn't negative
-                    .outerRadius(d => Math.max(0, d.y1 - 1)); // Ensure outer radius > inner, -1 for spacing
-
-      // Apply the partition layout
-      const partitionedRoot = partition(rootNode);
-
-       // Select the node corresponding to the current root for the center circle
-       const centerData = partitionedRoot.descendants().find(d => d.data === rootNode.data);
-
-
+        .startAngle(d => d.x0)
+        .endAngle(d => d.x1)
+        .innerRadius(d => Math.max(0, d.y0))
+        .outerRadius(d => Math.max(0, d.y1 - 1));
+  
       // Draw the arcs
       const path = g.append("g")
         .selectAll("path")
-        .data(partitionedRoot.descendants().filter(d => d.depth > 0 || d === partitionedRoot )) // Filter out root if desired, or style it differently
+        .data(partitionedRoot.descendants().filter(d => d.depth > 0 || d === partitionedRoot))
         .join("path")
           .attr("d", arc)
-          .attr("fill", d => getColor(d)) // Use the consistent color function
-          .attr("fill-opacity", d => (d === centerData || !d.children) ? 0.8 : 0.6) // Example: Highlight center/leaves
-          .style("cursor", d => (d.children || d === centerData && d.parent) ? "pointer" : "default") // Pointer cursor for clickable items
+          .attr("fill", d => getColor(d))
+          .attr("fill-opacity", d => (d === centerData || !d.children) ? 0.8 : 0.6)
+          .style("cursor", d => (d.children || d === centerData && d.parent) ? "pointer" : "default")
           .on("click", (event, d) => {
-              event.stopPropagation(); // Prevent triggering clicks on parent elements
-               // If clicked node is the center and has a parent, zoom out
-               if (d === centerData && d.parent) {
-                   onArcClick(d.parent);
-               }
-               // If clicked node has children, zoom in
-               else if (d.children) {
-                  onArcClick(d);
-              }
-              // Do nothing if it's a leaf node (and not the center eligible for zoom out)
+            event.stopPropagation();
+            
+            // Map from the visual node back to the original data structure for proper navigation
+            let targetNode;
+            
+            // Handle "zoom out" when clicking center
+            if (d === centerData && rootNode.parent) {
+              targetNode = rootNode.parent;
+            } 
+            // Handle "zoom in" when clicking on children
+            else if (d.children) {
+              // Find the corresponding node in the original hierarchy
+              targetNode = findNodeByPath(hierarchyData, getNodePath(d, resetHierarchy));
+            }
+            
+            if (targetNode) {
+              onArcClick(targetNode);
+            }
           })
           .on("mouseover", (event, d) => {
-            path.filter(node => node === d).attr("fill-opacity", 1); // Highlight
+            path.filter(node => node === d).attr("fill-opacity", 1);
         
             let valueToShow: number | undefined | null;
             let valueLabel = "Value";
         
-            // For leaf nodes, show the original value from the data
             if (!d.children && d.data.value !== undefined) {
-                valueToShow = d.data.value;
-            }
-            // For parent nodes, d.value is the result of the .sum() operation
-            // Since we summed absolute values, clarify this.
-            else if (d.children) {
-                valueToShow = d.value; // This is the sum of absolute values
-                valueLabel = "Sum of Magnitudes"; // Clarify what the summed value means
-                // Optional: You could recalculate the *actual* signed sum here if needed
-                // const actualSum = d.leaves().reduce((acc, leaf) => acc + (leaf.data.value || 0), 0);
-                // tooltipContent += `<br/>Net Sum: ${actualSum?.toLocaleString()}`;
+              valueToShow = d.data.value;
+            } else if (d.children) {
+              valueToShow = d.value;
+              valueLabel = "Sum of Magnitudes";
             } else {
-                 // Nodes without children AND without d.data.value (purely structural)
-                 valueToShow = d.value; // Might be 0 if summing abs value
-                 valueLabel = "Aggregated Value";
+              valueToShow = d.value;
+              valueLabel = "Aggregated Value";
             }
         
-        
-            const tooltipContent = `<strong><span class="math-inline">${d.data.name}</strong><br/></span>${valueLabel}: ${valueToShow?.toLocaleString() ?? 'N/A'}`;
+            const tooltipContent = `<strong>${d.data.name}</strong><br/>${valueLabel}: ${valueToShow?.toLocaleString() ?? 'N/A'}`;
             showTooltip(event, tooltipContent);
-        })
+          })
           .on("mouseout", (_event, d) => {
-               path.filter(node => node === d).attr("fill-opacity", (node => (node === centerData || !node.children) ? 0.8 : 0.6)); // Restore opacity
-               hideTooltip();
+            path.filter(node => node === d).attr("fill-opacity", (node => (node === centerData || !node.children) ? 0.8 : 0.6));
+            hideTooltip();
           });
-
-       // Add a center circle element explicitly? Could be used for zoom out click.
-       // Could style the center arc (d === centerData) specially instead.
-
-      // Cleanup tooltip on component unmount
+  
       return () => {
-          hideTooltip();
-          // Optional: remove tooltipDiv from body if this is the last chart using it
-          // if (tooltipDiv && !document.querySelector('.chart-tooltip')) {
-          //      tooltipDiv.remove();
-          //      tooltipDiv = null;
-          // }
+        hideTooltip();
       };
-
-  }, [rootNode, width, height, colorScale, onArcClick, radius]); // Dependencies
-
-  return (
-    <svg ref={svgRef} width={width} height={height}></svg>
-  );
-};
+    }, [rootNode, width, height, colorScale, onArcClick, radius, hierarchyData]);
+  
+    // Helper function to get a path from root to node (array of names)
+    const getNodePath = (node: d3.HierarchyRectangularNode<DataNode>, root: d3.HierarchyRectangularNode<DataNode>): string[] => {
+      const path: string[] = [];
+      let current: d3.HierarchyRectangularNode<DataNode> | null = node;
+      
+      while (current && current !== root) {
+        path.unshift(current.data.name);
+        current = current.parent;
+      }
+      
+      return path;
+    };
+    
+    // Helper function to find a node in the original hierarchy by following a path of names
+    const findNodeByPath = (root: HierarchyDataNode, path: string[]): HierarchyDataNode | undefined => {
+      let current: HierarchyDataNode | null = root;
+      
+      for (const name of path) {
+        if (!current || !current.children) return undefined;
+        
+        current = current.children.find(child => child.data.name === name) || null;
+        if (!current) return undefined;
+      }
+      
+      return current;
+    };
+  
+    return (
+      <svg ref={svgRef} width={width} height={height}></svg>
+    );
+  }
