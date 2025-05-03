@@ -1,9 +1,10 @@
 .dashboard-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   grid-template-areas:
       "controls ."
+      "category category"
       "charts-header charts-header"
       "sunburst barchart"
       "source   source";
@@ -14,6 +15,7 @@
 }
 
 .controls { grid-area: controls; text-align: left; }
+.category-section { grid-area: category; }
 .charts-header { 
   grid-area: charts-header; 
   text-align: center;
@@ -119,4 +121,45 @@
 .controls h2 {
   margin-bottom: 6px;
   font-size: 1.3em;
+}
+
+.category-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.zoom-out-button {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  color: #666;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.zoom-out-button:hover:not(.disabled) {
+  background-color: #f0f0f0;
+  color: #333;
+}
+
+.zoom-out-button.disabled {
+  color: #ccc;
+  cursor: not-allowed;
+}
+
+.zoom-out-button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
 }

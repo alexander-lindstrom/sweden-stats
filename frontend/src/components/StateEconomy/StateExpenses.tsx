@@ -51,7 +51,6 @@ export const DashboardComponent: React.FC = () => {
     }
   }, [hierarchyData]);
 
-
   const levelColorScale = useMemo(() => {
     const colorRange = d3.schemeTableau10;
     if (!currentRootNode || !currentRootNode.children) {
@@ -65,14 +64,18 @@ export const DashboardComponent: React.FC = () => {
 
   const handleSunburstZoom = useCallback((node: HierarchyDataNode | null) => {
     if (!node) return;
-     setCurrentRootNode(node);
-     
+    setCurrentRootNode(node);
   }, []);
 
   const handleBarClick = useCallback((node: HierarchyDataNode) => {
     setCurrentRootNode(node);
   }, []);
 
+  const handleZoomOut = useCallback(() => {
+    if (hierarchyData) {
+      setCurrentRootNode(hierarchyData);
+    }
+  }, [hierarchyData]);
 
   const barChartData = useMemo(() => {
     return currentRootNode?.children || [];
@@ -86,48 +89,63 @@ export const DashboardComponent: React.FC = () => {
     return <div className="p-4">Loading...</div>;
   }
 
-return (
-  <div className="dashboard-container">
-
+  return (
+    <div className="dashboard-container">
       <div className="controls">
-          <h2>Statens utgifter per kategori ({selectedYear})</h2>
-          <div className="year-slider">
-              <YearSlider
-                  years={years}
-                  selectedYear={selectedYear}
-                  onYearChange={setSelectedYear}
-              />
-          </div>
+        <h2>Statens utgifter per kategori ({selectedYear})</h2>
+        <div className="year-slider">
+          <YearSlider
+            years={years}
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
+          />
+        </div>
       </div>
 
-      <h3 className="charts-header">Kategori: {currentRootNode.data.name || 'Total'}</h3>
-      <div className="charts-container">
-          <div className="chart-wrapper sunburst-wrapper">
-              <SunburstChart
-                  rootNode={currentRootNode}
-                  hierarchyData={hierarchyData}
-                  levelColorScale={levelColorScale}
-                  width={600}
-                  height={600}
-                  onArcClick={handleSunburstZoom}
-              />
-          </div>
+      <div className="category-section">
+        <div className="category-header">
+          <button 
+            onClick={handleZoomOut}
+            className={`zoom-out-button ${currentRootNode === hierarchyData ? 'disabled' : ''}`}
+            title={currentRootNode === hierarchyData ? "Already at root view" : "Zoom out to root view"}
+            disabled={currentRootNode === hierarchyData}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+          </button>
+          <h2 className="charts-header">Kategori: {currentRootNode.data.name || 'Total'}</h2>
+        </div>
+      </div>
 
-          <div className="chart-wrapper barchart-wrapper">
-              <BarChart
-                  data={barChartData}
-                  levelColorScale={levelColorScale}
-                  width={500}
-                  height={400}
-                  onBarClick={handleBarClick}
-              />
-          </div>
+      <div className="charts-container">
+        <div className="chart-wrapper sunburst-wrapper">
+          <SunburstChart
+            rootNode={currentRootNode}
+            hierarchyData={hierarchyData}
+            levelColorScale={levelColorScale}
+            width={600}
+            height={600}
+            onArcClick={handleSunburstZoom}
+          />
+        </div>
+
+        <div className="chart-wrapper barchart-wrapper">
+          <BarChart
+            data={barChartData}
+            levelColorScale={levelColorScale}
+            width={500}
+            height={400}
+            onBarClick={handleBarClick}
+          />
+        </div>
       </div>
 
       <div className="source-info">
-          Källa: Ekonomistyrningsverket (ESV) - Statsbudgetens utfall <br />
-          Uppdaterad: 2025
+        Källa: Ekonomistyrningsverket (ESV) - Statsbudgetens utfall <br />
+        Uppdaterad: 2025
       </div>
-  </div>
-);
+    </div>
+  );
 };
