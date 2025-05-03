@@ -79,6 +79,23 @@ export const BarChart: React.FC<BarChartProps> = ({
       .range([0, adjustedWidth])
       .nice();
 
+    // Custom formatter for large numbers (values are in millions of SEK)
+    const formatValue = (value: number) => {
+      const absValue = Math.abs(value);
+      if (absValue >= 1000) {
+        return (value / 1000).toFixed(1) + 'B SEK';
+      } else if (absValue >= 1) {
+        return value.toFixed(1) + 'M SEK';
+      } else {
+        return (value * 1000).toFixed(0) + 'K SEK';
+      }
+    };
+
+    const formatTick = (domainValue: d3.NumberValue) => {
+      const value = domainValue.valueOf();
+      return formatValue(value);
+    };
+
     chart.append("g")
       .call(d3.axisLeft(yScale)
           .tickFormat(d => truncateLabel(d, LABEL_MAX_LENGTH))
@@ -88,7 +105,10 @@ export const BarChart: React.FC<BarChartProps> = ({
     // Adjust the x-axis position to align with the bottom of the bars
     chart.append("g")
       .attr("transform", `translate(0,${verticalOffset + effectiveHeight})`)
-      .call(d3.axisBottom(xScale));
+      .call(d3.axisBottom(xScale)
+        .tickFormat(formatTick)
+        .ticks(5) // Limit number of ticks to prevent overcrowding
+      );
 
     // Add truncation indicator if some bars were removed
     if (data.length > MAX_BARS) {
@@ -131,8 +151,7 @@ export const BarChart: React.FC<BarChartProps> = ({
         .on("mouseover", (event, d) => {
             d3.select(event.currentTarget).attr("fill-opacity", 0.7);
 
-            const roundedValue = Math.round(d.value ?? 0);
-            const tooltipContent = `<strong>${d.data.name}</strong><br/>Value: ${roundedValue.toLocaleString()}`;
+            const tooltipContent = `<strong>${d.data.name}</strong><br/>Value: ${formatValue(d.value ?? 0)}`;
 
             showTooltip(event, tooltipContent);
         })
