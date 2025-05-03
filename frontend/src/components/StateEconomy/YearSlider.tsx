@@ -20,6 +20,8 @@ const YearSlider: React.FC<YearSliderProps> = ({
   const min = 0;
   const max = years.length - 1;
   const selectedIndex = years.indexOf(selectedYear);
+  const startYear = years[0];
+  const endYear = years[years.length - 1];
 
   const handleSliderChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const newIndex = parseInt(event.target.value, 10);
@@ -29,22 +31,28 @@ const YearSlider: React.FC<YearSliderProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0' }}>
-      {label && (
-        <label htmlFor="year-slider">
-          {label}: {selectedYear}
-        </label>
-      )}
-      <input
-        type="range"
-        id="year-slider"
-        min={min}
-        max={max}
-        value={selectedIndex}
-        onChange={handleSliderChange}
-        step="1"
-        style={{ flexGrow: 1 }}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', padding: '10px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {label && (
+          <label htmlFor="year-slider">
+            {label}: {selectedYear}
+          </label>
+        )}
+        <input
+          type="range"
+          id="year-slider"
+          min={min}
+          max={max}
+          value={selectedIndex}
+          onChange={handleSliderChange}
+          step="1"
+          style={{ flexGrow: 1 }}
+        />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.85rem', color: '#666' }}>
+        <span>{startYear}</span>
+        <span>{endYear}</span>
+      </div>
     </div>
   );
 };

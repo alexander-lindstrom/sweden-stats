@@ -86,54 +86,47 @@ export const DashboardComponent: React.FC = () => {
     return <div className="p-4">Loading...</div>;
   }
 
-  return (
-    <div className="dashboard-container">
+return (
+  <div className="dashboard-container">
+
       <div className="controls">
-        <h2>Statens utgifter per kategori ({selectedYear})</h2>
-        <div className="year-slider">
-          <YearSlider
-            years={years}
-            selectedYear={selectedYear}
-            onYearChange={setSelectedYear}
-          />
-        </div>
+          <h2>Statens utgifter per kategori ({selectedYear})</h2>
+          <div className="year-slider">
+              <YearSlider
+                  years={years}
+                  selectedYear={selectedYear}
+                  onYearChange={setSelectedYear}
+              />
+          </div>
       </div>
 
       <div className="chart-wrapper sunburst-wrapper">
-        <h3>Sunburst View ({currentRootNode.data.name})</h3>
-        {currentRootNode !== hierarchyData && (
-           <button onClick={() => setCurrentRootNode(hierarchyData)}>Reset Zoom</button>
-         )}
-         {currentRootNode.parent && (
-           <button onClick={() => currentRootNode.parent && setCurrentRootNode(currentRootNode.parent)}>
-             Zoom Out
-           </button>
-         )}
-        <SunburstChart
-          rootNode={currentRootNode}
-          hierarchyData={hierarchyData}
-          levelColorScale={levelColorScale}
-          width={400}
-          height={400}
-          onArcClick={handleSunburstZoom}
-        />
+          <h3>Sunburst View ({currentRootNode.data.name || 'Total'})</h3>
+          <SunburstChart
+              rootNode={currentRootNode}
+              hierarchyData={hierarchyData}
+              levelColorScale={levelColorScale}
+              width={500}
+              height={500}
+              onArcClick={handleSunburstZoom}
+          />
       </div>
 
       <div className="chart-wrapper barchart-wrapper">
-        <h3>Breakdown for {currentRootNode.data.name}</h3>
-        <BarChart
-          data={barChartData}
-          levelColorScale={levelColorScale}
-          width={500}
-          height={400}
-          onBarClick={handleBarClick}
-        />
+          <h3>Breakdown ({currentRootNode.data.name || 'Total'})</h3>
+          <BarChart
+              data={barChartData}
+              levelColorScale={levelColorScale}
+              width={625}
+              height={500}
+              onBarClick={handleBarClick}
+          />
       </div>
 
       <div className="source-info">
-        Källa: ESV<br />
-        Uppdaterad: 2025
+          Källa: Ekonomistyrningsverket (ESV) - Statsbudgetens utfall <br />
+          Uppdaterad: 2025
       </div>
-    </div>
-  );
+  </div>
+);
 };

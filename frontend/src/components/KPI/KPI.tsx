@@ -59,12 +59,10 @@ export default function Kpi() {
   }, []);
 
   return (
-    <div className="dashboard-container">
-      
+    <div>
       {loading && <p>Loading data...</p>}
       {error && <p className="error-message">{error}</p>}
-      
-      <div className="chart-wrapper">
+      <div>
         {data && transformedData && (
           <KpiLineChart
             data={transformedData}

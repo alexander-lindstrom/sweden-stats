@@ -1,35 +1,90 @@
-/* Basic layout */
 .dashboard-container {
-    display: flex;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    gap: 20px; /* Space between charts */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  grid-template-areas:
+      "controls ."
+      "sunburst barchart"
+      "source   source";
+  gap: 12px;
+  padding: 20px;
+}
+
+.controls { grid-area: controls; text-align: left; }
+.sunburst-wrapper { grid-area: sunburst; }
+.barchart-wrapper { grid-area: barchart; }
+.source-info { grid-area: source; text-align: left; font-size: 0.9em; color: #555; padding-top: 5px;}
+
+.chart-wrapper {
+  min-width: 300px;
+  border: 1px solid #ccc;
+  padding: 8px;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chart-wrapper h3 {
+  margin-top: 0;
+  text-align: center;
+  font-size: 1.1em;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.sunburst-wrapper svg,
+.barchart-wrapper svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  flex-grow: 1;
+  min-height: 0;
+}
+
+.chart-wrapper button {
+  margin: 0 5px 6px 5px;
+  padding: 5px 10px;
+  font-size: 1em;
+  cursor: pointer;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto auto;
+      grid-template-areas:
+          "controls"
+          "sunburst"
+          "barchart"
+          "source";
+       padding: 10px;
+       gap: 10px;
   }
-  
+
   .chart-wrapper {
-    flex: 1; /* Allow charts to grow */
-    min-width: 350px; /* Minimum width before wrapping */
-    border: 1px solid #ccc;
-    padding: 15px;
-    border-radius: 5px;
-    background-color: #f9f9f9;
+      min-width: 280px;
+      padding: 6px;
   }
-  
-  .chart-wrapper h2 {
-    margin-top: 0;
-    text-align: center;
-    font-size: 1.1em;
-    margin-bottom: 10px;
+  .chart-wrapper h3 {
+      font-size: 1.0em;
+      margin-bottom: 4px;
   }
-  
-  /* Center SVG if needed within its wrapper */
-  .sunburst-wrapper svg, .barchart-wrapper svg {
-     display: block;
-     margin: 0 auto;
-  }
-  
-  /* Simple Button Style */
-  .chart-wrapper button {
-      margin: 0 5px 10px 5px;
-      padding: 5px 10px;
-      cursor: pointer;
-  }
+   .chart-wrapper button {
+      margin-bottom: 4px;
+      padding: 4px 8px;
+      font-size: 0.9em;
+   }
+   .source-info {
+      padding-top: 4px;
+   }
+}
+
+.controls h2 {
+  margin-bottom: 6px;
+  font-size: 1.3em;
+}
