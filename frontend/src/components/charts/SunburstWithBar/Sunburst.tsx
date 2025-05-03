@@ -50,7 +50,7 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       dynamicColorScale: d3.ScaleOrdinal<string, string>
   ): string => {
       if (arcNode.depth === 0) {
-          return '#e0e0e0'; // Center color
+          return '#e0e0e0';
       }
       let ancestorAtDepth1 = arcNode;
       while (ancestorAtDepth1.depth > 1) {

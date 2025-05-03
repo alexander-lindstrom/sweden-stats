@@ -1,9 +1,10 @@
 .dashboard-container {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto 1fr auto;
   grid-template-areas:
       "controls ."
+      "charts-header charts-header"
       "sunburst barchart"
       "source   source";
   gap: 12px;
@@ -13,9 +14,30 @@
 }
 
 .controls { grid-area: controls; text-align: left; }
-.sunburst-wrapper { grid-area: sunburst; display: flex; justify-content: center; align-items: center; }
-.barchart-wrapper { grid-area: barchart; }
-.source-info { grid-area: source; text-align: left; font-size: 0.9em; color: #555; padding-top: 5px;}
+.charts-header { 
+  grid-area: charts-header; 
+  text-align: center;
+  margin: 0;
+  font-size: 1.1em;
+}
+.charts-container {
+  grid-area: sunburst / 1 / barchart / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  height: 100%;
+  min-height: 0;
+}
+.sunburst-wrapper { display: flex; justify-content: center; align-items: center; }
+.barchart-wrapper { }
+.source-info { 
+  grid-area: source; 
+  text-align: left; 
+  font-size: 0.9em; 
+  color: #555; 
+  padding-top: 5px;
+  margin-top: auto;
+}
 
 .chart-wrapper {
   min-width: 300px;
@@ -60,14 +82,20 @@
 @media (max-width: 768px) {
   .dashboard-container {
       grid-template-columns: 1fr;
-      grid-template-rows: auto auto auto auto;
+      grid-template-rows: auto auto auto auto auto;
       grid-template-areas:
           "controls"
+          "charts-header"
           "sunburst"
           "barchart"
           "source";
        padding: 10px;
        gap: 10px;
+  }
+
+  .charts-container {
+    grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .chart-wrapper {

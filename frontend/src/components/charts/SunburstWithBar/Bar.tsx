@@ -82,7 +82,7 @@ export const BarChart: React.FC<BarChartProps> = ({
 
 
     const bars = chart.selectAll(".bar")
-      .data(sortedData, (d: HierarchyDataNode) => d.data.name)
+      .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
       .join("rect")
         .attr("class", "bar")
         .attr("y", d => yScale(d.data.name)!)
@@ -110,7 +110,7 @@ export const BarChart: React.FC<BarChartProps> = ({
         });
 
     chart.selectAll(".bar-label")
-      .data(sortedData, (d: HierarchyDataNode) => d.data.name)
+      .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
       .join("text")
         .attr("class", "bar-label")
         .attr("y", d => yScale(d.data.name)! + yScale.bandwidth() / 2)

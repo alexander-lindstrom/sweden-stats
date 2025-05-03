@@ -100,27 +100,28 @@ return (
           </div>
       </div>
 
-      <div className="chart-wrapper sunburst-wrapper">
-          <h3>Sunburst View ({currentRootNode.data.name || 'Total'})</h3>
-          <SunburstChart
-              rootNode={currentRootNode}
-              hierarchyData={hierarchyData}
-              levelColorScale={levelColorScale}
-              width={400}
-              height={400}
-              onArcClick={handleSunburstZoom}
-          />
-      </div>
+      <h3 className="charts-header">Kategori: {currentRootNode.data.name || 'Total'}</h3>
+      <div className="charts-container">
+          <div className="chart-wrapper sunburst-wrapper">
+              <SunburstChart
+                  rootNode={currentRootNode}
+                  hierarchyData={hierarchyData}
+                  levelColorScale={levelColorScale}
+                  width={400}
+                  height={400}
+                  onArcClick={handleSunburstZoom}
+              />
+          </div>
 
-      <div className="chart-wrapper barchart-wrapper">
-          <h3>Breakdown ({currentRootNode.data.name || 'Total'})</h3>
-          <BarChart
-              data={barChartData}
-              levelColorScale={levelColorScale}
-              width={500}
-              height={400}
-              onBarClick={handleBarClick}
-          />
+          <div className="chart-wrapper barchart-wrapper">
+              <BarChart
+                  data={barChartData}
+                  levelColorScale={levelColorScale}
+                  width={500}
+                  height={400}
+                  onBarClick={handleBarClick}
+              />
+          </div>
       </div>
 
       <div className="source-info">
