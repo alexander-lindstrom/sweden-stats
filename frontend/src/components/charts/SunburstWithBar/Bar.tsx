@@ -14,6 +14,9 @@ interface BarChartProps {
 }
 
 const LABEL_MAX_LENGTH = 25;
+const MAX_BAR_HEIGHT = 20;
+const MAX_BARS = 40;
+const BAR_SPACING = 2;
 
 const truncateLabel = (text: string, maxLength: number): string => {
     if (text.length <= maxLength) {
@@ -45,12 +48,28 @@ export const BarChart: React.FC<BarChartProps> = ({
     const chart = svg.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    const sortedData = [...data].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
+    // Sort and limit the number of bars
+    const sortedData = [...data]
+      .sort((a, b) => (b.value ?? 0) - (a.value ?? 0))
+      .slice(0, MAX_BARS);
+
+    // Calculate dynamic padding based on number of bars
+    const totalBars = sortedData.length;
+    const totalSpacing = (totalBars - 1) * BAR_SPACING;
+    const totalBarHeight = totalBars * MAX_BAR_HEIGHT;
+    const totalHeight = totalBarHeight + totalSpacing;
+    
+    // Adjust the height if we have fewer bars
+    const effectiveHeight = Math.min(adjustedHeight, totalHeight);
+    const dynamicPadding = totalBars > 1 ? BAR_SPACING : 0;
+
+    // Calculate vertical offset to center the bars when there are few of them
+    const verticalOffset = (adjustedHeight - effectiveHeight) / 2;
 
     const yScale = d3.scaleBand<string>()
       .domain(sortedData.map(d => d.data.name))
-      .range([0, adjustedHeight])
-      .padding(0.1);
+      .range([verticalOffset, verticalOffset + effectiveHeight])
+      .paddingInner(dynamicPadding / MAX_BAR_HEIGHT);
 
     const minValue = d3.min(sortedData, d => d.value ?? 0) ?? 0;
     const maxValue = d3.max(sortedData, d => d.value ?? 0) ?? 0;
@@ -66,16 +85,28 @@ export const BarChart: React.FC<BarChartProps> = ({
           .tickSizeOuter(0)
       );
 
+    // Adjust the x-axis position to align with the bottom of the bars
     chart.append("g")
-      .attr("transform", `translate(0,${adjustedHeight})`)
+      .attr("transform", `translate(0,${verticalOffset + effectiveHeight})`)
       .call(d3.axisBottom(xScale));
+
+    // Add truncation indicator if some bars were removed
+    if (data.length > MAX_BARS) {
+      chart.append("text")
+        .attr("x", adjustedWidth / 2)
+        .attr("y", verticalOffset + effectiveHeight + margin.bottom - 5)
+        .attr("text-anchor", "middle")
+        .attr("font-size", "12px")
+        .attr("fill", "#666")
+        .text(`Showing top ${MAX_BARS} of ${data.length} items`);
+    }
 
     if (minValue < 0 && maxValue > 0) {
       chart.append("line")
         .attr("x1", xScale(0))
         .attr("x2", xScale(0))
-        .attr("y1", 0)
-        .attr("y2", adjustedHeight)
+        .attr("y1", verticalOffset)
+        .attr("y2", verticalOffset + effectiveHeight)
         .attr("stroke", "grey")
         .attr("stroke-dasharray", "2,2");
     }
@@ -137,5 +168,5 @@ export const BarChart: React.FC<BarChartProps> = ({
         className="w-full h-auto"
       ></svg>
     </div>
-  );   
+  );
 };
