@@ -107,8 +107,8 @@ return (
                   rootNode={currentRootNode}
                   hierarchyData={hierarchyData}
                   levelColorScale={levelColorScale}
-                  width={400}
-                  height={400}
+                  width={600}
+                  height={600}
                   onArcClick={handleSunburstZoom}
               />
           </div>

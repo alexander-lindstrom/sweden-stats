@@ -23,7 +23,8 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
   onArcClick,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const radius = Math.min(width, height) / 2 * 0.9;
+  const padding = 50;
+  const radius = Math.min(width, height) / 2 * 0.9 - padding;
 
   useEffect(() => {
     setupTooltip();
@@ -113,6 +114,13 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
 
 
   return (
-    <svg ref={svgRef} width={width} height={height}></svg>
-  );
+    <div className="w-full max-w-[1100px] mx-auto">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="w-full h-auto"
+      ></svg>
+    </div>
+  );   
 };

@@ -129,6 +129,13 @@ export const BarChart: React.FC<BarChartProps> = ({
   }, [data, width, height, margin, adjustedWidth, adjustedHeight, onBarClick, levelColorScale]);
 
   return (
-    <svg ref={svgRef} width={width} height={height}></svg>
-  );
+    <div className="w-full max-w-[1100px] mx-auto">
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        className="w-full h-auto"
+      ></svg>
+    </div>
+  );   
 };
