@@ -81,6 +81,7 @@ export const BarChart: React.FC<BarChartProps> = ({
     }
 
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const bars = chart.selectAll(".bar")
       .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
       .join("rect")
