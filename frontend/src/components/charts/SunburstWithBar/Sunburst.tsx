@@ -94,9 +94,9 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
         .on("mouseover", (event, d) => {
              d3.select(event.currentTarget).attr("fill-opacity", 1);
 
-             const valueToShow = d.value;
+             const roundedValue = Math.round(d.value ?? 0);
              const valueLabel = d.children ? "Aggregated Value" : "Value";
-             const tooltipContent = `<strong>${d.data.name}</strong><br/>${valueLabel}: ${valueToShow?.toLocaleString() ?? 'N/A'}`;
+             const tooltipContent = `<strong>${d.data.name}</strong><br/>${valueLabel}: ${roundedValue?.toLocaleString() ?? 'N/A'}`;
              showTooltip(event, tooltipContent);
         })
         .on("mouseout", (event, d) => {
