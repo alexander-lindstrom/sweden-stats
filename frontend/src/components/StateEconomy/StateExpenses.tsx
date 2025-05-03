@@ -106,8 +106,8 @@ return (
               rootNode={currentRootNode}
               hierarchyData={hierarchyData}
               levelColorScale={levelColorScale}
-              width={500}
-              height={500}
+              width={400}
+              height={400}
               onArcClick={handleSunburstZoom}
           />
       </div>
@@ -117,8 +117,8 @@ return (
           <BarChart
               data={barChartData}
               levelColorScale={levelColorScale}
-              width={625}
-              height={500}
+              width={500}
+              height={400}
               onBarClick={handleBarClick}
           />
       </div>
