@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 
 import { DataNode, HierarchyDataNode } from './types';
 import { hideTooltip, setupTooltip, showTooltip } from '../util/Tooltip';
+import { formatValue } from '../util/Formatting';
 
 interface SunburstChartProps {
   rootNode: HierarchyDataNode;
@@ -65,18 +66,6 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .endAngle(d => d.x1)
       .innerRadius(d => d.y0 === 0 ? 0 : Math.max(0, d.y0))
       .outerRadius(d => Math.max(0, d.y1 - 0.5));
-
-    // Custom formatter for large numbers (values are in millions of SEK)
-    const formatValue = (value: number) => {
-      const absValue = Math.abs(value);
-      if (absValue >= 1000) {
-        return (value / 1000).toFixed(1) + 'B SEK';
-      } else if (absValue >= 1) {
-        return value.toFixed(1) + 'M SEK';
-      } else {
-        return (value * 1000).toFixed(0) + 'K SEK';
-      }
-    };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const path = g.append("g")

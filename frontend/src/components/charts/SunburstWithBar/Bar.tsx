@@ -4,6 +4,7 @@ import '../../StateEconomy/css/Tooltip.css';
 
 import { HierarchyDataNode } from './types';
 import { hideTooltip, setupTooltip, showTooltip } from '../util/Tooltip';
+import { formatValue } from '../util/Formatting';
 
 interface BarChartProps {
   data: HierarchyDataNode[];
@@ -99,18 +100,6 @@ export const BarChart: React.FC<BarChartProps> = ({
       .range([0, adjustedWidth])
       .nice();
 
-    // Custom formatter for large numbers (values are in millions of SEK)
-    const formatValue = (value: number) => {
-      const absValue = Math.abs(value);
-      if (absValue >= 1000) {
-        return (value / 1000).toFixed(1) + 'B SEK';
-      } else if (absValue >= 1) {
-        return value.toFixed(1) + 'M SEK';
-      } else {
-        return (value * 1000).toFixed(0) + 'K SEK';
-      }
-    };
-
     const formatTick = (domainValue: d3.NumberValue) => {
       const value = domainValue.valueOf();
       return formatValue(value);
@@ -203,7 +192,6 @@ export const BarChart: React.FC<BarChartProps> = ({
             hideTooltip();
         });
 
-    // Add data-name attribute to bars for easier selection
     bars.attr("data-name", d => d.data.name);
 
   }, [data, width, height, margin, adjustedWidth, adjustedHeight, onBarClick, levelColorScale]);
