@@ -64,7 +64,7 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .startAngle(d => d.x0)
       .endAngle(d => d.x1)
       .innerRadius(d => d.y0 === 0 ? 0 : Math.max(0, d.y0))
-      .outerRadius(d => Math.max(0, d.y1 - 1));
+      .outerRadius(d => Math.max(0, d.y1 - 0.5));
 
     // Custom formatter for large numbers (values are in millions of SEK)
     const formatValue = (value: number) => {
@@ -111,7 +111,7 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
              const tooltipContent = `<strong>${d.data.name}</strong><br/>${formatValue(d.value ?? 0)}`;
              showTooltip(event, tooltipContent);
         })
-        .on("mouseout", (event, d) => {
+        .on("mouseout", (event) => {
           d3.select(event.currentTarget).attr("fill-opacity", 1);
              hideTooltip();
         });
