@@ -39,7 +39,7 @@ export const DashboardComponent: React.FC = () => {
   const hierarchyData = useMemo(() => {
     if (!fullData) return null;
     return d3.hierarchy(fullData)
-      .sum((d) => Math.abs(d.value || 0))
+      .sum((d) => (d.value && d.value > 0) ? d.value : 0)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   }, [fullData]);
 
@@ -145,7 +145,8 @@ export const DashboardComponent: React.FC = () => {
 
       <div className="source-info">
         Källa: Ekonomistyrningsverket (ESV) - Statsbudgetens utfall <br />
-        Uppdaterad: 2025
+        Uppdaterad: 2025 <br />
+        Kommentar: Potentiella negativa värden visas ej
       </div>
     </div>
   );
