@@ -17,6 +17,7 @@ const LABEL_MAX_LENGTH = 25;
 const MAX_BAR_HEIGHT = 20;
 const MAX_BARS = 40;
 const BAR_SPACING = 2;
+const MIN_BAR_HIT = 10;
 
 const truncateLabel = (text: string, maxLength: number): string => {
     if (text.length <= maxLength) {
@@ -118,7 +119,7 @@ export const BarChart: React.FC<BarChartProps> = ({
         .attr("text-anchor", "middle")
         .attr("font-size", "12px")
         .attr("fill", "#666")
-        .text(`Showing top ${MAX_BARS} of ${data.length} items`);
+        .text(`Visar ${MAX_BARS} av ${data.length} kategorier`);
     }
 
     if (minValue < 0 && maxValue > 0) {
@@ -142,6 +143,23 @@ export const BarChart: React.FC<BarChartProps> = ({
         .attr("fill", d => levelColorScale(d.data.name))
         .attr("x", d => xScale(Math.min(0, d.value ?? 0)))
         .attr("width", d => Math.abs(xScale(d.value ?? 0) - xScale(0)))
+        .attr("stroke", "black")
+        .attr("stroke-width", "0.5")
+        .style("cursor", d => (d.children && d.children.length > 0 ? "pointer" : "default"));
+
+    // Add invisible hit areas for better interaction with thin bars
+    const hitAreas = chart.selectAll(".bar-hit-area")
+      .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
+      .join("rect")
+        .attr("class", "bar-hit-area")
+        .attr("y", d => yScale(d.data.name)!)
+        .attr("height", yScale.bandwidth())
+        .attr("fill", "transparent")
+        .attr("x", d => xScale(Math.min(0, d.value ?? 0)))
+        .attr("width", d => {
+          const barWidth = Math.abs(xScale(d.value ?? 0) - xScale(0));
+          return Math.max(barWidth, MIN_BAR_HIT);
+        })
         .style("cursor", d => (d.children && d.children.length > 0 ? "pointer" : "default"))
         .on("click", (_event, d) => {
           if (d.children && d.children.length > 0) {
@@ -149,32 +167,24 @@ export const BarChart: React.FC<BarChartProps> = ({
           }
         })
         .on("mouseover", (event, d) => {
-            d3.select(event.currentTarget).attr("fill-opacity", 0.7);
+            d3.select(event.currentTarget).attr("fill-opacity", 0.1);
+            d3.select(event.currentTarget.parentNode)
+              .select(`.bar[data-name="${d.data.name}"]`)
+              .attr("fill-opacity", 0.7);
 
-            const tooltipContent = `<strong>${d.data.name}</strong><br/>Value: ${formatValue(d.value ?? 0)}`;
-
+            const tooltipContent = `<strong>${d.data.name}</strong><br/>${formatValue(d.value ?? 0)}`;
             showTooltip(event, tooltipContent);
         })
-        .on("mouseout", (event) => {
-            d3.select(event.currentTarget).attr("fill-opacity", 1);
+        .on("mouseout", (event, d) => {
+            d3.select(event.currentTarget).attr("fill-opacity", 0);
+            d3.select(event.currentTarget.parentNode)
+              .select(`.bar[data-name="${d.data.name}"]`)
+              .attr("fill-opacity", 1);
             hideTooltip();
         });
 
-    chart.selectAll(".bar-label")
-      .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
-      .join("text")
-        .attr("class", "bar-label")
-        .attr("y", d => yScale(d.data.name)! + yScale.bandwidth() / 2)
-        .attr("dy", "0.35em")
-        .attr("font-size", "10px")
-        .attr("fill", "black")
-        .attr("x", d => {
-          const val = d.value ?? 0;
-          const space = 5;
-          return val >= 0 ? xScale(val) + space : xScale(val) - space;
-        })
-        .attr("text-anchor", d => (d.value ?? 0) >= 0 ? "start" : "end")
-        .text(d => Math.round(d.value ?? 0).toLocaleString());
+    // Add data-name attribute to bars for easier selection
+    bars.attr("data-name", d => d.data.name);
 
   }, [data, width, height, margin, adjustedWidth, adjustedHeight, onBarClick, levelColorScale]);
 
