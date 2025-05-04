@@ -148,6 +148,7 @@ export const BarChart: React.FC<BarChartProps> = ({
         .style("cursor", d => (d.children && d.children.length > 0 ? "pointer" : "default"));
 
     // Add invisible hit areas for better interaction with thin bars
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const hitAreas = chart.selectAll(".bar-hit-area")
       .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
       .join("rect")

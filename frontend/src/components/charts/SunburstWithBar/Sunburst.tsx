@@ -66,6 +66,18 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .innerRadius(d => d.y0 === 0 ? 0 : Math.max(0, d.y0))
       .outerRadius(d => Math.max(0, d.y1 - 1));
 
+    // Custom formatter for large numbers (values are in millions of SEK)
+    const formatValue = (value: number) => {
+      const absValue = Math.abs(value);
+      if (absValue >= 1000) {
+        return (value / 1000).toFixed(1) + 'B SEK';
+      } else if (absValue >= 1) {
+        return value.toFixed(1) + 'M SEK';
+      } else {
+        return (value * 1000).toFixed(0) + 'K SEK';
+      }
+    };
+
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const path = g.append("g")
       .selectAll("path")
@@ -73,7 +85,8 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .join("path")
         .attr("d", arc)
         .attr("fill", d => getDynamicArcColor(d, levelColorScale))
-        .attr("fill-opacity", d => (d.depth === 0) ? 0.6 : (d.children ? 0.6 : 0.8))
+        .attr("stroke", "#000")
+        .attr("stroke-width", "0.1")
         .style("cursor", d => (d.children || (d.depth === 0 && rootNode.parent)) ? "pointer" : "default")
         .on("click", (event, d) => {
             event.stopPropagation();
@@ -94,15 +107,12 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
             }
         })
         .on("mouseover", (event, d) => {
-             d3.select(event.currentTarget).attr("fill-opacity", 1);
-
-             const roundedValue = Math.round(d.value ?? 0);
-             const valueLabel = d.children ? "Aggregated Value" : "Value";
-             const tooltipContent = `<strong>${d.data.name}</strong><br/>${valueLabel}: ${roundedValue?.toLocaleString() ?? 'N/A'}`;
+             d3.select(event.currentTarget).attr("fill-opacity", 0.6);
+             const tooltipContent = `<strong>${d.data.name}</strong><br/>${formatValue(d.value ?? 0)}`;
              showTooltip(event, tooltipContent);
         })
         .on("mouseout", (event, d) => {
-             d3.select(event.currentTarget).attr("fill-opacity", (d.depth === 0) ? 0.6 : (d.children ? 0.6 : 0.8));
+          d3.select(event.currentTarget).attr("fill-opacity", 1);
              hideTooltip();
         });
 
