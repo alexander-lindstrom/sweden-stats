@@ -102,6 +102,9 @@ export const BarChart: React.FC<BarChartProps> = ({
 
     const formatTick = (domainValue: d3.NumberValue) => {
       const value = domainValue.valueOf();
+      if (value === 0) {
+        return "0";
+      }
       return formatValue(value);
     };
 
@@ -111,12 +114,11 @@ export const BarChart: React.FC<BarChartProps> = ({
           .tickSizeOuter(0)
       );
 
-    // Adjust the x-axis position to align with the bottom of the bars
     chart.append("g")
       .attr("transform", `translate(0,${verticalOffset + effectiveHeight})`)
       .call(d3.axisBottom(xScale)
         .tickFormat(formatTick)
-        .ticks(5) // Limit number of ticks to prevent overcrowding
+        .ticks(5)
       );
 
     // Add truncation indicator if some bars were removed
