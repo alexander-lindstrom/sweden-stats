@@ -12,14 +12,10 @@ const ResponsiveChartWrapper: React.FC<ResponsiveChartWrapperProps> = ({
   minHeight = 300,
   children,
 }) => {
-  console.log("ads")
   const containerRef = useRef<HTMLDivElement>(null);
   const dimensions = useResizeObserver(containerRef); 
 
-  console.log(dimensions)
-
   if (!dimensions || dimensions.width === 0 || dimensions.height === 0) {
-    console.log("failure")
     return <div ref={containerRef} className="w-full h-full" style={{ minHeight: `${minHeight}px` }} />; 
   }
 

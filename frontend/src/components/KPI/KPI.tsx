@@ -36,8 +36,6 @@ export default function Kpi() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  console.log(data, transformedData)
-
   useEffect(() => {
     const fetchData = async () => {
       try {
