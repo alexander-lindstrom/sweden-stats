@@ -86,7 +86,7 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
         .attr("d", arc)
         .attr("fill", d => getDynamicArcColor(d, levelColorScale))
         .attr("stroke", "#000")
-        .attr("stroke-width", "0.1")
+        .attr("stroke-width", "0.5")
         .style("cursor", d => (d.children || (d.depth === 0 && rootNode.parent)) ? "pointer" : "default")
         .on("click", (event, d) => {
             event.stopPropagation();

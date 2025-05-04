@@ -16,15 +16,34 @@ interface BarChartProps {
 const LABEL_MAX_LENGTH = 25;
 const MAX_BAR_HEIGHT = 20;
 const MAX_BARS = 40;
-const BAR_SPACING = 2;
+const BAR_SPACING = 1;
 const MIN_BAR_HIT = 10;
 
 const truncateLabel = (text: string, maxLength: number): string => {
-    if (text.length <= maxLength) {
-        return text;
-    }
-    return text.slice(0, maxLength) + '...';
+  if (text.length <= maxLength) {
+      return text;
+  }
+
+  const words = text.split(' ');
+  let result = '';
+  
+  for (const word of words) {
+      const next = result.length === 0 ? word : result + ' ' + word;
+      if (next.length > maxLength) {
+          break;
+      }
+      result = next;
+  }
+
+  // If at least one full word fits, return it (no ellipsis)
+  if (result.length > 0) {
+      return result;
+  }
+
+  // If not even one word fits, do a hard truncation with ellipsis
+  return text.slice(0, maxLength) + '...';
 };
+
 
 export const BarChart: React.FC<BarChartProps> = ({
   data,

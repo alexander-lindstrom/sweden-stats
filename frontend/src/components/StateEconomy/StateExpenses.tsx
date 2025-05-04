@@ -52,15 +52,16 @@ export const DashboardComponent: React.FC = () => {
   }, [hierarchyData]);
 
   const levelColorScale = useMemo(() => {
-    const colorRange = d3.schemeTableau10;
     if (!currentRootNode || !currentRootNode.children) {
-        return d3.scaleOrdinal<string>().range(colorRange);
+      return d3.scaleOrdinal<string, string>();
     }
     const currentChildrenNames = currentRootNode.children.map(d => d.data.name);
-    return d3.scaleOrdinal<string>()
-        .domain(currentChildrenNames)
-        .range(colorRange);
-  }, [currentRootNode]);
+    const colorScale = d3.scaleOrdinal<string, string>()
+      .domain(currentChildrenNames)
+      .range(currentChildrenNames.map((_, i) => d3.interpolateRainbow(i / currentChildrenNames.length)));
+  
+    return colorScale;
+  }, [currentRootNode]);  
 
   const handleSunburstZoom = useCallback((node: HierarchyDataNode | null) => {
     if (!node) return;
