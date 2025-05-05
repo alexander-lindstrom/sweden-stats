@@ -11,8 +11,8 @@ import BaseLayer from "ol/layer/Base";
 import { BaseMapKey, baseMaps } from "./BaseMaps";
 import { adminVectorTileLayers, createVectorTileLayer } from "./VectorTiles";
 import { MapControls } from "./MapControls";
-import { Feature } from "ol";
 import VectorTileLayer from "ol/layer/VectorTile";
+import { MapBrowserEvent } from "ol";
 
 const MapView: React.FC = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -58,6 +58,7 @@ const MapView: React.FC = () => {
     const { id, url } = adminVectorTileLayers[selectedAdminLevel];
     const vectorLayer = createVectorTileLayer(id, url);
     overlayLayersRef.current[id] = vectorLayer;
+    vectorLayer.setZIndex(1);
   
     map.addLayer(vectorLayer);
   }, [selectedAdminLevel]);
@@ -77,17 +78,28 @@ const MapView: React.FC = () => {
     baseLayerRef.current.setZIndex(0);
   }, [selectedBase]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleMapClick = (evt: any) => {
+  const handleMapClick = (evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
     if (!map) return;
   
     map.forEachFeatureAtPixel(evt.pixel, (feature) => {
-      if (feature instanceof Feature) {
-        const props = feature.getProperties();
-        delete props.geometry;
-        alert("Feature properties:\n" + JSON.stringify(props, null, 2));
+      
+      const geometry = feature.getGeometry();
+      if (geometry) {
+        const extent = geometry.getExtent();
+        const view = map.getView();
+
+        view.fit(extent, {
+          duration: 1000,
+          padding: [50, 50, 50, 50],
+          maxZoom: 14,
+        });
+        console.log("Zoomed to feature:", feature);
+
+        return true;
       }
+
+      return false;
     }, {
       layerFilter: (layer) => layer instanceof VectorTileLayer,
       hitTolerance: 5,
