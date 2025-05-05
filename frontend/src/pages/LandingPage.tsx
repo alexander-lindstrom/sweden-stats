@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
 const categories = [
-  { id: "population", title: "Population Data", description: "Explore demographic data across Sweden." },
+  { id: "map", title: "Map view", description: "Map view" },
   { id: "economy", title: "Economic Indicators", description: "Visualize trends and regional economic indicators." },
   { id: "education", title: "Education Levels", description: "Compare education levels by region or municipality." }
 ];
