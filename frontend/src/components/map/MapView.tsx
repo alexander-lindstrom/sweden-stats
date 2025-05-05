@@ -30,8 +30,8 @@ const MapView: React.FC = () => {
       target: mapRef.current,
       layers: [baseLayerRef.current],
       view: new View({
-        center: fromLonLat([0, 0]),
-        zoom: 2,
+        center: fromLonLat([15.0, 63.0]),
+        zoom: 6,
       }),
     });
 
