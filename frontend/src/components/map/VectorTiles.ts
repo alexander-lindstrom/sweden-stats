@@ -5,14 +5,13 @@ import Stroke from "ol/style/Stroke";
 import Fill from "ol/style/Fill";
 import Style from "ol/style/Style";
 
-// Example basic style
-const basicVectorStyle = new Style({
+const baseVectorStyle = new Style({
   fill: new Fill({
-    color: 'rgba(50, 50, 255, 0.4)',
+    color: 'rgba(100, 149, 237, 0.2)', // subtle light blue
   }),
   stroke: new Stroke({
-    color: '#333399',
-    width: 1,
+    color: '#1f3f81', // deep desaturated blue
+    width: 1.5,
   }),
 });
 
@@ -25,7 +24,7 @@ export function createVectorTileLayer(id: string, urlTemplate: string): VectorTi
     }),
     declutter: true,
     visible: true,
-    style: basicVectorStyle,
+    style: baseVectorStyle,
   });
 }
 

@@ -14,10 +14,21 @@ import { MapControls } from "./MapControls";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
 
+const zoomLevels: Record<string, number> = {
+  sveriges_lan_sf_simple: 7,
+  sveriges_kommuner_sf_simple: 9,
+  RegSO_2025: 10,
+  DeSO_2025: 10,
+};
+
 const MapView: React.FC = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
-  const baseLayerRef = useRef<TileLayer<OSM | XYZ>>(new TileLayer({ source: baseMaps.EsriNatGeo }));
+  const baseLayerRef = useRef<TileLayer<OSM | XYZ>>(new TileLayer({
+    source: baseMaps.EsriNatGeo,
+    visible: false,
+  }));
+  
   const overlayLayersRef = useRef<Record<string, BaseLayer>>({});
 
   const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriNatGeo");
@@ -82,28 +93,36 @@ const MapView: React.FC = () => {
     const map = mapInstanceRef.current;
     if (!map) return;
   
-    map.forEachFeatureAtPixel(evt.pixel, (feature) => {
-      
-      const geometry = feature.getGeometry();
-      if (geometry) {
-        const extent = geometry.getExtent();
+    map.forEachFeatureAtPixel(
+      evt.pixel,
+      (feature) => {
+        const geometry = feature.getGeometry();
+        if (!geometry) return false;
+  
         const view = map.getView();
-
-        view.fit(extent, {
+  
+        // Feature type determines zoom level
+        const layerName = feature.get('layer');
+        console.log(layerName)
+        const targetZoom = zoomLevels[layerName] ?? 8;
+  
+        const extent = geometry.getExtent();
+        const centerX = (extent[0] + extent[2]) / 2;
+        const centerY = (extent[1] + extent[3]) / 2;
+  
+        view.animate({
+          center: [centerX, centerY],
+          zoom: targetZoom,
           duration: 1000,
-          padding: [50, 50, 50, 50],
-          maxZoom: 14,
         });
-        console.log("Zoomed to feature:", feature);
-
+  
         return true;
+      },
+      {
+        layerFilter: (layer) => layer instanceof VectorTileLayer,
+        hitTolerance: 5,
       }
-
-      return false;
-    }, {
-      layerFilter: (layer) => layer instanceof VectorTileLayer,
-      hitTolerance: 5,
-    });
+    );
   };
   
   return (
