@@ -31,7 +31,7 @@ const MapView: React.FC = () => {
   
   const overlayLayersRef = useRef<Record<string, BaseLayer>>({});
 
-  const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriNatGeo");
+  const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriWorldGray");
   const [selectedAdminLevel, setSelectedAdminLevel] = useState<keyof typeof adminVectorTileLayers>("Region");
 
   useEffect(() => {
