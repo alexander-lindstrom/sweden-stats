@@ -5,7 +5,7 @@ import './css/StateExpenses.css';
 import { DataNode, HierarchyDataNode } from '../charts/sunBurstWithBar/types';
 import { BarChart } from '../charts/sunBurstWithBar/Bar';
 import { SunburstChart } from '../charts/sunBurstWithBar/Sunburst';
-import { fetchAllExpenses } from '@/api/StateExpensesApi';
+import { fetchAllExpenses } from '@/api/backend/StateExpensesApi';
 import YearSlider from './YearSlider';
 
 export const DashboardComponent: React.FC = () => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { fetchScbData } from "@/api/ScbApi";
+import { fetchScbData } from "@/api/backend/ScbApi";
 import { transformKPIData } from "./Util";
 import { KPIApiResponse, TransformedKPIData } from "./KpiTypes";
 import KpiLineChart from "./KpiLineChart";

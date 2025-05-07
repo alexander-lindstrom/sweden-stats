@@ -104,6 +104,7 @@ const MapView: React.FC = () => {
         // Feature type determines zoom level
         const layerName = feature.get('layer');
         console.log(layerName)
+        console.log(feature)
         const targetZoom = zoomLevels[layerName] ?? 8;
   
         const extent = geometry.getExtent();

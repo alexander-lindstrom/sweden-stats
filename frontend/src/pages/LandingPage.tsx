@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 const categories = [
   { id: "map", title: "Map view", description: "Map view" },
   { id: "economy", title: "Economic Indicators", description: "Visualize trends and regional economic indicators." },
-  { id: "education", title: "Education Levels", description: "Compare education levels by region or municipality." }
+  { id: "test", title: "test", description: "test" }
 ];
 
 export default function LandingPage() {

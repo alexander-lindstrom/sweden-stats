@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import EconomicIndicators from "./pages/EconomicIndicators";
 import MapView from "./components/map/MapView";
+import { PopulationDataViewer } from "./components/TestComponent";
 
 export default function App() {
   return (
@@ -9,6 +10,7 @@ export default function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/category/economy" element={<EconomicIndicators />} />
       <Route path="/category/map" element={<MapView />} />
+      <Route path="/category/test" element={<PopulationDataViewer />} />
     </Routes>
   );
 }

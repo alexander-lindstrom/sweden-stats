@@ -1,23 +1,50 @@
-const SCB_API_URL = "http://localhost:3001/api/scb";
+import { baseApi } from "./BaseApi";
 
-export const fetchScbData = async (endpoint: string, body: object) => {
-  try {
-    const response = await fetch(`${SCB_API_URL}/${endpoint}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+export const scbApi = baseApi.injectEndpoints({
+    endpoints: (builder) => ({
+      
+      getLatestMonthlyPopulation: builder.query<string, void>({
+        query: () => ({
+          url: 'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5444/data',
+          method: 'POST',
+          body: {
+            query: [
+              {
+                code: "region",
+                selection: {
+                  filter: "all",
+                  values: ["*"]
+                }
+              },
+              {
+                code: "ålder",
+                selection: {
+                  filter: "all",
+                  values: ["*"]
+                }
+              },
+              {
+                code: "kön",
+                selection: {
+                  filter: "all",
+                  values: ["*"]
+                }
+              },
+              {
+                code: "månad",
+                selection: {
+                  filter: "item",
+                  values: ["2024M12"]
+                }
+              }
+            ],
+            response: {
+              format: "json-stat2" 
+            }
+          },
+        }),
+      }),
+    }),
+  });
 
-    if (!response.ok) {
-      throw new Error(`SCB API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (err) {
-    console.error("Error fetching SCB data:", err);
-    throw err;
-  }
-};
+export const { useGetLatestMonthlyPopulationQuery } = scbApi;
