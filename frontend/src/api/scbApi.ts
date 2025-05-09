@@ -1,50 +1,17 @@
+import { buildScbApiRequestBody, JsonStat2Response, PopulationQueryArgs } from "@/util/scb";
 import { baseApi } from "./BaseApi";
 
 export const scbApi = baseApi.injectEndpoints({
-    endpoints: (builder) => ({
-      
-      getLatestMonthlyPopulation: builder.query<string, void>({
-        query: () => ({
-          url: 'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5444/data',
-          method: 'POST',
-          body: {
-            query: [
-              {
-                code: "region",
-                selection: {
-                  filter: "all",
-                  values: ["*"]
-                }
-              },
-              {
-                code: "ålder",
-                selection: {
-                  filter: "all",
-                  values: ["*"]
-                }
-              },
-              {
-                code: "kön",
-                selection: {
-                  filter: "all",
-                  values: ["*"]
-                }
-              },
-              {
-                code: "månad",
-                selection: {
-                  filter: "item",
-                  values: ["2024M12"]
-                }
-              }
-            ],
-            response: {
-              format: "json-stat2" 
-            }
-          },
-        }),
+  endpoints: (builder) => ({
+    getPopulationStatistics: builder.query<JsonStat2Response, PopulationQueryArgs>({
+      query: (args) => ({
+        url: `https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5444/data?outputFormat=json-stat2`,
+        method: 'POST',
+        body: buildScbApiRequestBody(args),
       }),
     }),
-  });
+  }),
+  overrideExisting: false, // Default is false, can be true if replacing existing endpoints
+});
 
-export const { useGetLatestMonthlyPopulationQuery } = scbApi;
+export const { useGetPopulationStatisticsQuery } = scbApi;
