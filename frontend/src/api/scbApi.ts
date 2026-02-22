@@ -11,7 +11,7 @@ export const scbApi = baseApi.injectEndpoints({
       }),
     }),
   }),
-  overrideExisting: false, // Default is false, can be true if replacing existing endpoints
+  overrideExisting: false,
 });
 
 export const { useGetPopulationStatisticsQuery } = scbApi;
