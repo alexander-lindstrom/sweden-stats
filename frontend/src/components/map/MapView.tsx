@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
@@ -14,13 +14,6 @@ import { MapControls } from "./MapControls";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
 
-const zoomLevels: Record<string, number> = {
-  sveriges_lan_sf_simple: 7,
-  sveriges_kommuner_sf_simple: 9,
-  RegSO_2025: 10,
-  DeSO_2025: 10,
-};
-
 const MapView: React.FC = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -28,11 +21,36 @@ const MapView: React.FC = () => {
     source: baseMaps.EsriNatGeo,
     visible: false,
   }));
-  
+
   const overlayLayersRef = useRef<Record<string, BaseLayer>>({});
 
   const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriWorldGray");
   const [selectedAdminLevel, setSelectedAdminLevel] = useState<keyof typeof adminVectorTileLayers>("Region");
+
+  const handleMapClick = useCallback((evt: MapBrowserEvent) => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    map.forEachFeatureAtPixel(
+      evt.pixel,
+      (feature) => {
+        const geometry = feature.getGeometry();
+        if (!geometry) return false;
+
+        map.getView().fit(geometry.getExtent(), {
+          duration: 800,
+          padding: [40, 40, 40, 40],
+          maxZoom: 12,
+        });
+
+        return true;
+      },
+      {
+        layerFilter: (layer) => layer instanceof VectorTileLayer,
+        hitTolerance: 5,
+      }
+    );
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -53,7 +71,7 @@ const MapView: React.FC = () => {
       map.setTarget(undefined);
       map.un('click', handleMapClick);
     };
-  }, []);
+  }, [handleMapClick]);
 
 
   useEffect(() => {
@@ -89,43 +107,6 @@ const MapView: React.FC = () => {
     baseLayerRef.current.setZIndex(0);
   }, [selectedBase]);
 
-  const handleMapClick = (evt: MapBrowserEvent) => {
-    const map = mapInstanceRef.current;
-    if (!map) return;
-  
-    map.forEachFeatureAtPixel(
-      evt.pixel,
-      (feature) => {
-        const geometry = feature.getGeometry();
-        if (!geometry) return false;
-  
-        const view = map.getView();
-  
-        // Feature type determines zoom level
-        const layerName = feature.get('layer');
-        console.log(layerName)
-        console.log(feature)
-        const targetZoom = zoomLevels[layerName] ?? 8;
-  
-        const extent = geometry.getExtent();
-        const centerX = (extent[0] + extent[2]) / 2;
-        const centerY = (extent[1] + extent[3]) / 2;
-  
-        view.animate({
-          center: [centerX, centerY],
-          zoom: targetZoom,
-          duration: 1000,
-        });
-  
-        return true;
-      },
-      {
-        layerFilter: (layer) => layer instanceof VectorTileLayer,
-        hitTolerance: 5,
-      }
-    );
-  };
-  
   return (
     <>
       <div

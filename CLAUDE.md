@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Vision
+
+A sleek, interactive data explorer for Sweden. Users browse official public datasets (SCB, ESV, and other government sources) mapped to Swedish administrative boundaries at five levels: country, region (län), municipality (kommun), RegSO, and DeSO.
+
+The core UX goal is frictionless navigation: switch datasets, switch boundary levels, see the data update — without losing your place or fighting the interface. Design should be clean and purposeful, letting the data speak rather than the chrome. The map is the primary shell; admin boundaries are the lens through which datasets are explored.
+
+The project is currently in a learning/exploratory phase (OpenLayers, GeoServer, React patterns). New work should push toward this vision.
+
 ## Project Overview
 
 Sweden Data Visualizer — interactive visualizations of public Swedish data (SCB, ESV) using a React frontend and a FastAPI backend.
