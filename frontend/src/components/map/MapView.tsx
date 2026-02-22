@@ -14,6 +14,16 @@ import { MapControls } from "./MapControls";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
 
+// MVT features are clipped to tile boundaries, so view.fit() on a feature
+// extent is unreliable — the same region yields different extents depending
+// on which tile was hit. A fixed zoom per admin level is simpler and consistent.
+const ADMIN_LEVEL_ZOOM: Record<keyof typeof adminVectorTileLayers, number> = {
+  Region: 7,
+  Municipality: 10,
+  RegSO: 12,
+  DeSO: 13,
+};
+
 const MapView: React.FC = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<Map | null>(null);
@@ -37,10 +47,11 @@ const MapView: React.FC = () => {
         const geometry = feature.getGeometry();
         if (!geometry) return false;
 
-        map.getView().fit(geometry.getExtent(), {
+        const extent = geometry.getExtent();
+        map.getView().animate({
+          center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
+          zoom: ADMIN_LEVEL_ZOOM[selectedAdminLevel],
           duration: 800,
-          padding: [40, 40, 40, 40],
-          maxZoom: 12,
         });
 
         return true;
@@ -50,8 +61,9 @@ const MapView: React.FC = () => {
         hitTolerance: 5,
       }
     );
-  }, []);
+  }, [selectedAdminLevel]);
 
+  // Create the map once on mount.
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -65,12 +77,17 @@ const MapView: React.FC = () => {
     });
 
     mapInstanceRef.current = map;
-    map.on('click', handleMapClick);
 
-    return () => {
-      map.setTarget(undefined);
-      map.un('click', handleMapClick);
-    };
+    return () => { map.setTarget(undefined); };
+  }, []);
+
+  // Re-register click handler whenever the admin level changes so the
+  // handler always closes over the current selectedAdminLevel.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    map.on('click', handleMapClick);
+    return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
 
 
