@@ -23,7 +23,10 @@ export default function useResizeObserver(ref: React.RefObject<HTMLElement | nul
     resizeObserver.observe(element);
 
     return () => resizeObserver.disconnect();
-  }, [ref]);
+  // ref is a stable object whose identity never changes, so [ref] is equivalent
+  // to [] but misleadingly implies the effect re-runs on ref changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return dimensions;
 }

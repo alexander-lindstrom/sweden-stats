@@ -3,6 +3,7 @@ export type ViewType = 'map' | 'chart' | 'table';
 
 export interface DatasetResult {
   values: Record<string, number>; // boundary code → value
+  labels: Record<string, string>; // boundary code → display name
   label: string;                  // e.g. "Folkmängd"
   unit: string;                   // e.g. "persons"
 }

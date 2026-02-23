@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
+import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
+import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { AdminLevel, DatasetResult, ViewType } from '@/datasets/types';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
 import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
@@ -221,23 +223,33 @@ export default function MapPage() {
               unit={datasetResult?.unit ?? ''}
             />
           )}
-          {activeView === 'chart' && (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Chart view — coming soon
+          {activeView === 'map' && datasetResult && (
+            <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+              <MapLegend data={datasetResult} scale={colorScale} />
             </div>
           )}
-          {activeView === 'table' && (
+          {activeView === 'chart' && datasetResult && (
+            <div className="w-full h-full p-6">
+              <RankedBarChart data={datasetResult} colorScale={colorScale} />
+            </div>
+          )}
+          {activeView === 'chart' && !datasetResult && (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Table view — coming soon
+              Select a dataset to view the chart.
+            </div>
+          )}
+          {activeView === 'table' && datasetResult && (
+            <div className="w-full h-full p-6">
+              <DatasetTable data={datasetResult} />
+            </div>
+          )}
+          {activeView === 'table' && !datasetResult && (
+            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+              Select a dataset to view the table.
             </div>
           )}
         </div>
       </div>
-
-      {/* ── Right sidebar (legend) ───────────────────────────────────────── */}
-      <aside className="w-48 flex-shrink-0 border-l border-gray-200 bg-white p-4">
-        <MapLegend data={datasetResult} scale={colorScale} />
-      </aside>
     </main>
   );
 }

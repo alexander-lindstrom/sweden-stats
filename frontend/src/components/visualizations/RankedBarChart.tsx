@@ -1,0 +1,135 @@
+import React, { useEffect, useRef } from 'react';
+import * as d3 from 'd3';
+import { DatasetResult } from '@/datasets/types';
+import useResizeObserver from '@/hooks/useResizeObserver';
+
+interface RankedBarChartProps {
+  data: DatasetResult;
+  colorScale?: ((value: number) => string) | null;
+}
+
+const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
+const ROW_HEIGHT = 28;
+const BAR_RADIUS = 3;
+
+export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const svgRef       = useRef<SVGSVGElement>(null);
+  const dimensions   = useResizeObserver(containerRef);
+
+  const sorted = Object.entries(data.values)
+    .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+    .sort((a, b) => b.value - a.value);
+
+  const idealHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
+  const containerH  = dimensions?.height ?? 0;
+  const svgHeight   = containerH > 0 ? Math.min(idealHeight, containerH) : idealHeight;
+  const svgWidth    = dimensions?.width ?? 0;
+
+  useEffect(() => {
+    if (!svgRef.current || svgWidth === 0 || sorted.length === 0) {
+      return;
+    }
+
+    const innerW = svgWidth  - MARGIN.left - MARGIN.right;
+    const innerH = svgHeight - MARGIN.top  - MARGIN.bottom;
+
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    const g = svg
+      .attr('width',  svgWidth)
+      .attr('height', svgHeight)
+      .append('g')
+      .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+
+    const xScale = d3.scaleLinear()
+      .domain([0, d3.max(sorted, d => d.value) ?? 1])
+      .range([0, innerW])
+      .nice();
+
+    const yScale = d3.scaleBand()
+      .domain(sorted.map(d => d.code))
+      .range([0, innerH])
+      .padding(0.25);
+
+    // Bars
+    g.selectAll('rect.bar')
+      .data(sorted)
+      .join('rect')
+      .attr('class', 'bar')
+      .attr('x', 0)
+      .attr('y', d => yScale(d.code)!)
+      .attr('width', d => xScale(d.value))
+      .attr('height', yScale.bandwidth())
+      .attr('rx', BAR_RADIUS)
+      .attr('fill', d =>
+        colorScale ? colorScale(d.value) : '#3b82f6'
+      );
+
+    // Value labels (right of bar)
+    g.selectAll('text.val')
+      .data(sorted)
+      .join('text')
+      .attr('class', 'val')
+      .attr('x', d => xScale(d.value) + 6)
+      .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
+      .attr('dy', '0.35em')
+      .attr('font-size', 11)
+      .attr('fill', '#6b7280')
+      .text(d => d.value.toLocaleString('sv-SE'));
+
+    // Y-axis labels (region names)
+    g.selectAll('text.label')
+      .data(sorted)
+      .join('text')
+      .attr('class', 'label')
+      .attr('x', -8)
+      .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
+      .attr('dy', '0.35em')
+      .attr('text-anchor', 'end')
+      .attr('font-size', 12)
+      .attr('fill', '#374151')
+      .text(d => d.name);
+
+    // X-axis
+    g.append('g')
+      .attr('transform', `translate(0,${innerH})`)
+      .call(
+        d3.axisBottom(xScale)
+          .ticks(4)
+          .tickFormat(n => {
+            const v = n.valueOf();
+            if (v >= 1_000_000) {
+              return `${(v / 1_000_000).toFixed(1)}M`;
+            }
+            if (v >= 1_000) {
+              return `${(v / 1_000).toFixed(0)}k`;
+            }
+            return String(v);
+          })
+      )
+      .call(ax => ax.select('.domain').remove())
+      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
+      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+
+    // Vertical grid lines
+    g.selectAll('line.grid')
+      .data(xScale.ticks(4))
+      .join('line')
+      .attr('class', 'grid')
+      .attr('x1', d => xScale(d))
+      .attr('x2', d => xScale(d))
+      .attr('y1', 0)
+      .attr('y2', innerH)
+      .attr('stroke', '#f3f4f6')
+      .attr('stroke-width', 1);
+
+  }, [sorted, svgWidth, svgHeight, colorScale]);
+
+  return (
+    <div ref={containerRef} className="w-full h-full overflow-y-auto">
+      <svg ref={svgRef} />
+    </div>
+  );
+};

@@ -9,13 +9,19 @@ const REGION_CODES = [
 const SCB_URL =
   'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5444/data?outputFormat=json-stat2';
 
+interface RegionData {
+  values: Record<string, number>;
+  labels: Record<string, string>;
+}
+
 /**
  * Aggregate JSON-stat2 values by the "Region" dimension, summing all other
- * dimensions (age, sex, …).  Returns a map of region code → total value.
+ * dimensions (age, sex, …).  Returns values (code → total) and labels
+ * (code → display name) extracted from the response's category metadata.
  */
-function aggregateByRegion(data: JsonStat2Response): Record<string, number> {
-  const dimIds = data.id;      // e.g. ["Region","Alder","Kon","ContentsCode","Tid"]
-  const sizes  = data.size;    // e.g. [21, 101, 2, 1, 1]
+function aggregateByRegion(data: JsonStat2Response): RegionData {
+  const dimIds = data.id;   // e.g. ["Region","Alder","Kon","ContentsCode","Tid"]
+  const sizes  = data.size; // e.g. [21, 101, 2, 1, 1]
 
   // Row-major strides
   const strides = new Array(dimIds.length).fill(1);
@@ -29,13 +35,13 @@ function aggregateByRegion(data: JsonStat2Response): Record<string, number> {
   }
 
   const regionDim = data.dimension['Region'];
-  // index property: { "01": 0, "03": 1, … }
+  // index: { "01": 0, "03": 1, … }  label: { "01": "Stockholm", … }
   const indexToCode: Record<number, string> = {};
   for (const [code, idx] of Object.entries(regionDim.category.index)) {
     indexToCode[idx as number] = code;
   }
 
-  const result: Record<string, number> = {};
+  const values: Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
     const raw = data.value[i];
@@ -51,11 +57,14 @@ function aggregateByRegion(data: JsonStat2Response): Record<string, number> {
       Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
     if (code) {
-      result[code] = (result[code] ?? 0) + num;
+      values[code] = (values[code] ?? 0) + num;
     }
   }
 
-  return result;
+  // Labels come directly from the response — no extra request needed.
+  const labels: Record<string, string> = { ...regionDim.category.label } as Record<string, string>;
+
+  return { values, labels };
 }
 
 async function fetchPopulationByRegion(_level: AdminLevel): Promise<DatasetResult> {
@@ -80,9 +89,9 @@ async function fetchPopulationByRegion(_level: AdminLevel): Promise<DatasetResul
   }
 
   const data: JsonStat2Response = await res.json();
-  const values = aggregateByRegion(data);
+  const { values, labels } = aggregateByRegion(data);
 
-  return { values, label: 'Folkmängd', unit: 'persons' };
+  return { values, labels, label: 'Folkmängd', unit: 'persons' };
 }
 
 export const populationByRegion: DatasetDescriptor = {
