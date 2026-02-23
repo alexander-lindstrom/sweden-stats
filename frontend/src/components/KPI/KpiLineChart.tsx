@@ -70,10 +70,14 @@ function KpiLineChartInner({
 
   // D3 chart rendering
   useEffect(() => {
-    if (!svgRef.current || !tooltipRef.current || !isInitialized) return;
+    if (!svgRef.current || !tooltipRef.current || !isInitialized) {
+      return;
+    }
 
     const filteredData = getFilteredData();
-    if (filteredData.length === 0) return;
+    if (filteredData.length === 0) {
+      return;
+    }
 
     // Clear existing chart
     d3.select(svgRef.current).selectAll('*').remove();

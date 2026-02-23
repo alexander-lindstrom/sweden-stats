@@ -54,17 +54,19 @@ const MapView: React.FC<MapViewProps> = ({
   colorScale,
   featureCodeProperty,
 }) => {
-  const mapRef            = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef    = useRef<Map | null>(null);
-  const baseLayerRef      = useRef<TileLayer<OSM | XYZ>>(
+  const mapRef          = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef  = useRef<Map | null>(null);
+  const baseLayerRef    = useRef<TileLayer<OSM | XYZ>>(
     new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
   );
-  const overlayLayerRef   = useRef<BaseLayer | null>(null);
+  const overlayLayerRef = useRef<BaseLayer | null>(null);
 
   // --- Click handler -------------------------------------------------------
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) {
+      return;
+    }
 
     const childLevel = LEVEL_TO_CHILD[adminLevel];
 
@@ -81,7 +83,9 @@ const MapView: React.FC<MapViewProps> = ({
           });
         } else {
           const geometry = feature.getGeometry();
-          if (!geometry) return false;
+          if (!geometry) {
+            return false;
+          }
           const extent = geometry.getExtent();
           view.animate({
             center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
@@ -100,7 +104,9 @@ const MapView: React.FC<MapViewProps> = ({
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current) {
+      return;
+    }
 
     const map = new Map({
       target: mapRef.current,
@@ -115,7 +121,9 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Re-bind click handler when admin level changes ---------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) {
+      return;
+    }
     map.on('click', handleMapClick);
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
@@ -123,7 +131,9 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Swap boundary layer when admin level changes -----------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) {
+      return;
+    }
 
     if (overlayLayerRef.current) {
       map.removeLayer(overlayLayerRef.current);
@@ -159,7 +169,9 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
     const layer = overlayLayerRef.current;
-    if (!(layer instanceof VectorTileLayer)) return;
+    if (!(layer instanceof VectorTileLayer)) {
+      return;
+    }
 
     if (choroplethData && colorScale) {
       layer.setStyle(
@@ -168,7 +180,9 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       // Revert to static style by recreating the static layer
       const map = mapInstanceRef.current;
-      if (!map) return;
+      if (!map) {
+        return;
+      }
       map.removeLayer(layer);
       const childLevel = LEVEL_TO_CHILD[adminLevel];
       const { id, url } = adminVectorTileLayers[childLevel];
@@ -182,7 +196,9 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) return;
+    if (!map) {
+      return;
+    }
 
     map.removeLayer(baseLayerRef.current);
     baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });

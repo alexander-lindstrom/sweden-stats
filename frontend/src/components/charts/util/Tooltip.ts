@@ -16,8 +16,12 @@ export const setupTooltip = (): void => {
 };
 
 export const showTooltip = (event: MouseEvent, content: string): void => {
-  if (!tooltipDiv) setupTooltip(); // Ensure it exists
-  if (!tooltipDiv) return; // Guard if setup failed
+  if (!tooltipDiv) {
+    setupTooltip(); // Ensure it exists
+  }
+  if (!tooltipDiv) {
+    return; // Guard if setup failed
+  }
 
   tooltipDiv.style.opacity = '1';
   tooltipDiv.style.visibility = 'visible';
@@ -28,7 +32,9 @@ export const showTooltip = (event: MouseEvent, content: string): void => {
 };
 
 export const hideTooltip = (): void => {
-  if (!tooltipDiv) return;
+  if (!tooltipDiv) {
+    return;
+  }
   tooltipDiv.style.opacity = '0';
   // Keep visibility: hidden to prevent ghost interactions if opacity transition is slow
   tooltipDiv.style.visibility = 'hidden';

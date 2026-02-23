@@ -23,6 +23,16 @@ export default tseslint.config(
         "warn",
         { allowConstantExport: true },
       ],
+
+      // Unused variables: allow _-prefixed names to mark intentionally unused
+      // parameters (e.g. interface-required params that aren't needed yet).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_" },
+      ],
+
+      // Always use braces around control-flow bodies (if/else/for/while).
+      "curly": "error",
     },
   }
 );

@@ -60,7 +60,9 @@ export const BarChart: React.FC<BarChartProps> = ({
 
 
   useEffect(() => {
-    if (!svgRef.current || !data) return;
+    if (!svgRef.current || !data) {
+      return;
+    }
     setupTooltip();
 
     const svg = d3.select(svgRef.current);

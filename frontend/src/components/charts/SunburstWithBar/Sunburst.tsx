@@ -29,7 +29,9 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
 
   useEffect(() => {
     setupTooltip();
-    if (!svgRef.current || !rootNode || !hierarchyData) return;
+    if (!svgRef.current || !rootNode || !hierarchyData) {
+      return;
+    }
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove();

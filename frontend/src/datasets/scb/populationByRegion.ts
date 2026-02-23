@@ -39,9 +39,13 @@ function aggregateByRegion(data: JsonStat2Response): Record<string, number> {
 
   for (let i = 0; i < data.value.length; i++) {
     const raw = data.value[i];
-    if (raw === null || raw === undefined) continue;
+    if (raw === null || raw === undefined) {
+      continue;
+    }
     const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) continue;
+    if (isNaN(num)) {
+      continue;
+    }
 
     const regionIdx =
       Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];

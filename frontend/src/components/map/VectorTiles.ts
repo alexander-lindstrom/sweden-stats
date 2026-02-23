@@ -62,7 +62,9 @@ export function buildChoroplethStyle(
   return (feature: FeatureLike): Style => {
     const code = String(feature.get(codeProperty) ?? '');
     const cached = styleCache.get(code);
-    if (cached) return cached;
+    if (cached) {
+      return cached;
+    }
 
     const value = data[code];
     const style =

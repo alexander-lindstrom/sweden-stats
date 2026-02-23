@@ -37,7 +37,9 @@ export const DashboardComponent: React.FC = () => {
   }, [selectedYear, expensesData]);
 
   const hierarchyData = useMemo(() => {
-    if (!fullData) return null;
+    if (!fullData) {
+      return null;
+    }
     return d3.hierarchy(fullData)
       .sum((d) => (d.value && d.value > 0) ? d.value : 0)
       .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
@@ -64,7 +66,9 @@ export const DashboardComponent: React.FC = () => {
   }, [currentRootNode]);  
 
   const handleSunburstZoom = useCallback((node: HierarchyDataNode | null) => {
-    if (!node) return;
+    if (!node) {
+      return;
+    }
     setCurrentRootNode(node);
   }, []);
 

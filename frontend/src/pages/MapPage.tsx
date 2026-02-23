@@ -62,7 +62,9 @@ export default function MapPage() {
     }
 
     const descriptor = DATASETS.find((d) => d.id === selectedDatasetId);
-    if (!descriptor) return;
+    if (!descriptor) {
+      return;
+    }
 
     // Abort any in-flight request
     fetchAbortRef.current?.abort();
