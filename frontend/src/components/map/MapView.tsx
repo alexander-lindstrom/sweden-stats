@@ -18,11 +18,14 @@ import { MapBrowserEvent } from "ol";
 // extent is unreliable — the same region yields different extents depending
 // on which tile was hit. A fixed zoom per admin level is simpler and consistent.
 const ADMIN_LEVEL_ZOOM: Record<keyof typeof adminVectorTileLayers, number> = {
+  Country: 5,
   Region: 7,
   Municipality: 10,
   RegSO: 12,
   DeSO: 13,
 };
+
+const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
 
 const MapView: React.FC = () => {
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -35,7 +38,7 @@ const MapView: React.FC = () => {
   const overlayLayersRef = useRef<Record<string, BaseLayer>>({});
 
   const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriWorldGray");
-  const [selectedAdminLevel, setSelectedAdminLevel] = useState<keyof typeof adminVectorTileLayers>("Region");
+  const [selectedAdminLevel, setSelectedAdminLevel] = useState<keyof typeof adminVectorTileLayers>("Country");
 
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
@@ -44,15 +47,22 @@ const MapView: React.FC = () => {
     map.forEachFeatureAtPixel(
       evt.pixel,
       (feature) => {
-        const geometry = feature.getGeometry();
-        if (!geometry) return false;
+        const view = map.getView();
 
-        const extent = geometry.getExtent();
-        map.getView().animate({
-          center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
-          zoom: ADMIN_LEVEL_ZOOM[selectedAdminLevel],
-          duration: 800,
-        });
+        if (selectedAdminLevel === 'Country') {
+          // Always snap back to the full Sweden view — tile-fragment centroid
+          // is meaningless for a single-polygon layer.
+          view.animate({ center: SWEDEN_CENTER, zoom: ADMIN_LEVEL_ZOOM.Country, duration: 800 });
+        } else {
+          const geometry = feature.getGeometry();
+          if (!geometry) return false;
+          const extent = geometry.getExtent();
+          view.animate({
+            center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
+            zoom: ADMIN_LEVEL_ZOOM[selectedAdminLevel],
+            duration: 800,
+          });
+        }
 
         return true;
       },
@@ -71,7 +81,7 @@ const MapView: React.FC = () => {
       target: mapRef.current,
       layers: [baseLayerRef.current],
       view: new View({
-        center: fromLonLat([15.0, 63.0]),
+        center: SWEDEN_CENTER,
         zoom: 6,
       }),
     });
@@ -105,8 +115,12 @@ const MapView: React.FC = () => {
     const vectorLayer = createVectorTileLayer(id, url);
     overlayLayersRef.current[id] = vectorLayer;
     vectorLayer.setZIndex(1);
-  
+
     map.addLayer(vectorLayer);
+
+    if (selectedAdminLevel === 'Country') {
+      map.getView().animate({ center: SWEDEN_CENTER, zoom: ADMIN_LEVEL_ZOOM.Country, duration: 800 });
+    }
   }, [selectedAdminLevel]);
 
   useEffect(() => {
