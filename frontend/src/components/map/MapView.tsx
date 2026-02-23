@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
@@ -9,61 +9,86 @@ import "ol/ol.css";
 import BaseLayer from "ol/layer/Base";
 
 import { BaseMapKey, baseMaps } from "./BaseMaps";
-import { adminVectorTileLayers, createVectorTileLayer } from "./VectorTiles";
-import { MapControls } from "./MapControls";
+import {
+  adminVectorTileLayers,
+  buildChoroplethStyle,
+  createChoroplethLayer,
+  createVectorTileLayer,
+} from "./VectorTiles";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
+import { AdminLevel } from "@/datasets/types";
 
-// MVT features are clipped to tile boundaries, so view.fit() on a feature
-// extent is unreliable — the same region yields different extents depending
-// on which tile was hit. A fixed zoom per admin level is simpler and consistent.
+// Which child boundary layer to show for each admin level
+const LEVEL_TO_CHILD: Record<AdminLevel, keyof typeof adminVectorTileLayers> = {
+  Country:      'Region',
+  Region:       'Municipality',
+  Municipality: 'RegSO',
+  RegSO:        'DeSO',
+  DeSO:         'DeSO',
+};
+
+// Zoom level to animate to when clicking a feature
 const ADMIN_LEVEL_ZOOM: Record<keyof typeof adminVectorTileLayers, number> = {
-  Country: 5,
-  Region: 7,
+  Country:      5,
+  Region:       7,
   Municipality: 10,
-  RegSO: 12,
-  DeSO: 13,
+  RegSO:        12,
+  DeSO:         13,
 };
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
 
-const MapView: React.FC = () => {
-  const mapRef = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef = useRef<Map | null>(null);
-  const baseLayerRef = useRef<TileLayer<OSM | XYZ>>(new TileLayer({
-    source: baseMaps.EsriNatGeo,
-    visible: false,
-  }));
+export interface MapViewProps {
+  adminLevel: AdminLevel;
+  selectedBase: BaseMapKey;
+  choroplethData: Record<string, number> | null;
+  colorScale: ((value: number) => string) | null;
+  featureCodeProperty: string;
+}
 
-  const overlayLayersRef = useRef<Record<string, BaseLayer>>({});
+const MapView: React.FC<MapViewProps> = ({
+  adminLevel,
+  selectedBase,
+  choroplethData,
+  colorScale,
+  featureCodeProperty,
+}) => {
+  const mapRef            = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef    = useRef<Map | null>(null);
+  const baseLayerRef      = useRef<TileLayer<OSM | XYZ>>(
+    new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
+  );
+  const overlayLayerRef   = useRef<BaseLayer | null>(null);
 
-  const [selectedBase, setSelectedBase] = useState<BaseMapKey>("EsriWorldGray");
-  const [selectedAdminLevel, setSelectedAdminLevel] = useState<keyof typeof adminVectorTileLayers>("Country");
-
+  // --- Click handler -------------------------------------------------------
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
     if (!map) return;
+
+    const childLevel = LEVEL_TO_CHILD[adminLevel];
 
     map.forEachFeatureAtPixel(
       evt.pixel,
       (feature) => {
         const view = map.getView();
 
-        if (selectedAdminLevel === 'Country') {
-          // Always snap back to the full Sweden view — tile-fragment centroid
-          // is meaningless for a single-polygon layer.
-          view.animate({ center: SWEDEN_CENTER, zoom: ADMIN_LEVEL_ZOOM.Country, duration: 800 });
+        if (adminLevel === 'Country') {
+          view.animate({
+            center: SWEDEN_CENTER,
+            zoom: ADMIN_LEVEL_ZOOM.Country,
+            duration: 800,
+          });
         } else {
           const geometry = feature.getGeometry();
           if (!geometry) return false;
           const extent = geometry.getExtent();
           view.animate({
             center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
-            zoom: ADMIN_LEVEL_ZOOM[selectedAdminLevel],
+            zoom: ADMIN_LEVEL_ZOOM[childLevel],
             duration: 800,
           });
         }
-
         return true;
       },
       {
@@ -71,28 +96,23 @@ const MapView: React.FC = () => {
         hitTolerance: 5,
       }
     );
-  }, [selectedAdminLevel]);
+  }, [adminLevel]);
 
-  // Create the map once on mount.
+  // --- Initialise map once -------------------------------------------------
   useEffect(() => {
     if (!mapRef.current) return;
 
     const map = new Map({
       target: mapRef.current,
       layers: [baseLayerRef.current],
-      view: new View({
-        center: SWEDEN_CENTER,
-        zoom: 6,
-      }),
+      view: new View({ center: SWEDEN_CENTER, zoom: 6 }),
     });
 
     mapInstanceRef.current = map;
-
     return () => { map.setTarget(undefined); };
   }, []);
 
-  // Re-register click handler whenever the admin level changes so the
-  // handler always closes over the current selectedAdminLevel.
+  // --- Re-bind click handler when admin level changes ---------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -100,74 +120,77 @@ const MapView: React.FC = () => {
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
 
-
+  // --- Swap boundary layer when admin level changes -----------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-  
-    // Clear any previous admin layer
-    Object.values(overlayLayersRef.current).forEach(layer => {
-      map.removeLayer(layer);
-    });
-    overlayLayersRef.current = {};
-  
-    const { id, url } = adminVectorTileLayers[selectedAdminLevel];
-    const vectorLayer = createVectorTileLayer(id, url);
-    overlayLayersRef.current[id] = vectorLayer;
-    vectorLayer.setZIndex(1);
 
-    map.addLayer(vectorLayer);
-
-    if (selectedAdminLevel === 'Country') {
-      map.getView().animate({ center: SWEDEN_CENTER, zoom: ADMIN_LEVEL_ZOOM.Country, duration: 800 });
+    if (overlayLayerRef.current) {
+      map.removeLayer(overlayLayerRef.current);
+      overlayLayerRef.current = null;
     }
-  }, [selectedAdminLevel]);
 
+    const childLevel = LEVEL_TO_CHILD[adminLevel];
+    const { id, url } = adminVectorTileLayers[childLevel];
+
+    const layer =
+      choroplethData && colorScale
+        ? createChoroplethLayer(
+            id,
+            url,
+            buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty),
+          )
+        : createVectorTileLayer(id, url);
+
+    layer.setZIndex(1);
+    map.addLayer(layer);
+    overlayLayerRef.current = layer;
+
+    if (adminLevel === 'Country') {
+      map.getView().animate({
+        center: SWEDEN_CENTER,
+        zoom: ADMIN_LEVEL_ZOOM.Country,
+        duration: 800,
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminLevel]);
+
+  // --- Update choropleth style in place when data changes -----------------
+  useEffect(() => {
+    const layer = overlayLayerRef.current;
+    if (!(layer instanceof VectorTileLayer)) return;
+
+    if (choroplethData && colorScale) {
+      layer.setStyle(
+        buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty)
+      );
+    } else {
+      // Revert to static style by recreating the static layer
+      const map = mapInstanceRef.current;
+      if (!map) return;
+      map.removeLayer(layer);
+      const childLevel = LEVEL_TO_CHILD[adminLevel];
+      const { id, url } = adminVectorTileLayers[childLevel];
+      const newLayer = createVectorTileLayer(id, url);
+      newLayer.setZIndex(1);
+      map.addLayer(newLayer);
+      overlayLayerRef.current = newLayer;
+    }
+  }, [choroplethData, colorScale, featureCodeProperty, adminLevel]);
+
+  // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Remove the old base layer
     map.removeLayer(baseLayerRef.current);
-
-    // Create and add the new base layer
     baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });
-    map.addLayer(baseLayerRef.current);
-
-    // Ensure the base layer is at the bottom
     baseLayerRef.current.setZIndex(0);
+    map.addLayer(baseLayerRef.current);
   }, [selectedBase]);
 
-  return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          bottom: "16px",
-          left: "16px",
-          zIndex: 1000,
-          display: "flex",
-          flexDirection: "column",
-          gap: "5px",
-          width: "250px",
-          padding: "10px",
-          borderRadius: "4px",
-        }}
-      >
-
-        <MapControls
-          selectedBase={selectedBase}
-          setSelectedBase={(value) => setSelectedBase(value as BaseMapKey)}
-          baseMapKeys={baseMaps}
-          selectedAdminLevel={selectedAdminLevel}
-          setSelectedAdminLevel={setSelectedAdminLevel}
-        />
-
-      </div>
-
-      <div ref={mapRef} style={{ width: "100%", height: "100vh" }} />
-    </>
-  );
+  return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />;
 };
 
 export default MapView;

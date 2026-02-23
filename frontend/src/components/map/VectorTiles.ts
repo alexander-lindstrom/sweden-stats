@@ -4,6 +4,7 @@ import VectorTileSource from "ol/source/VectorTile";
 import Stroke from "ol/style/Stroke";
 import Fill from "ol/style/Fill";
 import Style from "ol/style/Style";
+import type { FeatureLike } from "ol/Feature";
 
 const baseVectorStyle = new Style({
   fill: new Fill({
@@ -26,6 +27,55 @@ export function createVectorTileLayer(id: string, urlTemplate: string): VectorTi
     visible: true,
     style: baseVectorStyle,
   });
+}
+
+const choroplethStroke = new Stroke({ color: '#444', width: 0.5 });
+const noDataStyle = new Style({
+  fill: new Fill({ color: 'rgba(200, 200, 200, 0.4)' }),
+  stroke: choroplethStroke,
+});
+
+export function createChoroplethLayer(
+  id: string,
+  urlTemplate: string,
+  styleFunction: (feature: FeatureLike) => Style,
+): VectorTileLayer {
+  return new VectorTileLayer({
+    source: new VectorTileSource({
+      format: new MVT(),
+      url: urlTemplate,
+      maxZoom: 14,
+    }),
+    declutter: true,
+    visible: true,
+    style: styleFunction,
+  });
+}
+
+export function buildChoroplethStyle(
+  data: Record<string, number>,
+  colorScale: (value: number) => string,
+  codeProperty: string,
+): (feature: FeatureLike) => Style {
+  const styleCache = new Map<string, Style>();
+
+  return (feature: FeatureLike): Style => {
+    const code = String(feature.get(codeProperty) ?? '');
+    const cached = styleCache.get(code);
+    if (cached) return cached;
+
+    const value = data[code];
+    const style =
+      value !== undefined
+        ? new Style({
+            fill: new Fill({ color: colorScale(value) }),
+            stroke: choroplethStroke,
+          })
+        : noDataStyle;
+
+    styleCache.set(code, style);
+    return style;
+  };
 }
 
 export const adminVectorTileLayers = {
