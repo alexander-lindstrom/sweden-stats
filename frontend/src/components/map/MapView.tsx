@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
@@ -18,6 +18,7 @@ import {
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
+import { Tooltip } from "@/components/ui/Tooltip";
 
 // Which child boundary layer to show for each admin level
 const LEVEL_TO_CHILD: Record<AdminLevel, keyof typeof adminVectorTileLayers> = {
@@ -39,12 +40,21 @@ const ADMIN_LEVEL_ZOOM: Record<keyof typeof adminVectorTileLayers, number> = {
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
 
+interface HoverInfo {
+  x: number;
+  y: number;
+  label: string;
+  value: number | null;
+}
+
 export interface MapViewProps {
   adminLevel: AdminLevel;
   selectedBase: BaseMapKey;
   choroplethData: Record<string, number> | null;
   colorScale: ((value: number) => string) | null;
   featureCodeProperty: string;
+  featureLabelProperty: string;
+  unit: string;
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -53,6 +63,8 @@ const MapView: React.FC<MapViewProps> = ({
   choroplethData,
   colorScale,
   featureCodeProperty,
+  featureLabelProperty,
+  unit,
 }) => {
   const mapRef          = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef  = useRef<Map | null>(null);
@@ -60,6 +72,7 @@ const MapView: React.FC<MapViewProps> = ({
     new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
   );
   const overlayLayerRef = useRef<BaseLayer | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
   // --- Click handler -------------------------------------------------------
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
@@ -128,6 +141,42 @@ const MapView: React.FC<MapViewProps> = ({
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
 
+  // --- Pointermove: update hover tooltip -----------------------------------
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) {
+      return;
+    }
+
+    const handlePointerMove = (evt: MapBrowserEvent) => {
+      if (evt.dragging) {
+        setHoverInfo(null);
+        return;
+      }
+
+      let found = false;
+      map.forEachFeatureAtPixel(
+        evt.pixel,
+        (feature) => {
+          const code  = String(feature.get(featureCodeProperty) ?? '');
+          const label = String(feature.get(featureLabelProperty) ?? code);
+          const value = choroplethData?.[code] ?? null;
+          setHoverInfo({ x: evt.pixel[0], y: evt.pixel[1], label, value });
+          found = true;
+          return true;
+        },
+        { layerFilter: (l) => l instanceof VectorTileLayer, hitTolerance: 3 }
+      );
+
+      if (!found) {
+        setHoverInfo(null);
+      }
+    };
+
+    map.on('pointermove', handlePointerMove);
+    return () => { map.un('pointermove', handlePointerMove); };
+  }, [featureCodeProperty, featureLabelProperty, choroplethData]);
+
   // --- Swap boundary layer when admin level changes -----------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
@@ -178,7 +227,6 @@ const MapView: React.FC<MapViewProps> = ({
         buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty)
       );
     } else {
-      // Revert to static style by recreating the static layer
       const map = mapInstanceRef.current;
       if (!map) {
         return;
@@ -206,7 +254,27 @@ const MapView: React.FC<MapViewProps> = ({
     map.addLayer(baseLayerRef.current);
   }, [selectedBase]);
 
-  return <div ref={mapRef} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={mapRef} className="w-full h-full" />
+      <Tooltip
+        x={hoverInfo?.x ?? 0}
+        y={hoverInfo?.y ?? 0}
+        visible={hoverInfo !== null}
+      >
+        {hoverInfo && (
+          <>
+            <div className="font-semibold">{hoverInfo.label}</div>
+            {hoverInfo.value !== null && (
+              <div className="text-gray-300">
+                {hoverInfo.value.toLocaleString('sv-SE')} {unit}
+              </div>
+            )}
+          </>
+        )}
+      </Tooltip>
+    </div>
+  );
 };
 
 export default MapView;

@@ -17,6 +17,15 @@ const FEATURE_CODE_PROP: Record<AdminLevel, string> = {
   DeSO:         'deso',
 };
 
+// Feature property to use as the human-readable tooltip label.
+const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
+  Country:      'county_name',
+  Region:       'name',        // TODO: confirm Municipality layer property name
+  Municipality: 'name',        // TODO: confirm RegSO layer property name
+  RegSO:        'name',        // TODO: confirm DeSO layer property name
+  DeSO:         'name',
+};
+
 const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
 
 const LEVEL_LABELS: Record<AdminLevel, string> = {
@@ -208,6 +217,8 @@ export default function MapPage() {
               choroplethData={datasetResult?.values ?? null}
               colorScale={colorScale}
               featureCodeProperty={featureCodeProperty}
+              featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+              unit={datasetResult?.unit ?? ''}
             />
           )}
           {activeView === 'chart' && (
