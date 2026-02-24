@@ -239,17 +239,23 @@ async function fetchByMunicipality(): Promise<DatasetResult> {
 }
 
 async function fetchByRegso(): Promise<DatasetResult> {
-  const { regsoCodes } = await getRegsoDeso();
+  const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
+    getRegsoDeso(),
+    getMunicipalityCodes(),
+  ]);
   const data = await postDataQuery6574(regsoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Folkmängd', unit: 'personer' };
+  return { values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
 async function fetchByDeso(): Promise<DatasetResult> {
-  const { desoCodes } = await getRegsoDeso();
+  const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
+    getRegsoDeso(),
+    getMunicipalityCodes(),
+  ]);
   const data = await postDataQuery6574(desoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Folkmängd', unit: 'personer' };
+  return { values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
 // ── Hierarchy builder ────────────────────────────────────────────────────────

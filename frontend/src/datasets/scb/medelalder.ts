@@ -275,20 +275,27 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
 }
 
 async function fetchByRegso(): Promise<DatasetResult> {
-  const { regsoCodes } = await getRegsoDeso();
-  return fetchBySmallArea(regsoCodes);
+  const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
+    getRegsoDeso(),
+    getMunicipalityCodes637(),
+  ]);
+  const result = await fetchBySmallArea(regsoCodes);
+  return { ...result, parentLabels };
 }
 
 async function fetchByDeso(): Promise<DatasetResult> {
-  const { desoCodes } = await getRegsoDeso();
-  return fetchBySmallArea(desoCodes);
+  const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
+    getRegsoDeso(),
+    getMunicipalityCodes637(),
+  ]);
+  const result = await fetchBySmallArea(desoCodes);
+  return { ...result, parentLabels };
 }
 
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
 async function fetchMedelalder(level: AdminLevel): Promise<DatasetResult> {
   switch (level) {
-    case 'Country':      return fetchByCounty();
     case 'Region':       return fetchByCounty();
     case 'Municipality': return fetchByMunicipality();
     case 'RegSO':        return fetchByRegso();
@@ -300,15 +307,13 @@ async function fetchMedelalder(level: AdminLevel): Promise<DatasetResult> {
 export const medelalder: DatasetDescriptor = {
   id: 'medelalder',
   label: 'Medelålder',
-  supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
+  supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
-    Country: ['chart', 'table'],
-    RegSO:   ['map', 'chart', 'table'],
-    DeSO:    ['map', 'chart', 'table'],
+    RegSO: ['map', 'chart', 'table'],
+    DeSO:  ['map', 'chart', 'table'],
   },
   chartTypes: {
-    Country:      ['bar', 'diverging'],
     Region:       ['bar', 'diverging', 'histogram'],
     Municipality: ['diverging', 'histogram'],
     RegSO:        ['diverging', 'histogram'],

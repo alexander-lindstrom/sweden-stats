@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
@@ -35,6 +35,17 @@ const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
 
 const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
 
+// Stable county code → short name mapping (without "län" suffix for compact display).
+const COUNTY_NAMES: Record<string, string> = {
+  '01': 'Stockholms',      '03': 'Uppsala',          '04': 'Södermanlands',
+  '05': 'Östergötlands',   '06': 'Jönköpings',       '07': 'Kronobergs',
+  '08': 'Kalmar',          '09': 'Gotlands',          '10': 'Blekinge',
+  '12': 'Skåne',           '13': 'Hallands',          '14': 'Västra Götalands',
+  '17': 'Värmlands',       '18': 'Örebro',            '19': 'Västmanlands',
+  '20': 'Dalarnas',        '21': 'Gävleborgs',        '22': 'Västernorrlands',
+  '23': 'Jämtlands',       '24': 'Västerbottens',     '25': 'Norrbottens',
+};
+
 const LEVEL_LABELS: Record<AdminLevel, string> = {
   Country:      'Nationell',
   Region:       'Län',
@@ -59,6 +70,8 @@ export default function MapPage() {
   const [colorScale,        setColorScale]         = useState<d3.ScaleSequential<string> | null>(null);
   const [loading,           setLoading]            = useState(false);
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
+  const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
+  const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   // Generation counter — incremented on every new fetch; stale responses are ignored.
   const fetchGenRef = useRef(0);
 
@@ -94,6 +107,7 @@ export default function MapPage() {
     setActiveChartType(ct => types.includes(ct) ? ct : (types[0] ?? 'bar'));
   }, [selectedLevel, selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+
   // Fetch flat data when selected dataset or level changes.
   useEffect(() => {
     if (!selectedDatasetId) {
@@ -103,14 +117,14 @@ export default function MapPage() {
     }
 
     const descriptor = DATASETS.find((d) => d.id === selectedDatasetId);
-    if (!descriptor) return;
+    if (!descriptor) {return;}
 
     const gen = ++fetchGenRef.current;
     setLoading(true);
 
     fetchCached(descriptor, selectedLevel)
       .then((result) => {
-        if (gen !== fetchGenRef.current) return; // superseded by a newer fetch
+        if (gen !== fetchGenRef.current) {return;} // superseded by a newer fetch
 
         const vals = Object.values(result.values).filter(Number.isFinite);
         const scale = d3
@@ -138,16 +152,62 @@ export default function MapPage() {
 
   // Fetch hierarchy data when sunburst is active and descriptor supports it.
   useEffect(() => {
-    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) return;
+    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) {return;}
 
     const gen = ++fetchGenRef.current;
     fetchHierarchyCached(activeDescriptor)
       .then(result => {
-        if (gen !== fetchGenRef.current) return;
+        if (gen !== fetchGenRef.current) {return;}
         setHierarchyData(result);
       })
       .catch(err => console.error('Hierarchy fetch failed:', err));
   }, [activeChartType, activeDescriptor]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Diverging chart filter (Municipality / RegSO / DeSO) ──────────────────
+  const needsLanFilter  = activeChartType === 'diverging' &&
+    (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
+  const needsMuniFilter = activeChartType === 'diverging' &&
+    (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
+
+  const availableLans = useMemo(() => {
+    if (!datasetResult || !needsLanFilter) {return [];}
+    const codes = new Set(Object.keys(datasetResult.values).map(c => c.slice(0, 2)));
+    return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
+  }, [datasetResult, needsLanFilter]);
+
+  // Effective Lan: honour stored selection if still valid, otherwise first in list.
+  const effectiveLan = useMemo(() => {
+    if (availableLans.length === 0) {return null;}
+    return availableLans.some(l => l.code === selectedLan) ? selectedLan : availableLans[0].code;
+  }, [availableLans, selectedLan]);
+
+  const availableMunis = useMemo(() => {
+    if (!datasetResult?.parentLabels || !effectiveLan || !needsMuniFilter) {return [];}
+    return Object.entries(datasetResult.parentLabels)
+      .filter(([code]) => code.startsWith(effectiveLan))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code, name]) => ({ code, name }));
+  }, [datasetResult, effectiveLan, needsMuniFilter]);
+
+  // Effective muni: honour stored selection if still valid, otherwise first in list.
+  const effectiveMuni = useMemo(() => {
+    if (availableMunis.length === 0) {return null;}
+    return availableMunis.some(m => m.code === selectedMuni) ? selectedMuni : availableMunis[0].code;
+  }, [availableMunis, selectedMuni]);
+
+  const filteredForDiverging = useMemo((): DatasetResult | null => {
+    if (!datasetResult) {return null;}
+    if (!needsLanFilter) {return datasetResult;}
+    const filterCode = needsMuniFilter ? effectiveMuni : effectiveLan;
+    if (!filterCode) {return null;}
+    const values = Object.fromEntries(
+      Object.entries(datasetResult.values).filter(([code]) => code.startsWith(filterCode))
+    );
+    const labels = Object.fromEntries(
+      Object.entries(datasetResult.labels).filter(([code]) => code.startsWith(filterCode))
+    );
+    return { ...datasetResult, values, labels };
+  }, [datasetResult, needsLanFilter, needsMuniFilter, effectiveLan, effectiveMuni]);
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
@@ -279,6 +339,36 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Län / Municipality filter — shown for diverging chart at sub-county levels */}
+          {activeView === 'chart' && needsLanFilter && (
+            <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0 text-sm">
+              <label className="text-gray-500 whitespace-nowrap">Län:</label>
+              <select
+                value={effectiveLan ?? ''}
+                onChange={e => setSelectedLan(e.target.value || null)}
+                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white text-gray-700"
+              >
+                {availableLans.map(({ code, name }) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+              {needsMuniFilter && (
+                <>
+                  <label className="text-gray-500 whitespace-nowrap ml-2">Kommun:</label>
+                  <select
+                    value={effectiveMuni ?? ''}
+                    onChange={e => setSelectedMuni(e.target.value || null)}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm bg-white text-gray-700"
+                  >
+                    {availableMunis.map(({ code, name }) => (
+                      <option key={code} value={code}>{name}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex-1 relative overflow-hidden">
             {activeView === 'map' && (
               <MapView
@@ -307,9 +397,9 @@ export default function MapPage() {
                 <Histogram data={datasetResult} colorScale={colorScale} />
               </div>
             )}
-            {activeView === 'chart' && activeChartType === 'diverging' && datasetResult && (
+            {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
               <div className="w-full h-full p-6">
-                <DivergingBarChart data={datasetResult} />
+                <DivergingBarChart data={filteredForDiverging} />
               </div>
             )}
             {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (

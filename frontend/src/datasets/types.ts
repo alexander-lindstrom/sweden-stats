@@ -14,6 +14,8 @@ export interface DatasetResult {
   labels: Record<string, string>; // boundary code → display name
   label: string;                  // e.g. "Folkmängd"
   unit: string;                   // e.g. "persons"
+  /** Parent-level labels (municipality code → name) included at RegSO/DeSO levels. */
+  parentLabels?: Record<string, string>;
 }
 
 export interface GeoHierarchyNode {
