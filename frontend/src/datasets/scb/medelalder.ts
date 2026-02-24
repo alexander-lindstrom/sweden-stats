@@ -308,6 +308,7 @@ export const medelalder: DatasetDescriptor = {
   id: 'medelalder',
   label: 'Medelålder',
   source: 'SCB',
+  year: 2024,
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {

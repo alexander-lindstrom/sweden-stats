@@ -317,6 +317,7 @@ export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
   source: 'SCB',
+  year: 2024,
   supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {

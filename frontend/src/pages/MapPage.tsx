@@ -317,7 +317,7 @@ export default function MapPage() {
           )}
           {activeDescriptor && (
             <span className="ml-auto text-xs text-gray-400">
-              Källa: {activeDescriptor.source}
+              Källa: {activeDescriptor.source} · {activeDescriptor.year}
             </span>
           )}
         </div>

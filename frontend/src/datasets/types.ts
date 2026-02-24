@@ -29,6 +29,7 @@ export interface DatasetDescriptor {
   id: string;
   label: string;
   source: string;
+  year: number;
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];
   supportedViewsByLevel?: Partial<Record<AdminLevel, ViewType[]>>;
