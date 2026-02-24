@@ -1,50 +1,49 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
 import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
-import { AdminLevel, DatasetResult, ViewType } from '@/datasets/types';
+import { AdminLevel, DatasetResult, ViewType, viewsForLevel } from '@/datasets/types';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
 import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
 
-// Feature property used to look up the choropleth value for each admin level's
-// child boundary layer.  Only Region (county_code) is confirmed from GeoServer;
-// the others are placeholders to fill in once the layers are inspected.
+// Feature property used for choropleth lookup — matches the direct boundary
+// layer shown for each admin level.
 const FEATURE_CODE_PROP: Record<AdminLevel, string> = {
-  Country:      'county_code',
-  Region:       'municipality_code',
-  Municipality: 'regsokod',
-  RegSO:        'desokod',
+  Country:      'sovereignt',
+  Region:       'county_code',
+  Municipality: 'municipality_code',
+  RegSO:        'regsokod',
   DeSO:         'desokod',
 };
 
 const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
-  Country:      'county_name',
-  Region:       'municipality_name',
-  Municipality: 'regsonamn',
-  RegSO:        'desokod',  // DeSO layer has no dedicated name field
+  Country:      'name',
+  Region:       'county_name',
+  Municipality: 'municipality_name',
+  RegSO:        'regsonamn',
   DeSO:         'desokod',
 };
 
 const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
 
 const LEVEL_LABELS: Record<AdminLevel, string> = {
-  Country:      'Country',
-  Region:       'Region (Län)',
-  Municipality: 'Municipality (Kommun)',
+  Country:      'Nationell',
+  Region:       'Län',
+  Municipality: 'Kommun',
   RegSO:        'RegSO',
   DeSO:         'DeSO',
 };
 
-const VIEW_OPTIONS: { key: ViewType; label: string }[] = [
-  { key: 'map',   label: 'Map'   },
-  { key: 'chart', label: 'Chart' },
-  { key: 'table', label: 'Table' },
+const ALL_VIEWS: { key: ViewType; label: string }[] = [
+  { key: 'map',   label: 'Karta'   },
+  { key: 'chart', label: 'Diagram' },
+  { key: 'table', label: 'Tabell'  },
 ];
 
 export default function MapPage() {
-  const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Country');
+  const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
   const [activeView,        setActiveView]         = useState<ViewType>('map');
   const [datasetResult,     setDatasetResult]      = useState<DatasetResult | null>(null);
@@ -55,6 +54,11 @@ export default function MapPage() {
 
   const availableDatasets = getDatasetsForLevel(selectedLevel);
 
+  const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
+  const availableViews   = activeDescriptor
+    ? viewsForLevel(activeDescriptor, selectedLevel)
+    : ['map' as ViewType];
+
   // When admin level changes, reset to first available dataset (or none)
   useEffect(() => {
     const datasets = getDatasetsForLevel(selectedLevel);
@@ -63,7 +67,14 @@ export default function MapPage() {
     setColorScale(null);
   }, [selectedLevel]);
 
-  // Fetch data when selected dataset changes
+  // If the active view is no longer supported at the current level, fall back to map
+  useEffect(() => {
+    if (!availableViews.includes(activeView)) {
+      setActiveView('map');
+    }
+  }, [availableViews, activeView]);
+
+  // Fetch data when selected dataset or level changes
   useEffect(() => {
     if (!selectedDatasetId) {
       setDatasetResult(null);
@@ -76,7 +87,6 @@ export default function MapPage() {
       return;
     }
 
-    // Abort any in-flight request
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = new AbortController();
 
@@ -105,8 +115,6 @@ export default function MapPage() {
       });
   }, [selectedDatasetId, selectedLevel]);
 
-  const featureCodeProperty = FEATURE_CODE_PROP[selectedLevel];
-
   return (
     <main className="flex h-screen overflow-hidden bg-white">
       {/* ── Left sidebar ─────────────────────────────────────────────────── */}
@@ -114,7 +122,7 @@ export default function MapPage() {
         {/* Admin level */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Admin Level
+            Nivå
           </h2>
           <ul className="flex flex-col gap-1">
             {ADMIN_LEVELS.map((level) => (
@@ -142,7 +150,7 @@ export default function MapPage() {
           </h2>
           {availableDatasets.length === 0 ? (
             <p className="text-xs text-gray-400 italic">
-              No datasets for this level yet.
+              Inga dataset för denna nivå.
             </p>
           ) : (
             <ul className="flex flex-col gap-1">
@@ -168,7 +176,7 @@ export default function MapPage() {
         {/* Base map */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Base Map
+            Bakgrundskarta
           </h2>
           <select
             value={selectedBase}
@@ -188,23 +196,29 @@ export default function MapPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* View toggle bar */}
         <div className="flex items-center gap-1 border-b border-gray-200 px-4 py-2 bg-white flex-shrink-0">
-          {VIEW_OPTIONS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setActiveView(key)}
-              className={[
-                'px-4 py-1 rounded text-sm font-medium transition-colors',
-                activeView === key
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-100',
-              ].join(' ')}
-            >
-              {label}
-            </button>
-          ))}
+          {ALL_VIEWS.map(({ key, label }) => {
+            const supported = availableViews.includes(key);
+            return (
+              <button
+                key={key}
+                onClick={() => { if (supported) { setActiveView(key); } }}
+                disabled={!supported}
+                className={[
+                  'px-4 py-1 rounded text-sm font-medium transition-colors',
+                  !supported
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : activeView === key
+                      ? 'bg-blue-600 text-white'
+                      : 'text-gray-600 hover:bg-gray-100',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            );
+          })}
           {loading && (
             <span className="ml-4 text-xs text-gray-400 animate-pulse">
-              Loading data…
+              Laddar data…
             </span>
           )}
         </div>
@@ -217,7 +231,7 @@ export default function MapPage() {
               selectedBase={selectedBase}
               choroplethData={datasetResult?.values ?? null}
               colorScale={colorScale}
-              featureCodeProperty={featureCodeProperty}
+              featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
               featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
               unit={datasetResult?.unit ?? ''}
             />
@@ -234,7 +248,7 @@ export default function MapPage() {
           )}
           {activeView === 'chart' && !datasetResult && (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Select a dataset to view the chart.
+              Välj ett dataset för att visa diagram.
             </div>
           )}
           {activeView === 'table' && datasetResult && (
@@ -244,7 +258,7 @@ export default function MapPage() {
           )}
           {activeView === 'table' && !datasetResult && (
             <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Select a dataset to view the table.
+              Välj ett dataset för att visa tabell.
             </div>
           )}
         </div>

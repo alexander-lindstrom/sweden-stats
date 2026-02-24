@@ -54,7 +54,7 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data }) => {
               className="text-left py-2 font-medium text-gray-500 text-xs uppercase tracking-wide cursor-pointer select-none hover:text-gray-700"
               onClick={() => handleSort('name')}
             >
-              Name {indicator('name')}
+              Namn {indicator('name')}
             </th>
             <th
               className="text-right pr-4 py-2 font-medium text-gray-500 text-xs uppercase tracking-wide cursor-pointer select-none hover:text-gray-700"

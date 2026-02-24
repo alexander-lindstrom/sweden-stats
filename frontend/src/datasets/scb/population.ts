@@ -256,18 +256,23 @@ async function fetchByDeso(): Promise<DatasetResult> {
 
 async function fetchPopulation(level: AdminLevel): Promise<DatasetResult> {
   switch (level) {
-    case 'Country':      return fetchByCounty();
-    case 'Region':       return fetchByMunicipality();
-    case 'Municipality': return fetchByRegso();
-    case 'RegSO':        return fetchByDeso();
+    case 'Region':       return fetchByCounty();
+    case 'Municipality': return fetchByMunicipality();
+    case 'RegSO':        return fetchByRegso();
     case 'DeSO':         return fetchByDeso();
+    default:
+      throw new Error(`Population dataset: unsupported level "${level}"`);
   }
 }
 
 export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
-  supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
+  supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
+  supportedViewsByLevel: {
+    RegSO: ['map', 'table'],
+    DeSO:  ['map', 'table'],
+  },
   fetch: fetchPopulation,
 };

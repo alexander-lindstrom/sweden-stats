@@ -20,22 +20,14 @@ import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 
-// Which child boundary layer to show for each admin level
-const LEVEL_TO_CHILD: Record<AdminLevel, keyof typeof adminVectorTileLayers> = {
-  Country:      'Region',
-  Region:       'Municipality',
-  Municipality: 'RegSO',
-  RegSO:        'DeSO',
-  DeSO:         'DeSO',
-};
-
-// Zoom level to animate to when clicking a feature
-const ADMIN_LEVEL_ZOOM: Record<keyof typeof adminVectorTileLayers, number> = {
-  Country:      5,
-  Region:       7,
-  Municipality: 10,
-  RegSO:        12,
-  DeSO:         13,
+// Zoom level to animate to when clicking a feature at each admin level
+// (zooms one step deeper to reveal the next level of detail)
+const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
+  Country:      6,
+  Region:       9,
+  Municipality: 11,
+  RegSO:        13,
+  DeSO:         14,
 };
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
@@ -81,31 +73,22 @@ const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    const childLevel = LEVEL_TO_CHILD[adminLevel];
-
     map.forEachFeatureAtPixel(
       evt.pixel,
       (feature) => {
+        const geometry = feature.getGeometry();
         const view = map.getView();
 
-        if (adminLevel === 'Country') {
-          view.animate({
-            center: SWEDEN_CENTER,
-            zoom: ADMIN_LEVEL_ZOOM.Country,
-            duration: 800,
-          });
-        } else {
-          const geometry = feature.getGeometry();
-          if (!geometry) {
-            return false;
-          }
-          const extent = geometry.getExtent();
-          view.animate({
-            center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
-            zoom: ADMIN_LEVEL_ZOOM[childLevel],
-            duration: 800,
-          });
+        if (!geometry) {
+          return false;
         }
+
+        const extent = geometry.getExtent();
+        view.animate({
+          center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
+          zoom: LEVEL_CLICK_ZOOM[adminLevel],
+          duration: 800,
+        });
         return true;
       },
       {
@@ -189,8 +172,7 @@ const MapView: React.FC<MapViewProps> = ({
       overlayLayerRef.current = null;
     }
 
-    const childLevel = LEVEL_TO_CHILD[adminLevel];
-    const { id, url } = adminVectorTileLayers[childLevel];
+    const { id, url } = adminVectorTileLayers[adminLevel];
 
     const layer =
       choroplethData && colorScale
@@ -204,14 +186,6 @@ const MapView: React.FC<MapViewProps> = ({
     layer.setZIndex(1);
     map.addLayer(layer);
     overlayLayerRef.current = layer;
-
-    if (adminLevel === 'Country') {
-      map.getView().animate({
-        center: SWEDEN_CENTER,
-        zoom: ADMIN_LEVEL_ZOOM.Country,
-        duration: 800,
-      });
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminLevel]);
 
@@ -232,8 +206,7 @@ const MapView: React.FC<MapViewProps> = ({
         return;
       }
       map.removeLayer(layer);
-      const childLevel = LEVEL_TO_CHILD[adminLevel];
-      const { id, url } = adminVectorTileLayers[childLevel];
+      const { id, url } = adminVectorTileLayers[adminLevel];
       const newLayer = createVectorTileLayer(id, url);
       newLayer.setZIndex(1);
       map.addLayer(newLayer);

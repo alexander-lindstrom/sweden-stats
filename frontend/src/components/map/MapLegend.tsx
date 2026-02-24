@@ -15,7 +15,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
   if (!data || !scale) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm text-center p-4">
-        Select a dataset to see the legend.
+        Välj ett dataset för att visa teckenförklaringen.
       </div>
     );
   }

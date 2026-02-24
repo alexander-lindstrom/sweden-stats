@@ -13,5 +13,11 @@ export interface DatasetDescriptor {
   label: string;
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];
+  supportedViewsByLevel?: Partial<Record<AdminLevel, ViewType[]>>;
   fetch: (level: AdminLevel) => Promise<DatasetResult>;
+}
+
+/** Returns which views are available for a descriptor at a given level. */
+export function viewsForLevel(d: DatasetDescriptor, level: AdminLevel): ViewType[] {
+  return d.supportedViewsByLevel?.[level] ?? d.supportedViews;
 }
