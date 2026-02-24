@@ -20,14 +20,12 @@ import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 
-// Zoom level to animate to when clicking a feature at each admin level
-// (zooms one step deeper to reveal the next level of detail)
 const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
-  Country:      6,
-  Region:       9,
-  Municipality: 11,
-  RegSO:        13,
-  DeSO:         14,
+  Country:      5,
+  Region:       7,
+  Municipality: 8,
+  RegSO:        9,
+  DeSO:         10,
 };
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
