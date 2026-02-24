@@ -4,6 +4,7 @@ import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
 import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
 import { Histogram } from '@/components/visualizations/Histogram';
+import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import {
@@ -300,6 +301,11 @@ export default function MapPage() {
                 <Histogram data={datasetResult} colorScale={colorScale} />
               </div>
             )}
+            {activeView === 'chart' && activeChartType === 'diverging' && datasetResult && (
+              <div className="w-full h-full p-6">
+                <DivergingBarChart data={datasetResult} />
+              </div>
+            )}
             {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
               <div className="w-full h-full p-4">
                 <SunburstWithBar
@@ -314,7 +320,7 @@ export default function MapPage() {
                 Laddar hierarki…
               </div>
             )}
-            {activeView === 'chart' && activeChartType !== 'sunburst' && !datasetResult && (
+            {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && !datasetResult && (
               <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                 Välj ett dataset för att visa diagram.
               </div>

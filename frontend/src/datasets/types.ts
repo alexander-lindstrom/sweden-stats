@@ -1,11 +1,12 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table';
-export type ChartType = 'bar' | 'histogram' | 'sunburst';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar:       'Rankningslista',
   histogram: 'Fördelning',
   sunburst:  'Soldiagram',
+  diverging: 'Avvikelse',
 };
 
 export interface DatasetResult {
