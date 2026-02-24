@@ -13,19 +13,18 @@ import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
 // the others are placeholders to fill in once the layers are inspected.
 const FEATURE_CODE_PROP: Record<AdminLevel, string> = {
   Country:      'county_code',
-  Region:       'muni_code',   // TODO: confirm Municipality layer property name
-  Municipality: 'regso',       // TODO: confirm RegSO layer property name
-  RegSO:        'deso',        // TODO: confirm DeSO layer property name
-  DeSO:         'deso',
+  Region:       'municipality_code',
+  Municipality: 'regsokod',
+  RegSO:        'desokod',
+  DeSO:         'desokod',
 };
 
-// Feature property to use as the human-readable tooltip label.
 const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
   Country:      'county_name',
-  Region:       'name',        // TODO: confirm Municipality layer property name
-  Municipality: 'name',        // TODO: confirm RegSO layer property name
-  RegSO:        'name',        // TODO: confirm DeSO layer property name
-  DeSO:         'name',
+  Region:       'municipality_name',
+  Municipality: 'regsonamn',
+  RegSO:        'desokod',  // DeSO layer has no dedicated name field
+  DeSO:         'desokod',
 };
 
 const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
