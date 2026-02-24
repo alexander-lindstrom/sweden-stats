@@ -28,6 +28,7 @@ export interface GeoHierarchyNode {
 export interface DatasetDescriptor {
   id: string;
   label: string;
+  source: string;
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];
   supportedViewsByLevel?: Partial<Record<AdminLevel, ViewType[]>>;

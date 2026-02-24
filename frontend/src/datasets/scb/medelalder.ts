@@ -307,6 +307,7 @@ async function fetchMedelalder(level: AdminLevel): Promise<DatasetResult> {
 export const medelalder: DatasetDescriptor = {
   id: 'medelalder',
   label: 'Medelålder',
+  source: 'SCB',
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {

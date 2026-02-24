@@ -316,6 +316,7 @@ async function fetchPopulation(level: AdminLevel): Promise<DatasetResult> {
 export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
+  source: 'SCB',
   supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
