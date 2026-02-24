@@ -12,6 +12,7 @@ import {
   ViewType, viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
 } from '@/datasets/types';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
+import { fetchCached, fetchHierarchyCached, preload } from '@/datasets/cache';
 import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
 
 // Feature property used for choropleth lookup — matches the direct boundary
@@ -58,7 +59,8 @@ export default function MapPage() {
   const [colorScale,        setColorScale]         = useState<d3.ScaleSequential<string> | null>(null);
   const [loading,           setLoading]            = useState(false);
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
-  const fetchAbortRef = useRef<AbortController | null>(null);
+  // Generation counter — incremented on every new fetch; stale responses are ignored.
+  const fetchGenRef = useRef(0);
 
   const availableDatasets = getDatasetsForLevel(selectedLevel);
 
@@ -70,10 +72,10 @@ export default function MapPage() {
     ? chartTypesForLevel(activeDescriptor, selectedLevel)
     : ['bar' as ChartType];
 
-  // When admin level changes, reset to first available dataset (or none).
+  // When admin level changes, preserve dataset if still available; otherwise reset.
   useEffect(() => {
     const datasets = getDatasetsForLevel(selectedLevel);
-    setSelectedDatasetId(datasets[0]?.id ?? null);
+    setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
     setDatasetResult(null);
     setHierarchyData(null);
     setColorScale(null);
@@ -86,10 +88,10 @@ export default function MapPage() {
     }
   }, [availableViews, activeView]);
 
-  // When level or dataset changes, reset to the first available chart type.
+  // When level or dataset changes, preserve chart type if still available; otherwise reset.
   useEffect(() => {
     const types = activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType];
-    setActiveChartType(types[0] ?? 'bar');
+    setActiveChartType(ct => types.includes(ct) ? ct : (types[0] ?? 'bar'));
   }, [selectedLevel, selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch flat data when selected dataset or level changes.
@@ -103,28 +105,31 @@ export default function MapPage() {
     const descriptor = DATASETS.find((d) => d.id === selectedDatasetId);
     if (!descriptor) return;
 
-    fetchAbortRef.current?.abort();
-    fetchAbortRef.current = new AbortController();
-
+    const gen = ++fetchGenRef.current;
     setLoading(true);
-    descriptor
-      .fetch(selectedLevel)
-      .then((result) => {
-        const vals = Object.values(result.values).filter(Number.isFinite);
-        const min = Math.min(...vals);
-        const max = Math.max(...vals);
 
+    fetchCached(descriptor, selectedLevel)
+      .then((result) => {
+        if (gen !== fetchGenRef.current) return; // superseded by a newer fetch
+
+        const vals = Object.values(result.values).filter(Number.isFinite);
         const scale = d3
           .scaleSequential(d3.interpolateBlues)
-          .domain([min, max])
+          .domain([Math.min(...vals), Math.max(...vals)])
           .clamp(true);
 
         setDatasetResult(result);
         setColorScale(() => scale);
         setLoading(false);
+
+        // Preload neighbouring admin levels in the background.
+        const idx = ADMIN_LEVELS.indexOf(selectedLevel);
+        const neighbours = [ADMIN_LEVELS[idx - 1], ADMIN_LEVELS[idx + 1]]
+          .filter((l): l is AdminLevel => l !== undefined);
+        preload(descriptor, neighbours);
       })
       .catch((err) => {
-        if ((err as Error).name !== 'AbortError') {
+        if (gen === fetchGenRef.current) {
           console.error('Dataset fetch failed:', err);
           setLoading(false);
         }
@@ -133,13 +138,14 @@ export default function MapPage() {
 
   // Fetch hierarchy data when sunburst is active and descriptor supports it.
   useEffect(() => {
-    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) {
-      return;
-    }
-    if (hierarchyData) return; // already loaded
+    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) return;
 
-    activeDescriptor.fetchHierarchy()
-      .then(setHierarchyData)
+    const gen = ++fetchGenRef.current;
+    fetchHierarchyCached(activeDescriptor)
+      .then(result => {
+        if (gen !== fetchGenRef.current) return;
+        setHierarchyData(result);
+      })
       .catch(err => console.error('Hierarchy fetch failed:', err));
   }, [activeChartType, activeDescriptor]); // eslint-disable-line react-hooks/exhaustive-deps
 
