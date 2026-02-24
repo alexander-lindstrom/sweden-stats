@@ -65,7 +65,9 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('rx', BAR_RADIUS)
       .attr('fill', d =>
         colorScale ? colorScale(d.value) : '#3b82f6'
-      );
+      )
+      .attr('stroke', '#000')
+      .attr('stroke-width', 0.5);
 
     // Value labels (right of bar)
     g.selectAll('text.val')

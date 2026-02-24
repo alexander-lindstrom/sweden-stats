@@ -114,7 +114,7 @@ export default function MapPage() {
 
         const vals = Object.values(result.values).filter(Number.isFinite);
         const scale = d3
-          .scaleSequential(d3.interpolateBlues)
+          .scaleSequential(t => d3.interpolateBlues(0.15 + t * 0.85))
           .domain([Math.min(...vals), Math.max(...vals)])
           .clamp(true);
 

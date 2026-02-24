@@ -16,7 +16,7 @@ interface TooltipState {
   content: string[];
 }
 
-const MARGIN = { top: 16, right: 24, bottom: 36, left: 52 };
+const MARGIN   = { top: 16, right: 24, bottom: 36, left: 52 };
 const NUM_BINS = 15;
 
 function formatValue(v: number): string {
@@ -95,6 +95,8 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
         const mid = ((d.x0 ?? 0) + (d.x1 ?? 0)) / 2;
         return colorScale(mid);
       })
+      .attr('stroke', '#000')
+      .attr('stroke-width', 0.5)
       .on('mousemove', (event, d) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
