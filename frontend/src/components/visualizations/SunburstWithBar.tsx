@@ -18,8 +18,10 @@ interface TT {
   value: number;
 }
 
-const BAR_M   = { top: 20, right: 72, bottom: 36, left: 168 };
-const MAX_BARS = 40;
+const BAR_M      = { top: 20, right: 72, bottom: 36, left: 168 };
+const MAX_BARS   = 40;
+const MAX_BAR_H  = 20;   // max bar height in px — matches budget chart density
+const BAR_GAP    = 1;    // gap between bars in px
 
 function fmtShort(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -58,11 +60,13 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
   }, []);
 
   // Shared color scale — same keys and colors in both charts.
+  // Offset by 0.5/n so colors are evenly centred and don't wrap near t=0/t=1.
   const colorScale = useMemo(() => {
     const ch = focus.children ?? [];
+    const n  = Math.max(ch.length, 1);
     return d3.scaleOrdinal<string>()
       .domain(ch.map(c => c.name))
-      .range(ch.map((_, i) => d3.interpolateRainbow(i / Math.max(ch.length, 1))));
+      .range(ch.map((_, i) => d3.interpolateRainbow((i + 0.5) / n)));
   }, [focus]);
 
   // ── Sunburst ───────────────────────────────────────────────────────────────
@@ -79,7 +83,6 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
 
     const g = svg.append('g').attr('transform', `translate(${w / 2},${h / 2})`);
 
-    // Build partition from focus node (focus is the "root" of the current view).
     const hier = d3.hierarchy<GeoHierarchyNode>(focus)
       .sum(d => (!d.children?.length ? d.value : 0));
     d3.partition<GeoHierarchyNode>().size([2 * Math.PI, radius])(hier);
@@ -89,7 +92,6 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
 
     function nodeColor(d: PN): string {
       if (d.depth === 0) return '#e0e0e0';
-      // All nodes inherit the color of their depth-1 ancestor.
       let a: PN = d;
       while (a.depth > 1 && a.parent) a = a.parent as PN;
       return colorScale(a.data.name);
@@ -110,7 +112,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
       .join('path')
       .attr('d', arc)
       .attr('fill', nodeColor)
-      .attr('stroke', '#fff')
+      .attr('stroke', '#000')
       .attr('stroke-width', 0.5)
       .style('cursor', d => (drillable(d) ? 'pointer' : 'default'))
       .on('click', (_e, d) => {
@@ -171,21 +173,28 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
 
     const g = svg.append('g').attr('transform', `translate(${BAR_M.left},${BAR_M.top})`);
 
+    // Fixed bar height with centering — matches budget chart density.
+    const n        = sorted.length;
+    const needed   = n * MAX_BAR_H + Math.max(n - 1, 0) * BAR_GAP;
+    const effH     = Math.min(innerH, needed);
+    const vOffset  = (innerH - effH) / 2;
+    const padding  = n > 1 ? BAR_GAP / MAX_BAR_H : 0;
+
     const xScale = d3.scaleLinear()
       .domain([0, d3.max(sorted, d => d.value) ?? 1])
       .range([0, innerW]).nice();
 
     const yScale = d3.scaleBand<string>()
       .domain(sorted.map(d => d.name))
-      .range([0, innerH])
-      .padding(0.2);
+      .range([vOffset, vOffset + effH])
+      .paddingInner(padding);
 
     // Light grid lines.
     g.selectAll('line.grid')
       .data(xScale.ticks(4))
       .join('line').attr('class', 'grid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
-      .attr('y1', 0).attr('y2', innerH)
+      .attr('y1', vOffset).attr('y2', vOffset + effH)
       .attr('stroke', '#f3f4f6').attr('stroke-width', 1);
 
     // Bars.
@@ -196,9 +205,8 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
       .attr('y', d => yScale(d.name)!)
       .attr('width', d => xScale(d.value))
       .attr('height', yScale.bandwidth())
-      .attr('rx', 2)
       .attr('fill', d => colorScale(d.name))
-      .attr('stroke', 'rgba(0,0,0,0.15)').attr('stroke-width', 0.5)
+      .attr('stroke', '#000').attr('stroke-width', 0.5)
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
       .on('click', (_e, d) => { if (d.children?.length) drillDown(d); })
       .on('mouseover', (e, d) => {
@@ -223,17 +231,27 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
       .attr('pointer-events', 'none')
       .text(d => fmtShort(d.value));
 
-    // Y-axis — region/municipality names.
+    // Y-axis — names, truncated to fit the left margin using actual render width.
     g.append('g')
       .call(d3.axisLeft(yScale).tickSize(0).tickPadding(8))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll<SVGTextElement, string>('text')
         .attr('font-size', 12).attr('fill', '#374151')
-        .text(name => (name.length > 20 ? name.slice(0, 19) + '…' : name)));
+        .text(name => name)
+        .each(function() {
+          const el  = this as SVGTextElement;
+          const max = BAR_M.left - 16;
+          if (el.getComputedTextLength() <= max) return;
+          let t = el.textContent ?? '';
+          while (t.length > 2 && el.getComputedTextLength() > max) {
+            t = t.slice(0, -1);
+            el.textContent = t + '…';
+          }
+        }));
 
     // X-axis.
     g.append('g')
-      .attr('transform', `translate(0,${innerH})`)
+      .attr('transform', `translate(0,${vOffset + effH})`)
       .call(d3.axisBottom(xScale).ticks(4).tickFormat(n => {
         const v = n.valueOf();
         return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
@@ -255,11 +273,8 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
 
   return (
     <div ref={containerRef} className="relative w-full h-full flex">
-      {/* Sunburst — left half */}
       <svg ref={sunRef} className="flex-shrink-0" />
-      {/* Divider */}
       <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
-      {/* Bar chart — right half */}
       <svg ref={barRef} className="flex-1 min-w-0" />
       <Tooltip x={tt.x} y={tt.y} visible={tt.visible}>
         <div className="font-medium">{tt.name}</div>

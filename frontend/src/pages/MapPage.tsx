@@ -78,10 +78,10 @@ export default function MapPage() {
     setColorScale(null);
   }, [selectedLevel]);
 
-  // If the active view is no longer supported at the current level, fall back to map.
+  // If the active view is no longer supported at the current level, fall back to first available.
   useEffect(() => {
     if (!availableViews.includes(activeView)) {
-      setActiveView('map');
+      setActiveView(availableViews[0] ?? 'map');
     }
   }, [availableViews, activeView]);
 

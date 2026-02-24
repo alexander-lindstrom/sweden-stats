@@ -319,7 +319,7 @@ export const population: DatasetDescriptor = {
   },
   chartTypes: {
     Country:      ['sunburst'],
-    Region:       ['bar'],
+    Region:       ['bar', 'histogram'],
     Municipality: ['histogram'],
     RegSO:        ['histogram'],
   },
