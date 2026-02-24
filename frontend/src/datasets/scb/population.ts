@@ -1,5 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
-import { AdminLevel, DatasetDescriptor, DatasetResult } from '../types';
+import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode } from '../types';
 
 // ── TAB5444 constants (Country → Region, Region → Municipality) ──────────────
 
@@ -252,10 +252,52 @@ async function fetchByDeso(): Promise<DatasetResult> {
   return { values, labels, label: 'Folkmängd', unit: 'personer' };
 }
 
+// ── Hierarchy builder ────────────────────────────────────────────────────────
+
+export async function fetchPopulationHierarchy(): Promise<GeoHierarchyNode> {
+  const [countyResult, municipalityResult] = await Promise.all([
+    fetchByCounty(),
+    fetchByMunicipality(),
+  ]);
+
+  // Build läns nodes with their kommuner as children.
+  const lans: GeoHierarchyNode[] = REGION_CODES.map((countyCode) => {
+    const countyName  = countyResult.labels[countyCode] ?? countyCode;
+    const countyValue = countyResult.values[countyCode] ?? 0;
+
+    // Municipalities whose 4-digit code starts with the 2-digit county code.
+    const children: GeoHierarchyNode[] = Object.entries(municipalityResult.values)
+      .filter(([mCode]) => mCode.startsWith(countyCode))
+      .map(([mCode, mValue]) => ({
+        code:  mCode,
+        name:  municipalityResult.labels[mCode] ?? mCode,
+        value: mValue,
+      }))
+      .sort((a, b) => b.value - a.value);
+
+    return {
+      code:     countyCode,
+      name:     countyName,
+      value:    countyValue,
+      children,
+    };
+  }).sort((a, b) => b.value - a.value);
+
+  const totalValue = lans.reduce((sum, lan) => sum + lan.value, 0);
+
+  return {
+    code:     'SE',
+    name:     'Sverige',
+    value:    totalValue,
+    children: lans,
+  };
+}
+
 // ── Descriptor ───────────────────────────────────────────────────────────────
 
 async function fetchPopulation(level: AdminLevel): Promise<DatasetResult> {
   switch (level) {
+    case 'Country':      return fetchByCounty();
     case 'Region':       return fetchByCounty();
     case 'Municipality': return fetchByMunicipality();
     case 'RegSO':        return fetchByRegso();
@@ -268,11 +310,19 @@ async function fetchPopulation(level: AdminLevel): Promise<DatasetResult> {
 export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
-  supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
+  supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
-    RegSO: ['map', 'table'],
-    DeSO:  ['map', 'table'],
+    Country: ['chart', 'table'],
+    RegSO:   ['map', 'table'],
+    DeSO:    ['map', 'table'],
+  },
+  chartTypes: {
+    Country:      ['sunburst'],
+    Region:       ['bar'],
+    Municipality: ['histogram'],
+    RegSO:        ['histogram'],
   },
   fetch: fetchPopulation,
+  fetchHierarchy: fetchPopulationHierarchy,
 };

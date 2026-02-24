@@ -16,7 +16,7 @@ const baseVectorStyle = new Style({
   }),
 });
 
-export function createVectorTileLayer(id: string, urlTemplate: string): VectorTileLayer {
+export function createVectorTileLayer(_id: string, urlTemplate: string): VectorTileLayer {
   return new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
@@ -36,7 +36,7 @@ const noDataStyle = new Style({
 });
 
 export function createChoroplethLayer(
-  id: string,
+  _id: string,
   urlTemplate: string,
   styleFunction: (feature: FeatureLike) => Style,
 ): VectorTileLayer {

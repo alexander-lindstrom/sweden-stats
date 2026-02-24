@@ -3,8 +3,13 @@ import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
 import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
+import { Histogram } from '@/components/visualizations/Histogram';
+import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
-import { AdminLevel, DatasetResult, ViewType, viewsForLevel } from '@/datasets/types';
+import {
+  AdminLevel, ChartType, DatasetResult, GeoHierarchyNode,
+  ViewType, viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
+} from '@/datasets/types';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
 import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
 
@@ -46,7 +51,9 @@ export default function MapPage() {
   const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
   const [activeView,        setActiveView]         = useState<ViewType>('map');
+  const [activeChartType,   setActiveChartType]   = useState<ChartType>('bar');
   const [datasetResult,     setDatasetResult]      = useState<DatasetResult | null>(null);
+  const [hierarchyData,     setHierarchyData]      = useState<GeoHierarchyNode | null>(null);
   const [colorScale,        setColorScale]         = useState<d3.ScaleSequential<string> | null>(null);
   const [loading,           setLoading]            = useState(false);
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
@@ -58,23 +65,33 @@ export default function MapPage() {
   const availableViews   = activeDescriptor
     ? viewsForLevel(activeDescriptor, selectedLevel)
     : ['map' as ViewType];
+  const availableChartTypes = activeDescriptor
+    ? chartTypesForLevel(activeDescriptor, selectedLevel)
+    : ['bar' as ChartType];
 
-  // When admin level changes, reset to first available dataset (or none)
+  // When admin level changes, reset to first available dataset (or none).
   useEffect(() => {
     const datasets = getDatasetsForLevel(selectedLevel);
     setSelectedDatasetId(datasets[0]?.id ?? null);
     setDatasetResult(null);
+    setHierarchyData(null);
     setColorScale(null);
   }, [selectedLevel]);
 
-  // If the active view is no longer supported at the current level, fall back to map
+  // If the active view is no longer supported at the current level, fall back to map.
   useEffect(() => {
     if (!availableViews.includes(activeView)) {
       setActiveView('map');
     }
   }, [availableViews, activeView]);
 
-  // Fetch data when selected dataset or level changes
+  // When level or dataset changes, reset to the first available chart type.
+  useEffect(() => {
+    const types = activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType];
+    setActiveChartType(types[0] ?? 'bar');
+  }, [selectedLevel, selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch flat data when selected dataset or level changes.
   useEffect(() => {
     if (!selectedDatasetId) {
       setDatasetResult(null);
@@ -83,9 +100,7 @@ export default function MapPage() {
     }
 
     const descriptor = DATASETS.find((d) => d.id === selectedDatasetId);
-    if (!descriptor) {
-      return;
-    }
+    if (!descriptor) return;
 
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = new AbortController();
@@ -114,6 +129,18 @@ export default function MapPage() {
         }
       });
   }, [selectedDatasetId, selectedLevel]);
+
+  // Fetch hierarchy data when sunburst is active and descriptor supports it.
+  useEffect(() => {
+    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) {
+      return;
+    }
+    if (hierarchyData) return; // already loaded
+
+    activeDescriptor.fetchHierarchy()
+      .then(setHierarchyData)
+      .catch(err => console.error('Hierarchy fetch failed:', err));
+  }, [activeChartType, activeDescriptor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
@@ -224,43 +251,86 @@ export default function MapPage() {
         </div>
 
         {/* Main view area */}
-        <div className="flex-1 relative overflow-hidden">
-          {activeView === 'map' && (
-            <MapView
-              adminLevel={selectedLevel}
-              selectedBase={selectedBase}
-              choroplethData={datasetResult?.values ?? null}
-              colorScale={colorScale}
-              featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
-              featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
-              unit={datasetResult?.unit ?? ''}
-            />
-          )}
-          {activeView === 'map' && datasetResult && (
-            <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
-              <MapLegend data={datasetResult} scale={colorScale} />
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Chart type sub-selector — only shown in chart view with >1 type */}
+          {activeView === 'chart' && availableChartTypes.length > 1 && (
+            <div className="flex gap-1 px-6 pt-3 pb-1 border-b border-gray-100 flex-shrink-0">
+              {availableChartTypes.map(ct => (
+                <button
+                  key={ct}
+                  onClick={() => setActiveChartType(ct)}
+                  className={[
+                    'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                    activeChartType === ct
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-500 hover:bg-gray-100',
+                  ].join(' ')}
+                >
+                  {CHART_TYPE_LABELS[ct]}
+                </button>
+              ))}
             </div>
           )}
-          {activeView === 'chart' && datasetResult && (
-            <div className="w-full h-full p-6">
-              <RankedBarChart data={datasetResult} colorScale={colorScale} />
-            </div>
-          )}
-          {activeView === 'chart' && !datasetResult && (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Välj ett dataset för att visa diagram.
-            </div>
-          )}
-          {activeView === 'table' && datasetResult && (
-            <div className="w-full h-full p-6">
-              <DatasetTable data={datasetResult} />
-            </div>
-          )}
-          {activeView === 'table' && !datasetResult && (
-            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-              Välj ett dataset för att visa tabell.
-            </div>
-          )}
+
+          <div className="flex-1 relative overflow-hidden">
+            {activeView === 'map' && (
+              <MapView
+                adminLevel={selectedLevel}
+                selectedBase={selectedBase}
+                choroplethData={datasetResult?.values ?? null}
+                colorScale={colorScale}
+                featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
+                featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+                unit={datasetResult?.unit ?? ''}
+              />
+            )}
+            {activeView === 'map' && datasetResult && (
+              <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+                <MapLegend data={datasetResult} scale={colorScale} />
+              </div>
+            )}
+
+            {activeView === 'chart' && activeChartType === 'bar' && datasetResult && (
+              <div className="w-full h-full p-6">
+                <RankedBarChart data={datasetResult} colorScale={colorScale} />
+              </div>
+            )}
+            {activeView === 'chart' && activeChartType === 'histogram' && datasetResult && (
+              <div className="w-full h-full p-6">
+                <Histogram data={datasetResult} colorScale={colorScale} />
+              </div>
+            )}
+            {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
+              <div className="w-full h-full p-4">
+                <SunburstWithBar
+                  root={hierarchyData}
+                  unit={datasetResult?.unit ?? ''}
+                  label={activeDescriptor?.label ?? ''}
+                />
+              </div>
+            )}
+            {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
+                Laddar hierarki…
+              </div>
+            )}
+            {activeView === 'chart' && activeChartType !== 'sunburst' && !datasetResult && (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                Välj ett dataset för att visa diagram.
+              </div>
+            )}
+
+            {activeView === 'table' && datasetResult && (
+              <div className="w-full h-full p-6">
+                <DatasetTable data={datasetResult} />
+              </div>
+            )}
+            {activeView === 'table' && !datasetResult && (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                Välj ett dataset för att visa tabell.
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </main>

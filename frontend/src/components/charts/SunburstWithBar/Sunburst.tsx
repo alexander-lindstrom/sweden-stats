@@ -69,8 +69,7 @@ export const SunburstChart: React.FC<SunburstChartProps> = ({
       .innerRadius(d => d.y0 === 0 ? 0 : Math.max(0, d.y0))
       .outerRadius(d => Math.max(0, d.y1 - 0.5));
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const path = g.append("g")
+    g.append("g")
       .selectAll("path")
       .data(nodesToDraw)
       .join("path")
