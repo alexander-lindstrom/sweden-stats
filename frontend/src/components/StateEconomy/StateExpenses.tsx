@@ -6,7 +6,7 @@ import { DataNode, HierarchyDataNode } from '../charts/sunBurstWithBar/types';
 import { BarChart } from '../charts/sunBurstWithBar/Bar';
 import { SunburstChart } from '../charts/sunBurstWithBar/Sunburst';
 import { fetchAllExpenses } from '@/api/backend/StateExpensesApi';
-import YearSlider from './YearSlider';
+import YearSlider from '@/components/common/YearSlider';
 
 export const DashboardComponent: React.FC = () => {
   const [expensesData, setExpensesData] = useState<Record<string, DataNode> | null>(null);

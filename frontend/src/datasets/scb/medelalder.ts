@@ -156,7 +156,7 @@ function stripSuffixes(raw: { values: Record<string, number>; labels: Record<str
 
 // ── Fetch functions ───────────────────────────────────────────────────────────
 
-async function fetchByCounty(): Promise<DatasetResult> {
+async function fetchByCounty(year: number): Promise<DatasetResult> {
   const res = await fetch(DATA_URL_637, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -165,7 +165,7 @@ async function fetchByCounty(): Promise<DatasetResult> {
         { variableCode: 'Region',       valueCodes: REGION_CODES },
         { variableCode: 'Kon',          valueCodes: ['1+2'] },
         { variableCode: 'ContentsCode', valueCodes: ['BE0101G9'] },
-        { variableCode: 'Tid',          valueCodes: ['2024'] },
+        { variableCode: 'Tid',          valueCodes: [String(year)] },
       ],
     }),
   });
@@ -175,7 +175,7 @@ async function fetchByCounty(): Promise<DatasetResult> {
   return { values, labels, label: 'Medelålder', unit: 'år' };
 }
 
-async function fetchByMunicipality(): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<DatasetResult> {
   const { codes, labels: metaLabels } = await getMunicipalityCodes637();
   const res = await fetch(DATA_URL_637, {
     method: 'POST',
@@ -185,7 +185,7 @@ async function fetchByMunicipality(): Promise<DatasetResult> {
         { variableCode: 'Region',       valueCodes: codes },
         { variableCode: 'Kon',          valueCodes: ['1+2'] },
         { variableCode: 'ContentsCode', valueCodes: ['BE0101G9'] },
-        { variableCode: 'Tid',          valueCodes: ['2024'] },
+        { variableCode: 'Tid',          valueCodes: [String(year)] },
       ],
     }),
   });
@@ -197,6 +197,7 @@ async function fetchByMunicipality(): Promise<DatasetResult> {
 
 async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
   // TAB6574 has no pre-computed medelålder — compute as weighted mean from age bands.
+  // Boundary-locked: RegSO/DeSO boundaries are stable only at 2024.
   const res = await fetch(DATA_URL_6574, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -294,10 +295,10 @@ async function fetchByDeso(): Promise<DatasetResult> {
 
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
-async function fetchMedelalder(level: AdminLevel): Promise<DatasetResult> {
+async function fetchMedelalder(level: AdminLevel, year: number): Promise<DatasetResult> {
   switch (level) {
-    case 'Region':       return fetchByCounty();
-    case 'Municipality': return fetchByMunicipality();
+    case 'Region':       return fetchByCounty(year);
+    case 'Municipality': return fetchByMunicipality(year);
     case 'RegSO':        return fetchByRegso();
     case 'DeSO':         return fetchByDeso();
     default: throw new Error(`Medelålder: unsupported level "${level}"`);
@@ -308,7 +309,7 @@ export const medelalder: DatasetDescriptor = {
   id: 'medelalder',
   label: 'Medelålder',
   source: 'SCB',
-  year: 2024,
+  availableYears: Array.from({ length: 27 }, (_, i) => 1998 + i),
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {

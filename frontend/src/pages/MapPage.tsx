@@ -7,6 +7,7 @@ import { Histogram } from '@/components/visualizations/Histogram';
 import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
+import YearSlider from '@/components/common/YearSlider';
 import {
   AdminLevel, ChartType, DatasetResult, GeoHierarchyNode,
   ViewType, viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
@@ -63,6 +64,7 @@ const ALL_VIEWS: { key: ViewType; label: string }[] = [
 export default function MapPage() {
   const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [selectedYear,      setSelectedYear]       = useState<number>(2024);
   const [activeView,        setActiveView]         = useState<ViewType>('map');
   const [activeChartType,   setActiveChartType]   = useState<ChartType>('bar');
   const [datasetResult,     setDatasetResult]      = useState<DatasetResult | null>(null);
@@ -94,6 +96,18 @@ export default function MapPage() {
     setColorScale(null);
   }, [selectedLevel]);
 
+  // When dataset changes, clamp year to the new dataset's available range.
+  useEffect(() => {
+    if (!selectedDatasetId) {return;}
+    const descriptor = DATASETS.find(d => d.id === selectedDatasetId);
+    if (!descriptor) {return;}
+    const latest   = descriptor.availableYears.at(-1)!;
+    const earliest = descriptor.availableYears[0];
+    if (selectedYear > latest || selectedYear < earliest) {
+      setSelectedYear(latest);
+    }
+  }, [selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // If the active view is no longer supported at the current level, fall back to first available.
   useEffect(() => {
     if (!availableViews.includes(activeView)) {
@@ -122,7 +136,7 @@ export default function MapPage() {
     const gen = ++fetchGenRef.current;
     setLoading(true);
 
-    fetchCached(descriptor, selectedLevel)
+    fetchCached(descriptor, selectedLevel, selectedYear)
       .then((result) => {
         if (gen !== fetchGenRef.current) {return;} // superseded by a newer fetch
 
@@ -140,7 +154,7 @@ export default function MapPage() {
         const idx = ADMIN_LEVELS.indexOf(selectedLevel);
         const neighbours = [ADMIN_LEVELS[idx - 1], ADMIN_LEVELS[idx + 1]]
           .filter((l): l is AdminLevel => l !== undefined);
-        preload(descriptor, neighbours);
+        preload(descriptor, neighbours, selectedYear);
       })
       .catch((err) => {
         if (gen === fetchGenRef.current) {
@@ -148,20 +162,20 @@ export default function MapPage() {
           setLoading(false);
         }
       });
-  }, [selectedDatasetId, selectedLevel]);
+  }, [selectedDatasetId, selectedLevel, selectedYear]);
 
   // Fetch hierarchy data when sunburst is active and descriptor supports it.
   useEffect(() => {
     if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) {return;}
 
     const gen = ++fetchGenRef.current;
-    fetchHierarchyCached(activeDescriptor)
+    fetchHierarchyCached(activeDescriptor, selectedYear)
       .then(result => {
         if (gen !== fetchGenRef.current) {return;}
         setHierarchyData(result);
       })
       .catch(err => console.error('Hierarchy fetch failed:', err));
-  }, [activeChartType, activeDescriptor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeChartType, activeDescriptor, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Diverging chart filter (Municipality / RegSO / DeSO) ──────────────────
   const needsLanFilter  = activeChartType === 'diverging' &&
@@ -267,6 +281,20 @@ export default function MapPage() {
           )}
         </section>
 
+        {/* Year slider — hidden at RegSO/DeSO (boundary-locked) */}
+        {activeDescriptor && !['RegSO', 'DeSO'].includes(selectedLevel) && (
+          <section>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
+              År: {selectedYear}
+            </h2>
+            <YearSlider
+              years={activeDescriptor.availableYears.map(String)}
+              selectedYear={String(selectedYear)}
+              onYearChange={(y) => setSelectedYear(Number(y))}
+            />
+          </section>
+        )}
+
         {/* Base map */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
@@ -317,7 +345,7 @@ export default function MapPage() {
           )}
           {activeDescriptor && (
             <span className="ml-auto text-xs text-gray-400">
-              Källa: {activeDescriptor.source} · {activeDescriptor.year}
+              Källa: {activeDescriptor.source} · {selectedYear}
             </span>
           )}
         </div>

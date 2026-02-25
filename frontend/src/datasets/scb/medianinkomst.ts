@@ -119,7 +119,7 @@ function stripSuffixes(raw: { values: Record<string, number>; labels: Record<str
 
 // ── Data query ────────────────────────────────────────────────────────────────
 
-async function postQuery(codes: string[]): Promise<JsonStat2Response> {
+async function postQuery(codes: string[], year: number): Promise<JsonStat2Response> {
   const res = await fetch(DATA_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -129,7 +129,7 @@ async function postQuery(codes: string[]): Promise<JsonStat2Response> {
         { variableCode: 'Kon',          valueCodes: ['1+2'] },
         { variableCode: 'InkomstTyp',   valueCodes: ['NeInk'] },
         { variableCode: 'ContentsCode', valueCodes: ['0000089U'] },
-        { variableCode: 'Tid',          valueCodes: ['2024'] },
+        { variableCode: 'Tid',          valueCodes: [String(year)] },
       ],
     }),
   });
@@ -139,40 +139,42 @@ async function postQuery(codes: string[]): Promise<JsonStat2Response> {
 
 // ── Fetch functions ───────────────────────────────────────────────────────────
 
-async function fetchByRegion(): Promise<DatasetResult> {
+async function fetchByRegion(year: number): Promise<DatasetResult> {
   const { countyCodes } = await getCodesByLevel();
-  const data = await postQuery(countyCodes);
+  const data = await postQuery(countyCodes, year);
   const { values, labels } = aggregateByRegion(data);
   return { values, labels, label: 'Medianinkomst', unit: 'tkr' };
 }
 
-async function fetchByMunicipality(): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<DatasetResult> {
   const { municipalityCodes } = await getCodesByLevel();
-  const data = await postQuery(municipalityCodes);
+  const data = await postQuery(municipalityCodes, year);
   const { values, labels } = aggregateByRegion(data);
   return { values, labels, label: 'Medianinkomst', unit: 'tkr' };
 }
 
 async function fetchByRegso(): Promise<DatasetResult> {
+  // Boundary-locked: RegSO boundaries stable only at 2024.
   const { regsoCodes, municipalityLabels } = await getCodesByLevel();
-  const data = await postQuery(regsoCodes);
+  const data = await postQuery(regsoCodes, 2024);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
   return { values, labels, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
 }
 
 async function fetchByDeso(): Promise<DatasetResult> {
+  // Boundary-locked: DeSO boundaries stable only at 2024.
   const { desoCodes, municipalityLabels } = await getCodesByLevel();
-  const data = await postQuery(desoCodes);
+  const data = await postQuery(desoCodes, 2024);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
   return { values, labels, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
 }
 
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
-async function fetchMedianinkomst(level: AdminLevel): Promise<DatasetResult> {
+async function fetchMedianinkomst(level: AdminLevel, year: number): Promise<DatasetResult> {
   switch (level) {
-    case 'Region':       return fetchByRegion();
-    case 'Municipality': return fetchByMunicipality();
+    case 'Region':       return fetchByRegion(year);
+    case 'Municipality': return fetchByMunicipality(year);
     case 'RegSO':        return fetchByRegso();
     case 'DeSO':         return fetchByDeso();
     default: throw new Error(`Medianinkomst: unsupported level "${level}"`);
@@ -183,7 +185,7 @@ export const medianinkomst: DatasetDescriptor = {
   id: 'medianinkomst',
   label: 'Medianinkomst',
   source: 'SCB',
-  year: 2024,
+  availableYears: Array.from({ length: 14 }, (_, i) => 2011 + i),
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {

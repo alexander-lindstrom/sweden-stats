@@ -29,13 +29,13 @@ export interface DatasetDescriptor {
   id: string;
   label: string;
   source: string;
-  year: number;
+  availableYears: number[];
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];
   supportedViewsByLevel?: Partial<Record<AdminLevel, ViewType[]>>;
   chartTypes?: Partial<Record<AdminLevel, ChartType[]>>;
-  fetch: (level: AdminLevel) => Promise<DatasetResult>;
-  fetchHierarchy?: () => Promise<GeoHierarchyNode>;
+  fetch: (level: AdminLevel, year: number) => Promise<DatasetResult>;
+  fetchHierarchy?: (year: number) => Promise<GeoHierarchyNode>;
 }
 
 /** Returns which views are available for a descriptor at a given level. */

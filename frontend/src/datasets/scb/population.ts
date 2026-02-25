@@ -215,24 +215,24 @@ async function postDataQuery6574(codes: string[]): Promise<JsonStat2Response> {
   return res.json();
 }
 
-async function fetchByCounty(): Promise<DatasetResult> {
+async function fetchByCounty(year: number): Promise<DatasetResult> {
   const data = await postDataQuery5444([
     { variableCode: 'Region',       valueCodes: REGION_CODES },
     { variableCode: 'Kon',          valueCodes: ['1', '2'] },
     { variableCode: 'ContentsCode', valueCodes: ['000003O5'] },
-    { variableCode: 'Tid',          valueCodes: ['2024M12'] },
+    { variableCode: 'Tid',          valueCodes: [`${year}M12`] },
   ]);
   const { values, labels } = aggregateByRegion(data);
   return { values, labels, label: 'Folkmängd', unit: 'personer' };
 }
 
-async function fetchByMunicipality(): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<DatasetResult> {
   const { codes, labels: metaLabels } = await getMunicipalityCodes();
   const data = await postDataQuery5444([
     { variableCode: 'Region',       valueCodes: codes },
     { variableCode: 'Kon',          valueCodes: ['1', '2'] },
     { variableCode: 'ContentsCode', valueCodes: ['000003O5'] },
-    { variableCode: 'Tid',          valueCodes: ['2024M12'] },
+    { variableCode: 'Tid',          valueCodes: [`${year}M12`] },
   ]);
   const { values, labels } = aggregateByRegion(data, metaLabels);
   return { values, labels, label: 'Folkmängd', unit: 'personer' };
@@ -260,10 +260,10 @@ async function fetchByDeso(): Promise<DatasetResult> {
 
 // ── Hierarchy builder ────────────────────────────────────────────────────────
 
-export async function fetchPopulationHierarchy(): Promise<GeoHierarchyNode> {
+export async function fetchPopulationHierarchy(year: number): Promise<GeoHierarchyNode> {
   const [countyResult, municipalityResult] = await Promise.all([
-    fetchByCounty(),
-    fetchByMunicipality(),
+    fetchByCounty(year),
+    fetchByMunicipality(year),
   ]);
 
   // Build läns nodes with their kommuner as children.
@@ -301,11 +301,11 @@ export async function fetchPopulationHierarchy(): Promise<GeoHierarchyNode> {
 
 // ── Descriptor ───────────────────────────────────────────────────────────────
 
-async function fetchPopulation(level: AdminLevel): Promise<DatasetResult> {
+async function fetchPopulation(level: AdminLevel, year: number): Promise<DatasetResult> {
   switch (level) {
-    case 'Country':      return fetchByCounty();
-    case 'Region':       return fetchByCounty();
-    case 'Municipality': return fetchByMunicipality();
+    case 'Country':      return fetchByCounty(year);
+    case 'Region':       return fetchByCounty(year);
+    case 'Municipality': return fetchByMunicipality(year);
     case 'RegSO':        return fetchByRegso();
     case 'DeSO':         return fetchByDeso();
     default:
@@ -317,7 +317,7 @@ export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
   source: 'SCB',
-  year: 2024,
+  availableYears: Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
