@@ -5,6 +5,10 @@ import Stroke from "ol/style/Stroke";
 import Fill from "ol/style/Fill";
 import Style from "ol/style/Style";
 import type { FeatureLike } from "ol/Feature";
+import { transformExtent } from "ol/proj";
+
+// Bounding box for Sweden in Web Mercator — tiles outside this are never requested.
+const SWEDEN_EXTENT = transformExtent([10.0, 55.0, 25.0, 70.5], 'EPSG:4326', 'EPSG:3857');
 
 const baseVectorStyle = new Style({
   fill: new Fill({
@@ -23,6 +27,7 @@ export function createVectorTileLayer(_id: string, urlTemplate: string): VectorT
       url: urlTemplate,
       maxZoom: 14,
     }),
+    extent: SWEDEN_EXTENT,
     declutter: true,
     visible: true,
     style: baseVectorStyle,
@@ -46,6 +51,7 @@ export function createChoroplethLayer(
       url: urlTemplate,
       maxZoom: 14,
     }),
+    extent: SWEDEN_EXTENT,
     declutter: true,
     visible: true,
     style: styleFunction,
