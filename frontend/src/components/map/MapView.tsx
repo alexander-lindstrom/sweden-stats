@@ -5,12 +5,15 @@ import TileLayer from "ol/layer/Tile";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
+import { getCenter } from "ol/extent";
+import GeoJSON from "ol/format/GeoJSON";
 import "ol/ol.css";
 import BaseLayer from "ol/layer/Base";
 
 import { BaseMapKey, baseMaps } from "./BaseMaps";
 import {
   adminVectorTileLayers,
+  adminWfsLayers,
   buildChoroplethStyle,
   createChoroplethLayer,
   createVectorTileLayer,
@@ -61,46 +64,75 @@ const MapView: React.FC<MapViewProps> = ({
   const baseLayerRef    = useRef<TileLayer<OSM | XYZ>>(
     new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
   );
-  const overlayLayerRef = useRef<BaseLayer | null>(null);
+  const overlayLayerRef  = useRef<BaseLayer | null>(null);
+  const hoveredCodeRef   = useRef<string | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
 
-  // --- Click handler -------------------------------------------------------
+  // --- Click handler: zoom to true feature centroid via WFS -----------------
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
-    if (!map) {
-      return;
-    }
+    if (!map) {return;}
+
+    let clickedCode: string | null = null;
+    let fallbackCenter: [number, number] | null = null;
 
     map.forEachFeatureAtPixel(
       evt.pixel,
       (feature) => {
-        const geometry = feature.getGeometry();
-        const view = map.getView();
-
-        if (!geometry) {
-          return false;
+        clickedCode = String(feature.get(featureCodeProperty) ?? '');
+        const geom = feature.getGeometry();
+        if (geom) {
+          const ext = geom.getExtent();
+          fallbackCenter = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2];
         }
-
-        const extent = geometry.getExtent();
-        view.animate({
-          center: [(extent[0] + extent[2]) / 2, (extent[1] + extent[3]) / 2],
-          zoom: LEVEL_CLICK_ZOOM[adminLevel],
-          duration: 800,
-        });
         return true;
       },
-      {
-        layerFilter: (layer) => layer instanceof VectorTileLayer,
-        hitTolerance: 5,
-      }
+      { layerFilter: (layer) => layer instanceof VectorTileLayer, hitTolerance: 5 }
     );
-  }, [adminLevel]);
+
+    if (!clickedCode) {return;}
+
+    const view  = map.getView();
+    const code  = clickedCode;
+    const level = adminLevel;
+
+    const params = new URLSearchParams({
+      service:       'WFS',
+      version:       '2.0.0',
+      request:       'GetFeature',
+      typeNames:     adminWfsLayers[level],
+      CQL_FILTER:    `${featureCodeProperty}='${code}'`,
+      outputFormat:  'application/json',
+      srsName:       'EPSG:3857',
+      count:         '1',
+    });
+
+    fetch(`http://localhost:8080/geoserver/wfs?${params}`)
+      .then(r => r.json())
+      .then(geojson => {
+        if (geojson.features?.length > 0) {
+          const format   = new GeoJSON();
+          const features = format.readFeatures(geojson);
+          const extent   = features[0].getGeometry()?.getExtent();
+          if (extent) {
+            view.animate({ center: getCenter(extent), zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
+            return;
+          }
+        }
+        if (fallbackCenter) {
+          view.animate({ center: fallbackCenter, zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
+        }
+      })
+      .catch(() => {
+        if (fallbackCenter) {
+          view.animate({ center: fallbackCenter, zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
+        }
+      });
+  }, [adminLevel, featureCodeProperty]);
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
-    if (!mapRef.current) {
-      return;
-    }
+    if (!mapRef.current) {return;}
 
     const map = new Map({
       target: mapRef.current,
@@ -115,42 +147,56 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Re-bind click handler when admin level changes ---------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {
-      return;
-    }
+    if (!map) {return;}
     map.on('click', handleMapClick);
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
 
-  // --- Pointermove: update hover tooltip -----------------------------------
+  // --- Pointermove: hover tooltip + highlight -------------------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {
-      return;
-    }
+    if (!map) {return;}
 
     const handlePointerMove = (evt: MapBrowserEvent) => {
       if (evt.dragging) {
+        if (hoveredCodeRef.current !== null) {
+          hoveredCodeRef.current = null;
+          overlayLayerRef.current?.changed();
+        }
         setHoverInfo(null);
+        mapRef.current!.style.cursor = '';
         return;
       }
 
-      let found = false;
+      let result: { code: string; label: string; value: number | null } | null = null;
+
       map.forEachFeatureAtPixel(
         evt.pixel,
         (feature) => {
           const code  = String(feature.get(featureCodeProperty) ?? '');
           const label = String(feature.get(featureLabelProperty) ?? code);
           const value = choroplethData?.[code] ?? null;
-          setHoverInfo({ x: evt.pixel[0], y: evt.pixel[1], label, value });
-          found = true;
+          result = { code, label, value };
           return true;
         },
         { layerFilter: (l) => l instanceof VectorTileLayer, hitTolerance: 3 }
       );
 
-      if (!found) {
+      if (result !== null) {
+        const { code, label, value } = result;
+        setHoverInfo({ x: evt.pixel[0], y: evt.pixel[1], label, value });
+        if (code !== hoveredCodeRef.current) {
+          hoveredCodeRef.current = code;
+          overlayLayerRef.current?.changed();
+        }
+        mapRef.current!.style.cursor = 'pointer';
+      } else {
         setHoverInfo(null);
+        if (hoveredCodeRef.current !== null) {
+          hoveredCodeRef.current = null;
+          overlayLayerRef.current?.changed();
+        }
+        mapRef.current!.style.cursor = '';
       }
     };
 
@@ -161,14 +207,14 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Swap boundary layer when admin level changes -----------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {
-      return;
-    }
+    if (!map) {return;}
 
     if (overlayLayerRef.current) {
       map.removeLayer(overlayLayerRef.current);
       overlayLayerRef.current = null;
     }
+
+    hoveredCodeRef.current = null;
 
     const { id, url } = adminVectorTileLayers[adminLevel];
 
@@ -177,9 +223,9 @@ const MapView: React.FC<MapViewProps> = ({
         ? createChoroplethLayer(
             id,
             url,
-            buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty),
+            buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty, hoveredCodeRef),
           )
-        : createVectorTileLayer(id, url);
+        : createVectorTileLayer(id, url, featureCodeProperty, hoveredCodeRef);
 
     layer.setZIndex(1);
     map.addLayer(layer);
@@ -190,22 +236,18 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
     const layer = overlayLayerRef.current;
-    if (!(layer instanceof VectorTileLayer)) {
-      return;
-    }
+    if (!(layer instanceof VectorTileLayer)) {return;}
 
     if (choroplethData && colorScale) {
       layer.setStyle(
-        buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty)
+        buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty, hoveredCodeRef)
       );
     } else {
       const map = mapInstanceRef.current;
-      if (!map) {
-        return;
-      }
+      if (!map) {return;}
       map.removeLayer(layer);
       const { id, url } = adminVectorTileLayers[adminLevel];
-      const newLayer = createVectorTileLayer(id, url);
+      const newLayer = createVectorTileLayer(id, url, featureCodeProperty, hoveredCodeRef);
       newLayer.setZIndex(1);
       map.addLayer(newLayer);
       overlayLayerRef.current = newLayer;
@@ -215,9 +257,7 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {
-      return;
-    }
+    if (!map) {return;}
 
     map.removeLayer(baseLayerRef.current);
     baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });

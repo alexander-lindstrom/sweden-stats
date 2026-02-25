@@ -6,6 +6,7 @@ import Fill from "ol/style/Fill";
 import Style from "ol/style/Style";
 import type { FeatureLike } from "ol/Feature";
 import { transformExtent } from "ol/proj";
+import type { AdminLevel } from "@/datasets/types";
 
 // Bounding box for Sweden in Web Mercator — tiles outside this are never requested.
 const SWEDEN_EXTENT = transformExtent([10.0, 55.0, 25.0, 70.5], 'EPSG:4326', 'EPSG:3857');
@@ -20,7 +21,17 @@ const baseVectorStyle = new Style({
   }),
 });
 
-export function createVectorTileLayer(_id: string, urlTemplate: string): VectorTileLayer {
+const hoverBaseStyle = new Style({
+  fill: new Fill({ color: 'rgba(100, 149, 237, 0.5)' }),
+  stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2 }),
+});
+
+export function createVectorTileLayer(
+  _id: string,
+  urlTemplate: string,
+  codeProperty: string,
+  hoveredCodeRef: { current: string | null },
+): VectorTileLayer {
   return new VectorTileLayer({
     source: new VectorTileSource({
       format: new MVT(),
@@ -30,7 +41,10 @@ export function createVectorTileLayer(_id: string, urlTemplate: string): VectorT
     extent: SWEDEN_EXTENT,
     declutter: true,
     visible: true,
-    style: baseVectorStyle,
+    style: (feature: FeatureLike) => {
+      const code = String(feature.get(codeProperty) ?? '');
+      return code === hoveredCodeRef.current ? hoverBaseStyle : baseVectorStyle;
+    },
   });
 }
 
@@ -62,15 +76,25 @@ export function buildChoroplethStyle(
   data: Record<string, number>,
   colorScale: (value: number) => string,
   codeProperty: string,
+  hoveredCodeRef: { current: string | null },
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
   return (feature: FeatureLike): Style => {
     const code = String(feature.get(codeProperty) ?? '');
-    const cached = styleCache.get(code);
-    if (cached) {
-      return cached;
+
+    if (code === hoveredCodeRef.current) {
+      const value = data[code];
+      return new Style({
+        fill: new Fill({
+          color: value !== undefined ? colorScale(value) : 'rgba(200, 200, 200, 0.6)',
+        }),
+        stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }),
+      });
     }
+
+    const cached = styleCache.get(code);
+    if (cached) {return cached;}
 
     const value = data[code];
     const style =
@@ -99,15 +123,23 @@ export const adminVectorTileLayers = {
     id: "municipality_mvt",
     url: "http://localhost:8080/geoserver/gwc/service/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&LAYER=map-gis:sveriges_kommuner_sf_simple&STYLE=&TILEMATRIXSET=EPSG:900913&FORMAT=application/vnd.mapbox-vector-tile&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}"
   },
-  
+
   RegSO: {
     id: "regso_mvt",
     url: "http://localhost:8080/geoserver/gwc/service/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&LAYER=map-gis:RegSO_2025&STYLE=&TILEMATRIXSET=EPSG:900913&FORMAT=application/vnd.mapbox-vector-tile&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}"
   },
-  
+
   DeSO: {
     id: "deso_mvt",
     url: "http://localhost:8080/geoserver/gwc/service/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&LAYER=map-gis:DeSO_2025&STYLE=&TILEMATRIXSET=EPSG:900913&FORMAT=application/vnd.mapbox-vector-tile&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}"
   }
 };
-  
+
+// WFS layer names per admin level — used to fetch full feature geometry for true centroid.
+export const adminWfsLayers: Record<AdminLevel, string> = {
+  Country:      'ne:countries',
+  Region:       'map-gis:sveriges_lan_sf_simple',
+  Municipality: 'map-gis:sveriges_kommuner_sf_simple',
+  RegSO:        'map-gis:RegSO_2025',
+  DeSO:         'map-gis:DeSO_2025',
+};
