@@ -64,7 +64,8 @@ const ALL_VIEWS: { key: ViewType; label: string }[] = [
 export default function MapPage() {
   const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
   const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [selectedYear,      setSelectedYear]       = useState<number>(2024);
+  const [selectedYear,      setSelectedYear]       = useState<number>(2024); // debounced — drives fetches
+  const [displayYear,       setDisplayYear]        = useState<number>(2024); // immediate — drives slider UI
   const [activeView,        setActiveView]         = useState<ViewType>('map');
   const [activeChartType,   setActiveChartType]   = useState<ChartType>('bar');
   const [datasetResult,     setDatasetResult]      = useState<DatasetResult | null>(null);
@@ -75,7 +76,14 @@ export default function MapPage() {
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   // Generation counter — incremented on every new fetch; stale responses are ignored.
-  const fetchGenRef = useRef(0);
+  const fetchGenRef    = useRef(0);
+  const yearDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleYearChange = (y: number) => {
+    setDisplayYear(y);
+    if (yearDebounceRef.current) {clearTimeout(yearDebounceRef.current);}
+    yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
+  };
 
   const availableDatasets = getDatasetsForLevel(selectedLevel);
 
@@ -105,6 +113,7 @@ export default function MapPage() {
     const earliest = descriptor.availableYears[0];
     if (selectedYear > latest || selectedYear < earliest) {
       setSelectedYear(latest);
+      setDisplayYear(latest);
     }
   }, [selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -285,12 +294,12 @@ export default function MapPage() {
         {activeDescriptor && !['RegSO', 'DeSO'].includes(selectedLevel) && (
           <section>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-              År: {selectedYear}
+              År: {displayYear}
             </h2>
             <YearSlider
               years={activeDescriptor.availableYears.map(String)}
-              selectedYear={String(selectedYear)}
-              onYearChange={(y) => setSelectedYear(Number(y))}
+              selectedYear={String(displayYear)}
+              onYearChange={(y) => handleYearChange(Number(y))}
             />
           </section>
         )}
