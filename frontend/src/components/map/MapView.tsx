@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
+import DoubleClickZoom from "ol/interaction/DoubleClickZoom";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
 import { getCenter } from "ol/extent";
 import GeoJSON from "ol/format/GeoJSON";
+import VectorTileSource from "ol/source/VectorTile";
 import "ol/ol.css";
 
 import { BaseMapKey, baseMaps } from "./BaseMaps";
@@ -17,8 +19,14 @@ import {
   buildChoroplethStyle,
   createChoroplethLayer,
   createHighlightLayer,
+  createSelectionLayer,
+  createSubBoundaryLayer,
   createVectorTileLayer,
   createVectorTileSource,
+  SUB_LEVEL,
+  SUB_LEVEL_CODE_PROP,
+  SUB_LEVEL_FILTER_PROP,
+  SUB_LEVEL_LABEL_PROP,
 } from "./VectorTiles";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
@@ -47,7 +55,53 @@ export interface MapViewProps {
   colorScale: ((value: number) => string) | null;
   featureCodeProperty: string;
   featureLabelProperty: string;
+  featureParentProperty?: string;
   unit: string;
+  selectedFeature: { code: string; label: string; parentCode?: string } | null;
+  onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
+  onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
+}
+
+// Module-level helper — zoom the OL view to a WFS feature, falling back to a
+// pre-computed centre if the GeoServer request fails or returns nothing.
+function zoomToWfsFeature(
+  view: View,
+  wfsTypeName: string,
+  codeProperty: string,
+  code: string,
+  zoom: number,
+  fallbackCenter: [number, number] | null,
+): void {
+  const params = new URLSearchParams({
+    service:      'WFS',
+    version:      '2.0.0',
+    request:      'GetFeature',
+    typeNames:    wfsTypeName,
+    CQL_FILTER:   `${codeProperty}='${code}'`,
+    outputFormat: 'application/json',
+    srsName:      'EPSG:3857',
+    count:        '1',
+  });
+  fetch(`http://localhost:8080/geoserver/wfs?${params}`)
+    .then(r => r.json())
+    .then(geojson => {
+      if (geojson.features?.length > 0) {
+        const features = new GeoJSON().readFeatures(geojson);
+        const extent   = features[0].getGeometry()?.getExtent();
+        if (extent) {
+          view.animate({ center: getCenter(extent), zoom, duration: 800 });
+          return;
+        }
+      }
+      if (fallbackCenter) {
+        view.animate({ center: fallbackCenter, zoom, duration: 800 });
+      }
+    })
+    .catch(() => {
+      if (fallbackCenter) {
+        view.animate({ center: fallbackCenter, zoom, duration: 800 });
+      }
+    });
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -57,7 +111,11 @@ const MapView: React.FC<MapViewProps> = ({
   colorScale,
   featureCodeProperty,
   featureLabelProperty,
+  featureParentProperty,
   unit,
+  selectedFeature,
+  onFeatureSelect,
+  onDrillDown,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<Map | null>(null);
@@ -70,6 +128,12 @@ const MapView: React.FC<MapViewProps> = ({
   // hover changes instead of the full (expensive) choropleth layer.
   const highlightLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredCodeRef    = useRef<string | null>(null);
+  const sourceRef            = useRef<VectorTileSource | null>(null);
+  const selectedCodeRef      = useRef<string | null>(null);
+  const subLayerRef          = useRef<VectorTileLayer | null>(null);
+  const subHighlightLayerRef = useRef<VectorTileLayer | null>(null);
+  const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
+  const hoveredSubCodeRef    = useRef<string | null>(null);
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -80,18 +144,69 @@ const MapView: React.FC<MapViewProps> = ({
 
   const [hoveredFeature, setHoveredFeature] = useState<HoveredFeature | null>(null);
 
-  // --- Click handler: zoom to true feature centroid via WFS -----------------
+  // --- Click handler --------------------------------------------------------
+  // Priority 1: sub-boundary layer (drill down into selected feature's children)
+  // Priority 2: main overlay layer (select / re-select)
+  // No hit: deselect
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
     if (!map) {return;}
+    const view = map.getView();
 
+    // -- Priority 1: sub-layer --
+    const subLayer = subLayerRef.current;
+    if (subLayer && selectedCodeRef.current) {
+      const subLevel     = SUB_LEVEL[adminLevel];
+      const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
+      const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
+      const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
+
+      if (subLevel && subCodeProp && subLabelProp && filterProp) {
+        let subCode: string | null = null;
+        let subLabel: string | null = null;
+        let subFallback: [number, number] | null = null;
+
+        map.forEachFeatureAtPixel(
+          evt.pixel,
+          (feature) => {
+            // Only accept features that belong to the selected parent.
+            if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) {return;}
+            subCode  = String(feature.get(subCodeProp) ?? '');
+            subLabel = String(feature.get(subLabelProp) ?? subCode);
+            const geom = feature.getGeometry();
+            if (geom) {
+              const ext = geom.getExtent();
+              subFallback = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2];
+            }
+            return true;
+          },
+          { layerFilter: (l) => l === subLayer, hitTolerance: 5 },
+        );
+
+        if (subCode) {
+          // The currently selected feature is the direct parent of the drilled sub-feature.
+          onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
+          zoomToWfsFeature(view, adminWfsLayers[subLevel], subCodeProp, subCode, LEVEL_CLICK_ZOOM[subLevel], subFallback);
+          return;
+        }
+      }
+    }
+
+    // -- Priority 2: main overlay layer --
     let clickedCode: string | null = null;
+    let clickedLabel: string | null = null;
+    let clickedParentCode: string | undefined = undefined;
     let fallbackCenter: [number, number] | null = null;
 
     map.forEachFeatureAtPixel(
       evt.pixel,
       (feature) => {
-        clickedCode = String(feature.get(featureCodeProperty) ?? '');
+        clickedCode  = String(feature.get(featureCodeProperty) ?? '');
+        clickedLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        if (featureParentProperty) {
+          const p = feature.get(featureParentProperty);
+          if (p) { clickedParentCode = String(p); }
+        }
         const geom = feature.getGeometry();
         if (geom) {
           const ext = geom.getExtent();
@@ -99,48 +214,17 @@ const MapView: React.FC<MapViewProps> = ({
         }
         return true;
       },
-      { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 }
+      { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 },
     );
 
-    if (!clickedCode) {return;}
+    if (!clickedCode) {
+      onFeatureSelect(null); // empty-space click → deselect
+      return;
+    }
 
-    const view  = map.getView();
-    const code  = clickedCode;
-    const level = adminLevel;
-
-    const params = new URLSearchParams({
-      service:       'WFS',
-      version:       '2.0.0',
-      request:       'GetFeature',
-      typeNames:     adminWfsLayers[level],
-      CQL_FILTER:    `${featureCodeProperty}='${code}'`,
-      outputFormat:  'application/json',
-      srsName:       'EPSG:3857',
-      count:         '1',
-    });
-
-    fetch(`http://localhost:8080/geoserver/wfs?${params}`)
-      .then(r => r.json())
-      .then(geojson => {
-        if (geojson.features?.length > 0) {
-          const format   = new GeoJSON();
-          const features = format.readFeatures(geojson);
-          const extent   = features[0].getGeometry()?.getExtent();
-          if (extent) {
-            view.animate({ center: getCenter(extent), zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
-            return;
-          }
-        }
-        if (fallbackCenter) {
-          view.animate({ center: fallbackCenter, zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
-        }
-      })
-      .catch(() => {
-        if (fallbackCenter) {
-          view.animate({ center: fallbackCenter, zoom: LEVEL_CLICK_ZOOM[level], duration: 800 });
-        }
-      });
-  }, [adminLevel, featureCodeProperty]);
+    onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
+    zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, clickedCode, LEVEL_CLICK_ZOOM[adminLevel], fallbackCenter);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
@@ -150,6 +234,14 @@ const MapView: React.FC<MapViewProps> = ({
       target: mapRef.current,
       layers: [baseLayerRef.current],
       view: new View({ center: SWEDEN_CENTER, zoom: 6 }),
+    });
+
+    // Disable OL's built-in double-click zoom — it fires two single clicks
+    // plus a zoom, which interferes with the selection interaction.
+    map.getInteractions().forEach(interaction => {
+      if (interaction instanceof DoubleClickZoom) {
+        interaction.setActive(false);
+      }
     });
 
     mapInstanceRef.current = map;
@@ -179,6 +271,10 @@ const MapView: React.FC<MapViewProps> = ({
           hoveredCodeRef.current = null;
           highlightLayerRef.current?.changed();
         }
+        if (hoveredSubCodeRef.current !== null) {
+          hoveredSubCodeRef.current = null;
+          subHighlightLayerRef.current?.changed();
+        }
         setHoveredFeature(null);
         mapRef.current!.style.cursor = '';
         return;
@@ -198,6 +294,52 @@ const MapView: React.FC<MapViewProps> = ({
         const pixel = lastPixelRef.current;
         if (!pixel || !map) { return; }
 
+        // -- Priority 1: sub-layer (when a feature is selected) --
+        const subLayer = subLayerRef.current;
+        if (subLayer && selectedCodeRef.current) {
+          const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
+          const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
+          const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
+
+          if (subCodeProp && subLabelProp && filterProp) {
+            let subCode: string | null = null;
+            let subLabel: string | null = null;
+
+            map.forEachFeatureAtPixel(
+              pixel,
+              (feature) => {
+                if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) {return;}
+                subCode  = String(feature.get(subCodeProp) ?? '');
+                subLabel = String(feature.get(subLabelProp) ?? subCode);
+                return true;
+              },
+              { layerFilter: (l) => l === subLayer, hitTolerance: 3 },
+            );
+
+            if (subCode) {
+              if (subCode !== hoveredSubCodeRef.current) {
+                hoveredSubCodeRef.current = subCode;
+                subHighlightLayerRef.current?.changed();
+                setHoveredFeature({ label: subLabel!, value: null });
+              }
+              // Clear main highlight while hovering a sub-feature.
+              if (hoveredCodeRef.current !== null) {
+                hoveredCodeRef.current = null;
+                highlightLayerRef.current?.changed();
+              }
+              mapRef.current!.style.cursor = 'pointer';
+              return;
+            }
+          }
+        }
+
+        // Leaving sub-layer territory — clear sub highlight.
+        if (hoveredSubCodeRef.current !== null) {
+          hoveredSubCodeRef.current = null;
+          subHighlightLayerRef.current?.changed();
+        }
+
+        // -- Priority 2: main overlay layer --
         let result: { code: string; label: string; value: number | null } | null = null;
 
         map.forEachFeatureAtPixel(
@@ -209,7 +351,7 @@ const MapView: React.FC<MapViewProps> = ({
             result = { code, label, value };
             return true;
           },
-          { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 }
+          { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 },
         );
 
         if (result !== null) {
@@ -240,7 +382,7 @@ const MapView: React.FC<MapViewProps> = ({
         throttleRef.current = null;
       }
     };
-  }, [featureCodeProperty, featureLabelProperty, choroplethData]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData]);
 
   // --- Swap boundary layer when admin level changes -----------------------
   useEffect(() => {
@@ -254,6 +396,7 @@ const MapView: React.FC<MapViewProps> = ({
 
     const { url } = adminVectorTileLayers[adminLevel];
     const source = createVectorTileSource(url);
+    sourceRef.current = source;
 
     const mainLayer =
       choroplethData && colorScale
@@ -263,13 +406,51 @@ const MapView: React.FC<MapViewProps> = ({
     const highlightLayer = createHighlightLayer(source, featureCodeProperty, hoveredCodeRef);
 
     mainLayer.setZIndex(1);
-    highlightLayer.setZIndex(2);
+    highlightLayer.setZIndex(5);
     map.addLayer(mainLayer);
     map.addLayer(highlightLayer);
     overlayLayerRef.current  = mainLayer;
     highlightLayerRef.current = highlightLayer;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminLevel]);
+
+  // --- Show selection outline + sub-boundary when a feature is selected ----
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) {return;}
+
+    // Remove previous selection/sub-boundary/sub-highlight layers
+    if (subLayerRef.current)          { map.removeLayer(subLayerRef.current);          subLayerRef.current          = null; }
+    if (subHighlightLayerRef.current) { map.removeLayer(subHighlightLayerRef.current); subHighlightLayerRef.current = null; }
+    if (selectionLayerRef.current)    { map.removeLayer(selectionLayerRef.current);    selectionLayerRef.current    = null; }
+
+    hoveredSubCodeRef.current = null;
+    selectedCodeRef.current   = selectedFeature?.code ?? null;
+
+    if (!selectedFeature || !sourceRef.current) {return;}
+
+    // Selection outline (z=4) — shares source with main layer, no extra tile fetches
+    const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
+    selLayer.setZIndex(4);
+    map.addLayer(selLayer);
+    selectionLayerRef.current = selLayer;
+
+    // Sub-boundary + sub-hover-highlight layers (z=2, z=3) — one level down
+    const subLevel    = SUB_LEVEL[adminLevel];
+    const filterProp  = SUB_LEVEL_FILTER_PROP[adminLevel];
+    const subCodeProp = SUB_LEVEL_CODE_PROP[adminLevel];
+    if (subLevel && filterProp && subCodeProp) {
+      const subSource    = createVectorTileSource(adminVectorTileLayers[subLevel].url);
+      const subLayer     = createSubBoundaryLayer(subSource, filterProp, selectedFeature.code);
+      const subHighlight = createHighlightLayer(subSource, subCodeProp, hoveredSubCodeRef);
+      subLayer.setZIndex(2);
+      subHighlight.setZIndex(3);
+      map.addLayer(subLayer);
+      map.addLayer(subHighlight);
+      subLayerRef.current          = subLayer;
+      subHighlightLayerRef.current = subHighlight;
+    }
+  }, [selectedFeature, adminLevel, featureCodeProperty]);
 
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
