@@ -11,42 +11,21 @@ import type { AdminLevel } from "@/datasets/types";
 // Bounding box for Sweden in Web Mercator — tiles outside this are never requested.
 const SWEDEN_EXTENT = transformExtent([10.0, 55.0, 25.0, 70.5], 'EPSG:4326', 'EPSG:3857');
 
-const baseVectorStyle = new Style({
+export const baseVectorStyle = new Style({
   fill: new Fill({
-    color: 'rgba(100, 149, 237, 0.2)', // subtle light blue
+    color: 'rgba(100, 149, 237, 0.2)',
   }),
   stroke: new Stroke({
-    color: '#1f3f81', // deep desaturated blue
+    color: '#1f3f81',
     width: 1.5,
   }),
 });
 
-const hoverBaseStyle = new Style({
-  fill: new Fill({ color: 'rgba(100, 149, 237, 0.5)' }),
-  stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2 }),
+// Highlight is a separate layer on top — just a bright border, no fill change needed.
+const hoverHighlightStyle = new Style({
+  fill: new Fill({ color: 'rgba(255, 255, 255, 0.12)' }),
+  stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 2.5 }),
 });
-
-export function createVectorTileLayer(
-  _id: string,
-  urlTemplate: string,
-  codeProperty: string,
-  hoveredCodeRef: { current: string | null },
-): VectorTileLayer {
-  return new VectorTileLayer({
-    source: new VectorTileSource({
-      format: new MVT(),
-      url: urlTemplate,
-      maxZoom: 14,
-    }),
-    extent: SWEDEN_EXTENT,
-    declutter: true,
-    visible: true,
-    style: (feature: FeatureLike) => {
-      const code = String(feature.get(codeProperty) ?? '');
-      return code === hoveredCodeRef.current ? hoverBaseStyle : baseVectorStyle;
-    },
-  });
-}
 
 const choroplethStroke = new Stroke({ color: '#444', width: 0.5 });
 const noDataStyle = new Style({
@@ -54,17 +33,32 @@ const noDataStyle = new Style({
   stroke: choroplethStroke,
 });
 
+export function createVectorTileSource(urlTemplate: string): VectorTileSource {
+  return new VectorTileSource({
+    format: new MVT(),
+    url: urlTemplate,
+    maxZoom: 14,
+  });
+}
+
+export function createVectorTileLayer(
+  source: VectorTileSource,
+): VectorTileLayer {
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    declutter: true,
+    visible: true,
+    style: baseVectorStyle,
+  });
+}
+
 export function createChoroplethLayer(
-  _id: string,
-  urlTemplate: string,
+  source: VectorTileSource,
   styleFunction: (feature: FeatureLike) => Style,
 ): VectorTileLayer {
   return new VectorTileLayer({
-    source: new VectorTileSource({
-      format: new MVT(),
-      url: urlTemplate,
-      maxZoom: 14,
-    }),
+    source,
     extent: SWEDEN_EXTENT,
     declutter: true,
     visible: true,
@@ -72,26 +66,36 @@ export function createChoroplethLayer(
   });
 }
 
+/**
+ * Lightweight layer sharing the same source as the main layer.
+ * Only renders the hovered feature (returns null for everything else),
+ * so OL skips non-hovered features entirely during re-render.
+ * Call changed() on this instead of the main layer on hover changes.
+ */
+export function createHighlightLayer(
+  source: VectorTileSource,
+  codeProperty: string,
+  hoveredCodeRef: { current: string | null },
+): VectorTileLayer {
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    style: (feature: FeatureLike) => {
+      const code = String(feature.get(codeProperty) ?? '');
+      return code === hoveredCodeRef.current ? hoverHighlightStyle : null;
+    },
+  });
+}
+
 export function buildChoroplethStyle(
   data: Record<string, number>,
   colorScale: (value: number) => string,
   codeProperty: string,
-  hoveredCodeRef: { current: string | null },
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
   return (feature: FeatureLike): Style => {
     const code = String(feature.get(codeProperty) ?? '');
-
-    if (code === hoveredCodeRef.current) {
-      const value = data[code];
-      return new Style({
-        fill: new Fill({
-          color: value !== undefined ? colorScale(value) : 'rgba(200, 200, 200, 0.6)',
-        }),
-        stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.85)', width: 2.5 }),
-      });
-    }
 
     const cached = styleCache.get(code);
     if (cached) {return cached;}

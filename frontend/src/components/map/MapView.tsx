@@ -8,15 +8,17 @@ import { fromLonLat } from "ol/proj";
 import { getCenter } from "ol/extent";
 import GeoJSON from "ol/format/GeoJSON";
 import "ol/ol.css";
-import BaseLayer from "ol/layer/Base";
 
 import { BaseMapKey, baseMaps } from "./BaseMaps";
 import {
   adminVectorTileLayers,
   adminWfsLayers,
+  baseVectorStyle,
   buildChoroplethStyle,
   createChoroplethLayer,
+  createHighlightLayer,
   createVectorTileLayer,
+  createVectorTileSource,
 } from "./VectorTiles";
 import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
@@ -57,16 +59,20 @@ const MapView: React.FC<MapViewProps> = ({
   featureLabelProperty,
   unit,
 }) => {
-  const mapRef          = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef  = useRef<Map | null>(null);
-  const baseLayerRef    = useRef<TileLayer<OSM | XYZ>>(
+  const mapRef           = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef   = useRef<Map | null>(null);
+  const baseLayerRef     = useRef<TileLayer<OSM | XYZ>>(
     new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
   );
-  const overlayLayerRef  = useRef<BaseLayer | null>(null);
-  const hoveredCodeRef   = useRef<string | null>(null);
+  const overlayLayerRef  = useRef<VectorTileLayer | null>(null);
+  // Separate lightweight layer for hover highlight — shares the same source as
+  // overlayLayerRef so no extra tile fetches. Only re-renders this layer on
+  // hover changes instead of the full (expensive) choropleth layer.
+  const highlightLayerRef = useRef<VectorTileLayer | null>(null);
+  const hoveredCodeRef    = useRef<string | null>(null);
 
-  // RAF throttle refs
-  const rafRef       = useRef<number | null>(null);
+  // Hit-test throttle refs (50 ms ≈ 20/s)
+  const throttleRef  = useRef<number | null>(null);
   const lastPixelRef = useRef<[number, number] | null>(null);
 
   // Tooltip DOM ref — position is updated directly, bypassing React
@@ -93,7 +99,7 @@ const MapView: React.FC<MapViewProps> = ({
         }
         return true;
       },
-      { layerFilter: (layer) => layer instanceof VectorTileLayer, hitTolerance: 5 }
+      { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 }
     );
 
     if (!clickedCode) {return;}
@@ -165,13 +171,13 @@ const MapView: React.FC<MapViewProps> = ({
 
     const handlePointerMove = (evt: MapBrowserEvent) => {
       if (evt.dragging) {
-        if (rafRef.current !== null) {
-          cancelAnimationFrame(rafRef.current);
-          rafRef.current = null;
+        if (throttleRef.current !== null) {
+          clearTimeout(throttleRef.current);
+          throttleRef.current = null;
         }
         if (hoveredCodeRef.current !== null) {
           hoveredCodeRef.current = null;
-          overlayLayerRef.current?.changed();
+          highlightLayerRef.current?.changed();
         }
         setHoveredFeature(null);
         mapRef.current!.style.cursor = '';
@@ -185,10 +191,10 @@ const MapView: React.FC<MapViewProps> = ({
         tooltipRef.current.style.top  = `${evt.pixel[1] + 14}px`;
       }
 
-      // Throttle expensive hit detection to one per animation frame
-      if (rafRef.current !== null) return;
-      rafRef.current = requestAnimationFrame(() => {
-        rafRef.current = null;
+      // Throttle expensive hit detection to ~20/s
+      if (throttleRef.current !== null) return;
+      throttleRef.current = window.setTimeout(() => {
+        throttleRef.current = null;
         const pixel = lastPixelRef.current;
         if (!pixel || !map) return;
 
@@ -203,34 +209,35 @@ const MapView: React.FC<MapViewProps> = ({
             result = { code, label, value };
             return true;
           },
-          { layerFilter: (l) => l instanceof VectorTileLayer, hitTolerance: 3 }
+          { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 }
         );
 
         if (result !== null) {
           const { code, label, value } = result;
           if (code !== hoveredCodeRef.current) {
             hoveredCodeRef.current = code;
-            overlayLayerRef.current?.changed();
+            // Only re-render the thin highlight layer, not the full choropleth layer
+            highlightLayerRef.current?.changed();
             setHoveredFeature({ label, value });
           }
           mapRef.current!.style.cursor = 'pointer';
         } else {
           if (hoveredCodeRef.current !== null) {
             hoveredCodeRef.current = null;
-            overlayLayerRef.current?.changed();
+            highlightLayerRef.current?.changed();
             setHoveredFeature(null);
           }
           mapRef.current!.style.cursor = '';
         }
-      });
+      }, 50);
     };
 
     map.on('pointermove', handlePointerMove);
     return () => {
       map.un('pointermove', handlePointerMove);
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
+      if (throttleRef.current !== null) {
+        clearTimeout(throttleRef.current);
+        throttleRef.current = null;
       }
     };
   }, [featureCodeProperty, featureLabelProperty, choroplethData]);
@@ -240,50 +247,41 @@ const MapView: React.FC<MapViewProps> = ({
     const map = mapInstanceRef.current;
     if (!map) {return;}
 
-    if (overlayLayerRef.current) {
-      map.removeLayer(overlayLayerRef.current);
-      overlayLayerRef.current = null;
-    }
+    if (overlayLayerRef.current)  { map.removeLayer(overlayLayerRef.current);  overlayLayerRef.current  = null; }
+    if (highlightLayerRef.current) { map.removeLayer(highlightLayerRef.current); highlightLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
 
-    const { id, url } = adminVectorTileLayers[adminLevel];
+    const { url } = adminVectorTileLayers[adminLevel];
+    const source = createVectorTileSource(url);
 
-    const layer =
+    const mainLayer =
       choroplethData && colorScale
-        ? createChoroplethLayer(
-            id,
-            url,
-            buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty, hoveredCodeRef),
-          )
-        : createVectorTileLayer(id, url, featureCodeProperty, hoveredCodeRef);
+        ? createChoroplethLayer(source, buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty))
+        : createVectorTileLayer(source);
 
-    layer.setZIndex(1);
-    map.addLayer(layer);
-    overlayLayerRef.current = layer;
+    const highlightLayer = createHighlightLayer(source, featureCodeProperty, hoveredCodeRef);
+
+    mainLayer.setZIndex(1);
+    highlightLayer.setZIndex(2);
+    map.addLayer(mainLayer);
+    map.addLayer(highlightLayer);
+    overlayLayerRef.current  = mainLayer;
+    highlightLayerRef.current = highlightLayer;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminLevel]);
 
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
     const layer = overlayLayerRef.current;
-    if (!(layer instanceof VectorTileLayer)) {return;}
+    if (!layer) {return;}
 
     if (choroplethData && colorScale) {
-      layer.setStyle(
-        buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty, hoveredCodeRef)
-      );
+      layer.setStyle(buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty));
     } else {
-      const map = mapInstanceRef.current;
-      if (!map) {return;}
-      map.removeLayer(layer);
-      const { id, url } = adminVectorTileLayers[adminLevel];
-      const newLayer = createVectorTileLayer(id, url, featureCodeProperty, hoveredCodeRef);
-      newLayer.setZIndex(1);
-      map.addLayer(newLayer);
-      overlayLayerRef.current = newLayer;
+      layer.setStyle(baseVectorStyle);
     }
-  }, [choroplethData, colorScale, featureCodeProperty, adminLevel]);
+  }, [choroplethData, colorScale, featureCodeProperty]);
 
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
