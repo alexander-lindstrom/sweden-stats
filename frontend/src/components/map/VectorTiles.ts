@@ -147,3 +147,64 @@ export const adminWfsLayers: Record<AdminLevel, string> = {
   RegSO:        'map-gis:RegSO_2025',
   DeSO:         'map-gis:DeSO_2025',
 };
+
+// Administrative hierarchy for sub-boundary rendering.
+// RegSO and DeSO are both subdivisions of Municipality (siblings, not parent/child),
+// so RegSO and DeSO are leaves — no sub-level below them.
+export const SUB_LEVEL: Partial<Record<AdminLevel, AdminLevel>> = {
+  Region:       'Municipality',
+  Municipality: 'RegSO',
+};
+
+export const SUB_LEVEL_FILTER_PROP: Partial<Record<AdminLevel, string>> = {
+  Region:       'county_code',
+  Municipality: 'kommunkod',
+};
+
+// Code and label properties on sub-level features (mirrors FEATURE_CODE/LABEL_PROP in MapPage).
+export const SUB_LEVEL_CODE_PROP: Partial<Record<AdminLevel, string>> = {
+  Region:       'municipality_code',
+  Municipality: 'regsokod',
+};
+
+export const SUB_LEVEL_LABEL_PROP: Partial<Record<AdminLevel, string>> = {
+  Region:       'municipality_name',
+  Municipality: 'regsonamn',
+};
+
+export function createSubBoundaryLayer(
+  source: VectorTileSource,
+  filterProp: string,
+  parentCode: string,
+): VectorTileLayer {
+  const matchStyle = new Style({
+    // Near-transparent fill makes the whole polygon interior hit-detectable.
+    // Without it, forEachFeatureAtPixel only detects the stroke boundary pixels.
+    fill: new Fill({ color: 'rgba(0, 0, 0, 0.01)' }),
+    stroke: new Stroke({ color: 'rgba(60, 60, 60, 0.3)', width: 0.75 }),
+  });
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    style: (feature: FeatureLike) =>
+      String(feature.get(filterProp) ?? '') === parentCode ? matchStyle : undefined,
+  });
+}
+
+export function createSelectionLayer(
+  source: VectorTileSource,
+  codeProperty: string,
+  selectedCodeRef: { current: string | null },
+): VectorTileLayer {
+  const selectionStyle = new Style({
+    stroke: new Stroke({ color: '#1e293b', width: 2.5 }),
+  });
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    style: (feature: FeatureLike) => {
+      const code = String(feature.get(codeProperty) ?? '');
+      return code === selectedCodeRef.current ? selectionStyle : undefined;
+    },
+  });
+}

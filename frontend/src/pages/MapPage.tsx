@@ -75,14 +75,23 @@ export default function MapPage() {
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
+  const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string } | null>(null);
   // Generation counter — incremented on every new fetch; stale responses are ignored.
-  const fetchGenRef    = useRef(0);
-  const yearDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchGenRef         = useRef(0);
+  const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // When drill-down changes the admin level, this carries the clicked sub-feature
+  // through the [selectedLevel] effect so it isn't cleared by the level-change reset.
+  const pendingSelectionRef = useRef<{ code: string; label: string } | null>(null);
 
   const handleYearChange = (y: number) => {
     setDisplayYear(y);
     if (yearDebounceRef.current) {clearTimeout(yearDebounceRef.current);}
     yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
+  };
+
+  const handleDrillDown = (level: AdminLevel, code: string, label: string) => {
+    pendingSelectionRef.current = { code, label };
+    setSelectedLevel(level);
   };
 
   const availableDatasets = getDatasetsForLevel(selectedLevel);
@@ -96,12 +105,19 @@ export default function MapPage() {
     : ['bar' as ChartType];
 
   // When admin level changes, preserve dataset if still available; otherwise reset.
+  // If the change came from a drill-down, honour the pending selection instead of clearing it.
   useEffect(() => {
     const datasets = getDatasetsForLevel(selectedLevel);
     setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
     setDatasetResult(null);
     setHierarchyData(null);
     setColorScale(null);
+    if (pendingSelectionRef.current) {
+      setSelectedFeature(pendingSelectionRef.current);
+      pendingSelectionRef.current = null;
+    } else {
+      setSelectedFeature(null);
+    }
   }, [selectedLevel]);
 
   // When dataset changes, clamp year to the new dataset's available range.
@@ -421,6 +437,9 @@ export default function MapPage() {
                 featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                 featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                 unit={datasetResult?.unit ?? ''}
+                selectedFeature={selectedFeature}
+                onFeatureSelect={setSelectedFeature}
+                onDrillDown={handleDrillDown}
               />
             )}
             {activeView === 'map' && datasetResult && (
