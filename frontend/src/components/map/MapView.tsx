@@ -33,9 +33,7 @@ const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
 
-interface HoverInfo {
-  x: number;
-  y: number;
+interface HoveredFeature {
   label: string;
   value: number | null;
 }
@@ -66,7 +64,15 @@ const MapView: React.FC<MapViewProps> = ({
   );
   const overlayLayerRef  = useRef<BaseLayer | null>(null);
   const hoveredCodeRef   = useRef<string | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+
+  // RAF throttle refs
+  const rafRef       = useRef<number | null>(null);
+  const lastPixelRef = useRef<[number, number] | null>(null);
+
+  // Tooltip DOM ref — position is updated directly, bypassing React
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+
+  const [hoveredFeature, setHoveredFeature] = useState<HoveredFeature | null>(null);
 
   // --- Click handler: zoom to true feature centroid via WFS -----------------
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
@@ -159,49 +165,74 @@ const MapView: React.FC<MapViewProps> = ({
 
     const handlePointerMove = (evt: MapBrowserEvent) => {
       if (evt.dragging) {
+        if (rafRef.current !== null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
         if (hoveredCodeRef.current !== null) {
           hoveredCodeRef.current = null;
           overlayLayerRef.current?.changed();
         }
-        setHoverInfo(null);
+        setHoveredFeature(null);
         mapRef.current!.style.cursor = '';
         return;
       }
 
-      let result: { code: string; label: string; value: number | null } | null = null;
-
-      map.forEachFeatureAtPixel(
-        evt.pixel,
-        (feature) => {
-          const code  = String(feature.get(featureCodeProperty) ?? '');
-          const label = String(feature.get(featureLabelProperty) ?? code);
-          const value = choroplethData?.[code] ?? null;
-          result = { code, label, value };
-          return true;
-        },
-        { layerFilter: (l) => l instanceof VectorTileLayer, hitTolerance: 3 }
-      );
-
-      if (result !== null) {
-        const { code, label, value } = result;
-        setHoverInfo({ x: evt.pixel[0], y: evt.pixel[1], label, value });
-        if (code !== hoveredCodeRef.current) {
-          hoveredCodeRef.current = code;
-          overlayLayerRef.current?.changed();
-        }
-        mapRef.current!.style.cursor = 'pointer';
-      } else {
-        setHoverInfo(null);
-        if (hoveredCodeRef.current !== null) {
-          hoveredCodeRef.current = null;
-          overlayLayerRef.current?.changed();
-        }
-        mapRef.current!.style.cursor = '';
+      // Update tooltip position immediately — cheap direct DOM, no React re-render
+      lastPixelRef.current = evt.pixel as [number, number];
+      if (tooltipRef.current) {
+        tooltipRef.current.style.left = `${evt.pixel[0] + 14}px`;
+        tooltipRef.current.style.top  = `${evt.pixel[1] + 14}px`;
       }
+
+      // Throttle expensive hit detection to one per animation frame
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const pixel = lastPixelRef.current;
+        if (!pixel || !map) return;
+
+        let result: { code: string; label: string; value: number | null } | null = null;
+
+        map.forEachFeatureAtPixel(
+          pixel,
+          (feature) => {
+            const code  = String(feature.get(featureCodeProperty) ?? '');
+            const label = String(feature.get(featureLabelProperty) ?? code);
+            const value = choroplethData?.[code] ?? null;
+            result = { code, label, value };
+            return true;
+          },
+          { layerFilter: (l) => l instanceof VectorTileLayer, hitTolerance: 3 }
+        );
+
+        if (result !== null) {
+          const { code, label, value } = result;
+          if (code !== hoveredCodeRef.current) {
+            hoveredCodeRef.current = code;
+            overlayLayerRef.current?.changed();
+            setHoveredFeature({ label, value });
+          }
+          mapRef.current!.style.cursor = 'pointer';
+        } else {
+          if (hoveredCodeRef.current !== null) {
+            hoveredCodeRef.current = null;
+            overlayLayerRef.current?.changed();
+            setHoveredFeature(null);
+          }
+          mapRef.current!.style.cursor = '';
+        }
+      });
     };
 
     map.on('pointermove', handlePointerMove);
-    return () => { map.un('pointermove', handlePointerMove); };
+    return () => {
+      map.un('pointermove', handlePointerMove);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
   }, [featureCodeProperty, featureLabelProperty, choroplethData]);
 
   // --- Swap boundary layer when admin level changes -----------------------
@@ -268,17 +299,13 @@ const MapView: React.FC<MapViewProps> = ({
   return (
     <div className="relative w-full h-full">
       <div ref={mapRef} className="w-full h-full" />
-      <Tooltip
-        x={hoverInfo?.x ?? 0}
-        y={hoverInfo?.y ?? 0}
-        visible={hoverInfo !== null}
-      >
-        {hoverInfo && (
+      <Tooltip ref={tooltipRef} visible={hoveredFeature !== null}>
+        {hoveredFeature && (
           <>
-            <div className="font-semibold">{hoverInfo.label}</div>
-            {hoverInfo.value !== null && (
+            <div className="font-semibold">{hoveredFeature.label}</div>
+            {hoveredFeature.value !== null && (
               <div className="text-gray-300">
-                {hoverInfo.value.toLocaleString('sv-SE')} {unit}
+                {hoveredFeature.value.toLocaleString('sv-SE')} {unit}
               </div>
             )}
           </>
