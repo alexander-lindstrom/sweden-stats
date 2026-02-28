@@ -149,8 +149,10 @@ export const adminWfsLayers: Record<AdminLevel, string> = {
 };
 
 // Administrative hierarchy for sub-boundary rendering.
-// RegSO and DeSO are both subdivisions of Municipality (siblings, not parent/child),
-// so RegSO and DeSO are leaves — no sub-level below them.
+// Conceptual nesting is Region → Municipality → RegSO → DeSO, but the
+// RegSO→DeSO sub-boundary preview is intentionally omitted: urban RegSO
+// enclaves inside rural RegSOs make the overlay unreadably cluttered.
+// DeSO is reached by switching level explicitly, not as a passive overlay.
 export const SUB_LEVEL: Partial<Record<AdminLevel, AdminLevel>> = {
   Region:       'Municipality',
   Municipality: 'RegSO',

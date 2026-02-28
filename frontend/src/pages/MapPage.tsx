@@ -52,7 +52,7 @@ const COUNTY_NAMES: Record<string, string> = {
 // Used to store parentCode on selectedFeature so Escape can navigate up.
 const FEATURE_PARENT_PROP: Partial<Record<AdminLevel, string>> = {
   RegSO: 'kommunkod',
-  DeSO:  'kommunkod',
+  DeSO:  'regsokod',  // DeSO parent is RegSO, not Municipality
 };
 
 const LEVEL_LABELS: Record<AdminLevel, string> = {
@@ -121,11 +121,15 @@ export default function MapPage() {
         const parentLabel = COUNTY_NAMES[parentCode];
         if (parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
         setSelectedLevel('Region');
-      } else if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
+      } else if (selectedLevel === 'RegSO') {
         const parentCode  = selectedFeature.parentCode;
         const parentLabel = parentCode ? datasetResult?.parentLabels?.[parentCode] : undefined;
         if (parentCode && parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
         setSelectedLevel('Municipality');
+      } else if (selectedLevel === 'DeSO') {
+        // parentCode is regsokod; RegSO labels aren't in parentLabels at DeSO level,
+        // so navigate up without pre-selecting.
+        setSelectedLevel('RegSO');
       } else {
         setSelectedFeature(null);
       }
