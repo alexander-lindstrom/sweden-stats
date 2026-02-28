@@ -1,28 +1,26 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface TooltipProps {
-  x: number;
-  y: number;
   visible: boolean;
   children: React.ReactNode;
 }
 
 /**
- * A lightweight floating tooltip, positioned in pixels relative to the nearest
- * `position: relative` ancestor.  The caller is responsible for updating x/y
- * and toggling visible on pointer events.
+ * A lightweight floating tooltip. Position is managed externally via the
+ * forwarded ref (set `style.left` / `style.top` directly for zero-re-render
+ * cursor tracking). The component is always mounted so the ref is always valid;
+ * visibility is toggled via CSS.
  */
-export const Tooltip: React.FC<TooltipProps> = ({ x, y, visible, children }) => {
-  if (!visible) {
-    return null;
-  }
-
-  return (
+export const Tooltip = forwardRef<HTMLDivElement, TooltipProps>(
+  ({ visible, children }, ref) => (
     <div
-      style={{ left: x + 14, top: y + 14 }}
+      ref={ref}
+      style={{ visibility: visible ? 'visible' : 'hidden' }}
       className="absolute z-50 pointer-events-none bg-gray-900/90 text-white text-xs px-2.5 py-1.5 rounded shadow-md whitespace-nowrap"
     >
       {children}
     </div>
-  );
-};
+  )
+);
+
+Tooltip.displayName = 'Tooltip';
