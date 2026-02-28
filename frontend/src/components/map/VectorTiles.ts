@@ -82,7 +82,7 @@ export function createHighlightLayer(
     extent: SWEDEN_EXTENT,
     style: (feature: FeatureLike) => {
       const code = String(feature.get(codeProperty) ?? '');
-      return code === hoveredCodeRef.current ? hoverHighlightStyle : null;
+      return code === hoveredCodeRef.current ? hoverHighlightStyle : undefined;
     },
   });
 }

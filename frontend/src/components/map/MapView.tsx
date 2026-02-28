@@ -192,11 +192,11 @@ const MapView: React.FC<MapViewProps> = ({
       }
 
       // Throttle expensive hit detection to ~20/s
-      if (throttleRef.current !== null) return;
+      if (throttleRef.current !== null) { return; }
       throttleRef.current = window.setTimeout(() => {
         throttleRef.current = null;
         const pixel = lastPixelRef.current;
-        if (!pixel || !map) return;
+        if (!pixel || !map) { return; }
 
         let result: { code: string; label: string; value: number | null } | null = null;
 
