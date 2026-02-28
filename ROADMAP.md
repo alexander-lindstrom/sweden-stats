@@ -63,3 +63,4 @@ Kolada is worth a look — it aggregates many official sources into one clean AP
 - **Ranking view** — sortable list of all municipalities/regions on a chosen metric, linked to the map (hover list item → highlight on map)
 - **Percentile bands** — instead of raw choropleth values, show which quintile each area falls into, making cross-metric comparison more intuitive
 - **Mobile** — the map works on mobile but the UI isn't optimized for it
+- **Select from chart/table → update right panel** — clicking a bar or row in the ranked list, histogram, or diverging chart selects that feature in the right sidebar (same panel as clicking on the map), without triggering a map zoom. Makes it easy to look up a specific area by name and see its full stats profile. Requires threading `selectedFeature`/`onFeatureSelect` down to chart and table components.

@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+
+interface Hovered { name: string; value: number; deviation: number; x: number; y: number; }
 
 interface Props {
   data: DatasetResult;
@@ -22,8 +24,8 @@ function fmtDev(dev: number, unit: string): string {
 }
 
 function fmtAbs(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}k`;
+  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
+  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
   return v.toFixed(1);
 }
 
@@ -31,12 +33,17 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
+  const hoveredElRef = useRef<SVGRectElement | null>(null);
+  const [hovered, setHovered] = useState<Hovered | null>(null);
 
   // Sort descending by value (highest at top — e.g. oldest counties first).
-  const sorted = Object.entries(data.values)
-    .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-    .filter(d => Number.isFinite(d.value))
-    .sort((a, b) => b.value - a.value);
+  const sorted = useMemo(() =>
+    Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+      .filter(d => Number.isFinite(d.value))
+      .sort((a, b) => b.value - a.value),
+    [data.values, data.labels],
+  );
 
   const mean = d3.mean(sorted, d => d.value) ?? 0;
 
@@ -45,12 +52,12 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
   const needed  = n * MAX_BAR_H + Math.max(n - 1, 0) * BAR_GAP;
 
   useEffect(() => {
-    if (!svgRef.current || !dimensions || sorted.length === 0) return;
+    if (!svgRef.current || !dimensions || sorted.length === 0) {return;}
 
     const { width, height } = dimensions;
     const innerW = width  - MARGIN.left - MARGIN.right;
     const innerH = height - MARGIN.top  - MARGIN.bottom;
-    if (innerW <= 0 || innerH <= 0) return;
+    if (innerW <= 0 || innerH <= 0) {return;}
 
     const effH    = Math.min(innerH, needed);
     const vOffset = (innerH - effH) / 2;
@@ -97,7 +104,34 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill',   d => d.value >= mean ? COLOR_ABOVE : COLOR_BELOW)
-      .attr('stroke', '#000').attr('stroke-width', 0.5);
+      .attr('stroke', '#000').attr('stroke-width', 0.5)
+      .style('cursor', 'pointer')
+      .on('mousemove', (event: MouseEvent, d) => {
+        const el = event.currentTarget as SVGRectElement;
+        if (hoveredElRef.current !== el) {
+          if (hoveredElRef.current) {
+            d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+          }
+          hoveredElRef.current = el;
+          d3.select(el).attr('fill-opacity', 0.6);
+        }
+        setHovered({ name: d.name, value: d.value, deviation: d.value - mean, x: event.clientX, y: event.clientY });
+      });
+
+    const clearHighlight = () => {
+      if (hoveredElRef.current) {
+        d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+        hoveredElRef.current = null;
+      }
+      setHovered(null);
+    };
+    d3.select(svgRef.current)
+      .on('mousemove.clear', (event: MouseEvent) => {
+        if (!(event.target as Element).classList?.contains('bar') && hoveredElRef.current !== null) {
+          clearHighlight();
+        }
+      })
+      .on('mouseleave', () => { if (hoveredElRef.current !== null) { clearHighlight(); } });
 
     // Mean axis line — drawn after bars so it sits on top.
     g.append('line')
@@ -137,7 +171,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
         .each(function() {
           const el  = this as SVGTextElement;
           const max = MARGIN.left - 16;
-          if (el.getComputedTextLength() <= max) return;
+          if (el.getComputedTextLength() <= max) {return;}
           let t = el.textContent ?? '';
           while (t.length > 2 && el.getComputedTextLength() > max) {
             t = t.slice(0, -1);
@@ -160,6 +194,16 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">
       <svg ref={svgRef} style={{ height: svgH }} />
+      {hovered && (
+        <div
+          className="fixed z-50 pointer-events-none bg-gray-900 text-white text-xs rounded px-2 py-1.5 shadow-lg"
+          style={{ left: hovered.x + 14, top: hovered.y - 10 }}
+        >
+          <div className="font-semibold">{hovered.name}</div>
+          <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
+          <div className="text-gray-400">{fmtDev(hovered.deviation, data.unit)} från medel</div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,14 +1,9 @@
 # Open Issues
 
-## #1 — Admin boundary layers not consistently clipped to land
+## #1 — Admin boundary layers not consistently clipped to land and municipality boundaries
 
-**Layers affected:** DeSO, RegSO
-**Current state:** Region and Municipality GeoPackages (from Lantmäteriet) are coastline-clipped. DeSO and RegSO from SCB are not — they extend into the sea.
-**Desired state:** All four boundary levels clipped to land for visual consistency.
+## #2 - Right side panel partially blocks table. Also, can selected feature be highlighted in the table?
 
-**Options investigated (priority order):**
-1. WFS from SCB (`https://geodata.scb.se/geoserver/stat/wfs`) — DeSO_2025 and RegSO_2025 are available and CC0, but no pre-clipped variants exist
-2. Download pre-clipped GeoPackages — check SCB for `_kl` variants
-3. Clip manually using Python + GeoPandas with a Sweden land polygon
+## #3 - Start Pre-loading data in different situations where it's slow currently?
 
-**Notes:** SCB WFS uses EPSG:3006 (SWEREF 99 TM) as default SRS — verify reprojection support before using as cascading WFS in GeoServer.
+## #4 - Historical data for RegSO/DeSO. Requires work as the boundary change every 5 years. Without it we cannot show population trends for example.

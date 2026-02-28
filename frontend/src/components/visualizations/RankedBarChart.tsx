@@ -1,7 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+
+interface Hovered { name: string; value: number; x: number; y: number; }
 
 interface RankedBarChartProps {
   data: DatasetResult;
@@ -16,10 +18,15 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
+  const hoveredElRef = useRef<SVGRectElement | null>(null);
+  const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const sorted = Object.entries(data.values)
-    .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-    .sort((a, b) => b.value - a.value);
+  const sorted = useMemo(() =>
+    Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+      .sort((a, b) => b.value - a.value),
+    [data.values, data.labels],
+  );
 
   const idealHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
   const containerH  = dimensions?.height ?? 0;
@@ -67,7 +74,34 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         colorScale ? colorScale(d.value) : '#3b82f6'
       )
       .attr('stroke', '#000')
-      .attr('stroke-width', 0.5);
+      .attr('stroke-width', 0.5)
+      .style('cursor', 'pointer')
+      .on('mousemove', (event: MouseEvent, d) => {
+        const el = event.currentTarget as SVGRectElement;
+        if (hoveredElRef.current !== el) {
+          if (hoveredElRef.current) {
+            d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+          }
+          hoveredElRef.current = el;
+          d3.select(el).attr('fill-opacity', 0.6);
+        }
+        setHovered({ name: d.name, value: d.value, x: event.clientX, y: event.clientY });
+      });
+
+    const clearHighlight = () => {
+      if (hoveredElRef.current) {
+        d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+        hoveredElRef.current = null;
+      }
+      setHovered(null);
+    };
+    d3.select(svgRef.current)
+      .on('mousemove.clear', (event: MouseEvent) => {
+        if (!(event.target as Element).classList?.contains('bar') && hoveredElRef.current !== null) {
+          clearHighlight();
+        }
+      })
+      .on('mouseleave', () => { if (hoveredElRef.current !== null) { clearHighlight(); } });
 
     // Value labels (right of bar)
     g.selectAll('text.val')
@@ -132,6 +166,15 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">
       <svg ref={svgRef} />
+      {hovered && (
+        <div
+          className="fixed z-50 pointer-events-none bg-gray-900 text-white text-xs rounded px-2 py-1.5 shadow-lg"
+          style={{ left: hovered.x + 14, top: hovered.y - 10 }}
+        >
+          <div className="font-semibold">{hovered.name}</div>
+          <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
+        </div>
+      )}
     </div>
   );
 };

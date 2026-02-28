@@ -1,7 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
-import { Tooltip } from '@/components/ui/Tooltip';
 import useResizeObserver from '@/hooks/useResizeObserver';
 
 interface HistogramProps {
@@ -9,11 +8,10 @@ interface HistogramProps {
   colorScale?: ((v: number) => string) | null;
 }
 
-interface TooltipState {
-  x: number;
-  y: number;
-  visible: boolean;
-  content: string[];
+interface Hovered {
+  x0: number; x1: number;
+  count: number; names: string[]; more: number;
+  x: number; y: number;
 }
 
 const MARGIN   = { top: 16, right: 24, bottom: 36, left: 52 };
@@ -29,12 +27,16 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
+  const hoveredElRef = useRef<SVGRectElement | null>(null);
 
-  const [tooltip, setTooltip] = useState<TooltipState>({ x: 0, y: 0, visible: false, content: [] });
+  const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const entries = Object.entries(data.values)
-    .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-    .filter(d => Number.isFinite(d.value));
+  const entries = useMemo(() =>
+    Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+      .filter(d => Number.isFinite(d.value)),
+    [data.values, data.labels],
+  );
 
   useEffect(() => {
     if (!svgRef.current || !dimensions || entries.length === 0) return;
@@ -97,22 +99,39 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       })
       .attr('stroke', '#000')
       .attr('stroke-width', 0.5)
-      .on('mousemove', (event, d) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const names = d.slice(0, 5).map(e => e.name);
-        const more  = d.length > 5 ? [`+${d.length - 5} till`] : [];
-        const range = `${formatValue(d.x0 ?? 0)} – ${formatValue(d.x1 ?? 0)} ${data.unit}`;
-        setTooltip({
-          x: event.clientX - rect.left,
-          y: event.clientY - rect.top,
-          visible: true,
-          content: [range, `${d.length} kommuner`, ...names, ...more],
+      .style('cursor', 'pointer')
+      .on('mousemove', (event: MouseEvent, d) => {
+        const el = event.currentTarget as SVGRectElement;
+        if (hoveredElRef.current !== el) {
+          if (hoveredElRef.current) {
+            d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+          }
+          hoveredElRef.current = el;
+          d3.select(el).attr('fill-opacity', 0.6);
+        }
+        setHovered({
+          x0: d.x0 ?? 0, x1: d.x1 ?? 0,
+          count: d.length,
+          names: d.slice(0, 5).map(e => e.name),
+          more:  Math.max(0, d.length - 5),
+          x: event.clientX, y: event.clientY,
         });
-      })
-      .on('mouseleave', () => {
-        setTooltip(t => ({ ...t, visible: false }));
       });
+
+    const clearHighlight = () => {
+      if (hoveredElRef.current) {
+        d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+        hoveredElRef.current = null;
+      }
+      setHovered(null);
+    };
+    d3.select(svgRef.current)
+      .on('mousemove.clear', (event: MouseEvent) => {
+        if (!(event.target as Element).classList?.contains('bin') && hoveredElRef.current !== null) {
+          clearHighlight();
+        }
+      })
+      .on('mouseleave', () => { if (hoveredElRef.current !== null) { clearHighlight(); } });
 
     // X axis.
     g.append('g')
@@ -156,18 +175,28 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('fill', '#6b7280')
       .text('Antal');
 
-  }, [entries, dimensions, colorScale, data.label, data.unit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entries, dimensions, colorScale, data.label, data.unit]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
       <svg ref={svgRef} className="w-full h-full" />
-      <Tooltip x={tooltip.x} y={tooltip.y} visible={tooltip.visible}>
-        {tooltip.content.map((line, i) => (
-          <div key={i} className={i === 0 ? 'font-medium' : i === 1 ? 'text-gray-400 mb-1' : 'text-gray-300'}>
-            {line}
+      {hovered && (
+        <div
+          className="fixed z-50 pointer-events-none bg-gray-900 text-white text-xs rounded px-2 py-1.5 shadow-lg"
+          style={{ left: hovered.x + 14, top: hovered.y - 10 }}
+        >
+          <div className="font-semibold">
+            {formatValue(hovered.x0)} – {formatValue(hovered.x1)} {data.unit}
           </div>
-        ))}
-      </Tooltip>
+          <div className="text-gray-400 mb-1">{hovered.count} områden</div>
+          {hovered.names.map((n, i) => (
+            <div key={i} className="text-gray-300">{n}</div>
+          ))}
+          {hovered.more > 0 && (
+            <div className="text-gray-400">+{hovered.more} till</div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
