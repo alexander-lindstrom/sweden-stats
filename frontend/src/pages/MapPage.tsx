@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
+import { SelectionPanel } from '@/components/map/SelectionPanel';
 import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
 import { Histogram } from '@/components/visualizations/Histogram';
 import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
@@ -47,6 +48,13 @@ const COUNTY_NAMES: Record<string, string> = {
   '23': 'Jämtlands',       '24': 'Västerbottens',     '25': 'Norrbottens',
 };
 
+// Property on sub-level features that holds the parent feature's code.
+// Used to store parentCode on selectedFeature so Escape can navigate up.
+const FEATURE_PARENT_PROP: Partial<Record<AdminLevel, string>> = {
+  RegSO: 'kommunkod',
+  DeSO:  'kommunkod',
+};
+
 const LEVEL_LABELS: Record<AdminLevel, string> = {
   Country:      'Nationell',
   Region:       'Län',
@@ -75,13 +83,14 @@ export default function MapPage() {
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
-  const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string } | null>(null);
+  const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
+  const [isPanelOpen,       setIsPanelOpen]        = useState(false);
   // Generation counter — incremented on every new fetch; stale responses are ignored.
   const fetchGenRef         = useRef(0);
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   // When drill-down changes the admin level, this carries the clicked sub-feature
   // through the [selectedLevel] effect so it isn't cleared by the level-change reset.
-  const pendingSelectionRef = useRef<{ code: string; label: string } | null>(null);
+  const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
 
   const handleYearChange = (y: number) => {
     setDisplayYear(y);
@@ -89,10 +98,41 @@ export default function MapPage() {
     yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
   };
 
-  const handleDrillDown = (level: AdminLevel, code: string, label: string) => {
-    pendingSelectionRef.current = { code, label };
+  const handleDrillDown = (level: AdminLevel, code: string, label: string, parentCode?: string) => {
+    pendingSelectionRef.current = { code, label, parentCode };
     setSelectedLevel(level);
   };
+
+  // Auto-open the panel whenever a feature is selected.
+  useEffect(() => {
+    if (selectedFeature) { setIsPanelOpen(true); }
+  }, [selectedFeature]);
+
+  // Escape: go up one admin level and auto-select the parent feature.
+  // Municipality → Region:   parent code = first 2 digits of municipality code.
+  // RegSO / DeSO → Municipality: parent code stored on selectedFeature.parentCode (kommunkod).
+  // Region → (nothing above worth navigating to): just deselect.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !selectedFeature) { return; }
+
+      if (selectedLevel === 'Municipality') {
+        const parentCode  = selectedFeature.code.slice(0, 2);
+        const parentLabel = COUNTY_NAMES[parentCode];
+        if (parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
+        setSelectedLevel('Region');
+      } else if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
+        const parentCode  = selectedFeature.parentCode;
+        const parentLabel = parentCode ? datasetResult?.parentLabels?.[parentCode] : undefined;
+        if (parentCode && parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
+        setSelectedLevel('Municipality');
+      } else {
+        setSelectedFeature(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedFeature, selectedLevel, datasetResult]);
 
   const availableDatasets = getDatasetsForLevel(selectedLevel);
 
@@ -373,6 +413,18 @@ export default function MapPage() {
               Källa: {activeDescriptor.source} · {selectedYear}
             </span>
           )}
+          <button
+            onClick={() => setIsPanelOpen(p => !p)}
+            title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
+            className={[
+              'ml-2 flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
+              isPanelOpen
+                ? 'bg-blue-50 border-blue-200 text-blue-700'
+                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50',
+            ].join(' ')}
+          >
+            {isPanelOpen ? '▶ Dölj' : '◀ Detaljer'}
+          </button>
         </div>
 
         {/* Main view area */}
@@ -427,7 +479,7 @@ export default function MapPage() {
             </div>
           )}
 
-          <div className="flex-1 relative overflow-hidden">
+          <div className="flex-1 relative overflow-hidden" style={{ isolation: 'isolate' }}>
             {activeView === 'map' && (
               <MapView
                 adminLevel={selectedLevel}
@@ -436,6 +488,7 @@ export default function MapPage() {
                 colorScale={colorScale}
                 featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                 featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+                featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                 unit={datasetResult?.unit ?? ''}
                 selectedFeature={selectedFeature}
                 onFeatureSelect={setSelectedFeature}
@@ -493,6 +546,13 @@ export default function MapPage() {
                 Välj ett dataset för att visa tabell.
               </div>
             )}
+
+            <SelectionPanel
+              selectedFeature={selectedFeature}
+              adminLevel={selectedLevel}
+              isOpen={isPanelOpen}
+              onClose={() => setIsPanelOpen(false)}
+            />
           </div>
         </div>
       </div>

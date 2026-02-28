@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
+import DoubleClickZoom from "ol/interaction/DoubleClickZoom";
 import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
@@ -54,10 +55,11 @@ export interface MapViewProps {
   colorScale: ((value: number) => string) | null;
   featureCodeProperty: string;
   featureLabelProperty: string;
+  featureParentProperty?: string;
   unit: string;
-  selectedFeature: { code: string; label: string } | null;
-  onFeatureSelect: (f: { code: string; label: string } | null) => void;
-  onDrillDown: (level: AdminLevel, code: string, label: string) => void;
+  selectedFeature: { code: string; label: string; parentCode?: string } | null;
+  onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
+  onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
 }
 
 // Module-level helper — zoom the OL view to a WFS feature, falling back to a
@@ -109,6 +111,7 @@ const MapView: React.FC<MapViewProps> = ({
   colorScale,
   featureCodeProperty,
   featureLabelProperty,
+  featureParentProperty,
   unit,
   selectedFeature,
   onFeatureSelect,
@@ -181,7 +184,8 @@ const MapView: React.FC<MapViewProps> = ({
         );
 
         if (subCode) {
-          onDrillDown(subLevel, subCode, subLabel ?? subCode);
+          // The currently selected feature is the direct parent of the drilled sub-feature.
+          onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
           zoomToWfsFeature(view, adminWfsLayers[subLevel], subCodeProp, subCode, LEVEL_CLICK_ZOOM[subLevel], subFallback);
           return;
         }
@@ -191,6 +195,7 @@ const MapView: React.FC<MapViewProps> = ({
     // -- Priority 2: main overlay layer --
     let clickedCode: string | null = null;
     let clickedLabel: string | null = null;
+    let clickedParentCode: string | undefined = undefined;
     let fallbackCenter: [number, number] | null = null;
 
     map.forEachFeatureAtPixel(
@@ -198,6 +203,10 @@ const MapView: React.FC<MapViewProps> = ({
       (feature) => {
         clickedCode  = String(feature.get(featureCodeProperty) ?? '');
         clickedLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        if (featureParentProperty) {
+          const p = feature.get(featureParentProperty);
+          if (p) { clickedParentCode = String(p); }
+        }
         const geom = feature.getGeometry();
         if (geom) {
           const ext = geom.getExtent();
@@ -213,9 +222,9 @@ const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode });
+    onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
     zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, clickedCode, LEVEL_CLICK_ZOOM[adminLevel], fallbackCenter);
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, onFeatureSelect, onDrillDown]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
@@ -225,6 +234,14 @@ const MapView: React.FC<MapViewProps> = ({
       target: mapRef.current,
       layers: [baseLayerRef.current],
       view: new View({ center: SWEDEN_CENTER, zoom: 6 }),
+    });
+
+    // Disable OL's built-in double-click zoom — it fires two single clicks
+    // plus a zoom, which interferes with the selection interaction.
+    map.getInteractions().forEach(interaction => {
+      if (interaction instanceof DoubleClickZoom) {
+        interaction.setActive(false);
+      }
     });
 
     mapInstanceRef.current = map;
