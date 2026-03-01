@@ -15,7 +15,7 @@ import {
 } from '@/datasets/types';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
 import { fetchCached, fetchHierarchyCached, preload } from '@/datasets/cache';
-import { BaseMapKey, baseMaps } from '@/components/map/BaseMaps';
+import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
 
 // Feature property used for choropleth lookup — matches the direct boundary
 // layer shown for each admin level.
@@ -37,15 +37,15 @@ const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
 
 const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
 
-// Stable county code → short name mapping (without "län" suffix for compact display).
+// Stable county code → short name mapping (without "län" suffix or genitive "s").
 const COUNTY_NAMES: Record<string, string> = {
-  '01': 'Stockholms',      '03': 'Uppsala',          '04': 'Södermanlands',
-  '05': 'Östergötlands',   '06': 'Jönköpings',       '07': 'Kronobergs',
-  '08': 'Kalmar',          '09': 'Gotlands',          '10': 'Blekinge',
-  '12': 'Skåne',           '13': 'Hallands',          '14': 'Västra Götalands',
-  '17': 'Värmlands',       '18': 'Örebro',            '19': 'Västmanlands',
-  '20': 'Dalarnas',        '21': 'Gävleborgs',        '22': 'Västernorrlands',
-  '23': 'Jämtlands',       '24': 'Västerbottens',     '25': 'Norrbottens',
+  '01': 'Stockholm',       '03': 'Uppsala',           '04': 'Södermanland',
+  '05': 'Östergötland',    '06': 'Jönköping',         '07': 'Kronoberg',
+  '08': 'Kalmar',          '09': 'Gotland',            '10': 'Blekinge',
+  '12': 'Skåne',           '13': 'Halland',            '14': 'Västra Götaland',
+  '17': 'Värmland',        '18': 'Örebro',             '19': 'Västmanland',
+  '20': 'Dalarna',         '21': 'Gävleborg',          '22': 'Västernorrland',
+  '23': 'Jämtland',        '24': 'Västerbotten',       '25': 'Norrbotten',
 };
 
 // Property on sub-level features that holds the parent feature's code.
@@ -80,7 +80,7 @@ export default function MapPage() {
   const [hierarchyData,     setHierarchyData]      = useState<GeoHierarchyNode | null>(null);
   const [colorScale,        setColorScale]         = useState<d3.ScaleSequential<string> | null>(null);
   const [loading,           setLoading]            = useState(false);
-  const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('EsriWorldGray');
+  const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('None');
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -211,7 +211,7 @@ export default function MapPage() {
 
         const vals = Object.values(result.values).filter(Number.isFinite);
         const scale = d3
-          .scaleSequential(t => d3.interpolateBlues(0.15 + t * 0.85))
+          .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
           .domain([Math.min(...vals), Math.max(...vals)])
           .clamp(true);
 
@@ -374,9 +374,9 @@ export default function MapPage() {
             onChange={(e) => setSelectedBase(e.target.value as BaseMapKey)}
             className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700"
           >
-            {(Object.keys(baseMaps) as BaseMapKey[]).map((key) => (
+            {(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map((key) => (
               <option key={key} value={key}>
-                {key}
+                {baseMapLabels[key]}
               </option>
             ))}
           </select>

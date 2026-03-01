@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface HistogramProps {
   data: DatasetResult;
@@ -31,12 +32,13 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
 
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const entries = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-      .filter(d => Number.isFinite(d.value)),
-    [data.values, data.labels],
-  );
+  const entries = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
+      .filter(d => Number.isFinite(d.value));
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   useEffect(() => {
     if (!svgRef.current || !dimensions || entries.length === 0) return;

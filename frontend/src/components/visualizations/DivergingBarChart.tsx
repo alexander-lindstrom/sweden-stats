@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface Hovered { name: string; value: number; deviation: number; x: number; y: number; }
 
@@ -37,13 +38,14 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
   // Sort descending by value (highest at top — e.g. oldest counties first).
-  const sorted = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+  const sorted = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
       .filter(d => Number.isFinite(d.value))
-      .sort((a, b) => b.value - a.value),
-    [data.values, data.labels],
-  );
+      .sort((a, b) => b.value - a.value);
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   const mean = d3.mean(sorted, d => d.value) ?? 0;
 
@@ -162,9 +164,10 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .text(d => fmtDev(d.value - mean, data.unit));
 
     // Y-axis — names, truncated with getComputedTextLength.
+    const nameByCode = new Map(sorted.map(d => [d.code, d.name]));
     g.append('g')
       .call(d3.axisLeft(yScale).tickSize(0).tickPadding(8)
-        .tickFormat(code => data.labels[code] ?? code))
+        .tickFormat(code => nameByCode.get(code) ?? code))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll<SVGTextElement, string>('text')
         .attr('font-size', 12).attr('fill', '#374151')
