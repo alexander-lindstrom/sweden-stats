@@ -259,8 +259,8 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               )}
             </section>
 
-            {/* Population sparkline ───────────────────────────────────── */}
-            <section>
+            {/* Population sparkline — hidden for RegSO/DeSO (SCB only provides 2024 data at those levels) */}
+            {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && <section>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">
                 Befolkningstrend
               </h3>
@@ -282,7 +282,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               {!sparkLoading && sparkline.length < 2 && (
                 <p className="text-sm text-gray-400">Ingen data tillgänglig.</p>
               )}
-            </section>
+            </section>}
           </>
         )}
       </div>

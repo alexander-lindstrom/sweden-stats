@@ -57,6 +57,28 @@ Kolada is worth a look — it aggregates many official sources into one clean AP
 
 ---
 
+## Known limitations and future work
+
+### RegSO/DeSO historical data (SCB vintage code problem)
+
+SCB's fine-grained area codes carry a **vintage suffix** reflecting boundary revisions. The 2025 revision introduced `_RegSO2025` and `_DeSO2025` codes across tables like TAB6574, TAB6679, TAB6693, and TAB6680. These new codes exist in the metadata and claim coverage back to 2010–2020, but the actual data cells are `null` for all years except 2024. SCB's documented policy: *"Previous years are not updated to the new division."*
+
+Consequence: the population sparkline is hidden at RegSO/DeSO level, and the year slider is disabled there, because fetching any year other than 2024 returns an empty dataset and breaks the choropleth.
+
+**Implementing historical RegSO/DeSO data (the messy way)**
+
+The historical data exists under the *old* vintage codes (`_RegSO2020`, `_DeSO2018`) in older SCB tables (e.g. TAB5722 Demografivariabler 2007–2023). The challenge is that the boundary geometries changed between vintages, so codes don't map 1-to-1.
+
+The path forward:
+
+1. **Build a correspondence table** using the GeoPackage files (`DeSO_2018.gpkg`, `RegSO_2020.gpkg`) and the current 2025-boundary GeoPackages. Compute geometric intersection areas to produce a weighted mapping: `old_code → [(new_code, weight), ...]` where weight = intersection area / old area.
+2. **Run a Python preprocessing step** that fetches historical data under old codes, applies the correspondence weights to reproject values onto 2025-vintage codes, and writes the result to a static JSON file (keyed by `level/year`).
+3. **Serve the static files** from the backend (or bundle as assets) and load them in place of live SCB API calls for historical years at RegSO/DeSO level.
+
+This is high-effort, low-generalisation work. Worth doing only if the time-series story at DeSO level becomes a core feature of the explorer.
+
+---
+
 ## Ideas parking lot
 
 - **"Find areas like this"** — given a selected area, surface the N most similar areas nationally (by statistical profile). Useful and unusual.
