@@ -196,6 +196,14 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
 
+    // Scroll the selected bar into view.
+    if (selectedFeature && containerRef.current) {
+      const idx = sorted.findIndex(d => d.code === selectedFeature.code);
+      if (idx >= 0) {
+        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+      }
+    }
   }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect]);
 
   const svgH = Math.max(dimensions?.height ?? 0, needed + MARGIN.top + MARGIN.bottom);

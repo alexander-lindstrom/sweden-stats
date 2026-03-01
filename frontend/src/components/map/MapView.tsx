@@ -71,6 +71,7 @@ function zoomToWfsFeature(
   code: string,
   zoom: number,
   fallbackCenter: [number, number] | null,
+  signal?: AbortSignal,
 ): void {
   const params = new URLSearchParams({
     service:      'WFS',
@@ -82,7 +83,7 @@ function zoomToWfsFeature(
     srsName:      'EPSG:3857',
     count:        '1',
   });
-  fetch(`http://localhost:8080/geoserver/wfs?${params}`)
+  fetch(`http://localhost:8080/geoserver/wfs?${params}`, { signal })
     .then(r => r.json())
     .then(geojson => {
       if (geojson.features?.length > 0) {
@@ -134,6 +135,10 @@ const MapView: React.FC<MapViewProps> = ({
   const subHighlightLayerRef = useRef<VectorTileLayer | null>(null);
   const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef    = useRef<string | null>(null);
+  // Set to true by handleMapClick before calling onFeatureSelect, so the
+  // selection effect knows the map click already triggered a zoom and can skip.
+  // Consumed (reset to false) on the next selection effect run.
+  const skipNextZoomRef      = useRef(false);
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -185,6 +190,7 @@ const MapView: React.FC<MapViewProps> = ({
 
         if (subCode) {
           // The currently selected feature is the direct parent of the drilled sub-feature.
+          skipNextZoomRef.current = true; // map click already zooms; selection effect should skip
           onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
           zoomToWfsFeature(view, adminWfsLayers[subLevel], subCodeProp, subCode, LEVEL_CLICK_ZOOM[subLevel], subFallback);
           return;
@@ -223,6 +229,7 @@ const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
+    skipNextZoomRef.current = true; // map click already zooms; selection effect should skip
     onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
     zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, clickedCode, LEVEL_CLICK_ZOOM[adminLevel], fallbackCenter);
   }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
@@ -431,6 +438,19 @@ const MapView: React.FC<MapViewProps> = ({
 
     if (!selectedFeature || !sourceRef.current) {return;}
 
+    // Zoom the view to the selected feature unless the map click already did it.
+    // Uses an AbortController so React StrictMode's first-mount effect is
+    // cancelled on cleanup and the second-mount effect zooms the live view.
+    let zoomCleanup: (() => void) | undefined;
+    if (skipNextZoomRef.current) {
+      skipNextZoomRef.current = false; // consume the skip flag
+    } else {
+      const controller = new AbortController();
+      const view       = mapInstanceRef.current!.getView();
+      zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_CLICK_ZOOM[adminLevel], null, controller.signal);
+      zoomCleanup = () => controller.abort();
+    }
+
     // Selection outline (z=4) — shares source with main layer, no extra tile fetches
     const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
     selLayer.setZIndex(4);
@@ -452,6 +472,8 @@ const MapView: React.FC<MapViewProps> = ({
       subLayerRef.current          = subLayer;
       subHighlightLayerRef.current = subHighlight;
     }
+
+    return zoomCleanup;
   }, [selectedFeature, adminLevel, featureCodeProperty]);
 
   // --- Update choropleth style in place when data changes -----------------

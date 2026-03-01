@@ -84,6 +84,10 @@ ESV (Ekonomistyrningsverket) CSV files in `processing/data/esv/` → Python pars
 
 The processed JSON files (`state_expenses_1997_2024.json`, `state_revenue_2006_2024.json`) are keyed by year.
 
+## Working Preferences
+
+- **Never commit without explicit user approval.** Always show what you plan to commit and wait for an "ok", "go ahead", or equivalent before running `git commit`.
+
 ### SCB API Notes
 - **v1** (`api.scb.se/OV0104/v1/doris/sv/ssd`): Used for KPI and other table queries, proxied through backend.
 - **v2beta** (`api.scb.se/OV0104/v2beta/api/v2/tables`): Used directly by the RTK Query population endpoint (no proxy needed).

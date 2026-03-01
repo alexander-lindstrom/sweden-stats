@@ -168,6 +168,14 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('stroke', '#f3f4f6')
       .attr('stroke-width', 1);
 
+    // Scroll the selected bar into view.
+    if (selectedFeature && containerRef.current) {
+      const idx = sorted.findIndex(d => d.code === selectedFeature.code);
+      if (idx >= 0) {
+        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+      }
+    }
   }, [sorted, svgWidth, svgHeight, colorScale, selectedFeature, onFeatureSelect]);
 
   return (

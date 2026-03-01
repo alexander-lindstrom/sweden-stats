@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { DatasetResult } from '@/datasets/types';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 
@@ -14,6 +14,11 @@ type SortDir = 'asc' | 'desc';
 export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect }) => {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const selectedRowRef = useRef<HTMLTableRowElement | null>(null);
+
+  useEffect(() => {
+    selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedFeature?.code]);
 
   const rows = Object.entries(data.values).map(([code, value]) => ({
     code,
@@ -71,6 +76,7 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeatur
           {sorted.map((row, i) => (
             <tr
               key={row.code}
+              ref={row.code === selectedFeature?.code ? selectedRowRef : null}
               onClick={() => onFeatureSelect?.(row.code === selectedFeature?.code ? null : { code: row.code, label: row.name })}
               className={[
                 'border-b border-gray-100 transition-colors',

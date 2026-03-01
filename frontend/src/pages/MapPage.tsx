@@ -108,6 +108,20 @@ export default function MapPage() {
     if (selectedFeature) { setIsPanelOpen(true); }
   }, [selectedFeature]);
 
+  // When a feature is selected, auto-derive the diverging-chart filter so the
+  // selected item is always visible in the chart without manual filter changes.
+  // All admin codes start with a 2-digit county prefix; RegSO/DeSO codes also
+  // embed the 4-digit municipality prefix (e.g. '0114R001' → muni '0114').
+  useEffect(() => {
+    if (!selectedFeature) { return; }
+    if (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
+      setSelectedLan(selectedFeature.code.slice(0, 2));
+    }
+    if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
+      setSelectedMuni(selectedFeature.code.slice(0, 4));
+    }
+  }, [selectedFeature, selectedLevel]);
+
   // Escape: go up one admin level and auto-select the parent feature.
   // Municipality → Region:   parent code = first 2 digits of municipality code.
   // RegSO / DeSO → Municipality: parent code stored on selectedFeature.parentCode (kommunkod).
