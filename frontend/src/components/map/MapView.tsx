@@ -135,10 +135,6 @@ const MapView: React.FC<MapViewProps> = ({
   const subHighlightLayerRef = useRef<VectorTileLayer | null>(null);
   const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef    = useRef<string | null>(null);
-  // Set to true by handleMapClick before calling onFeatureSelect, so the
-  // selection effect knows the map click already triggered a zoom and can skip.
-  // Consumed (reset to false) on the next selection effect run.
-  const skipNextZoomRef      = useRef(false);
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -156,7 +152,6 @@ const MapView: React.FC<MapViewProps> = ({
   const handleMapClick = useCallback((evt: MapBrowserEvent) => {
     const map = mapInstanceRef.current;
     if (!map) {return;}
-    const view = map.getView();
 
     // -- Priority 1: sub-layer --
     const subLayer = subLayerRef.current;
@@ -169,7 +164,6 @@ const MapView: React.FC<MapViewProps> = ({
       if (subLevel && subCodeProp && subLabelProp && filterProp) {
         let subCode: string | null = null;
         let subLabel: string | null = null;
-        let subFallback: [number, number] | null = null;
 
         map.forEachFeatureAtPixel(
           evt.pixel,
@@ -178,21 +172,14 @@ const MapView: React.FC<MapViewProps> = ({
             if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) {return;}
             subCode  = String(feature.get(subCodeProp) ?? '');
             subLabel = String(feature.get(subLabelProp) ?? subCode);
-            const geom = feature.getGeometry();
-            if (geom) {
-              const ext = geom.getExtent();
-              subFallback = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2];
-            }
             return true;
           },
           { layerFilter: (l) => l === subLayer, hitTolerance: 5 },
         );
 
         if (subCode) {
-          // The currently selected feature is the direct parent of the drilled sub-feature.
-          skipNextZoomRef.current = true; // map click already zooms; selection effect should skip
+          // Zoom is handled by the selection effect via WFS after state updates.
           onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
-          zoomToWfsFeature(view, adminWfsLayers[subLevel], subCodeProp, subCode, LEVEL_CLICK_ZOOM[subLevel], subFallback);
           return;
         }
       }
@@ -202,7 +189,6 @@ const MapView: React.FC<MapViewProps> = ({
     let clickedCode: string | null = null;
     let clickedLabel: string | null = null;
     let clickedParentCode: string | undefined = undefined;
-    let fallbackCenter: [number, number] | null = null;
 
     map.forEachFeatureAtPixel(
       evt.pixel,
@@ -214,11 +200,6 @@ const MapView: React.FC<MapViewProps> = ({
           const p = feature.get(featureParentProperty);
           if (p) { clickedParentCode = String(p); }
         }
-        const geom = feature.getGeometry();
-        if (geom) {
-          const ext = geom.getExtent();
-          fallbackCenter = [(ext[0] + ext[2]) / 2, (ext[1] + ext[3]) / 2];
-        }
         return true;
       },
       { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 },
@@ -229,9 +210,7 @@ const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    skipNextZoomRef.current = true; // map click already zooms; selection effect should skip
     onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
-    zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, clickedCode, LEVEL_CLICK_ZOOM[adminLevel], fallbackCenter);
   }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
 
   // --- Initialise map once -------------------------------------------------
@@ -438,18 +417,12 @@ const MapView: React.FC<MapViewProps> = ({
 
     if (!selectedFeature || !sourceRef.current) {return;}
 
-    // Zoom the view to the selected feature unless the map click already did it.
-    // Uses an AbortController so React StrictMode's first-mount effect is
-    // cancelled on cleanup and the second-mount effect zooms the live view.
-    let zoomCleanup: (() => void) | undefined;
-    if (skipNextZoomRef.current) {
-      skipNextZoomRef.current = false; // consume the skip flag
-    } else {
-      const controller = new AbortController();
-      const view       = mapInstanceRef.current!.getView();
-      zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_CLICK_ZOOM[adminLevel], null, controller.signal);
-      zoomCleanup = () => controller.abort();
-    }
+    // Zoom the view to the selected feature. AbortController in the cleanup
+    // cancels any in-flight WFS request when this effect re-runs or when React
+    // StrictMode unmounts the first mount, so only the live view gets animated.
+    const controller = new AbortController();
+    const view       = mapInstanceRef.current!.getView();
+    zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_CLICK_ZOOM[adminLevel], null, controller.signal);
 
     // Selection outline (z=4) — shares source with main layer, no extra tile fetches
     const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
@@ -473,7 +446,7 @@ const MapView: React.FC<MapViewProps> = ({
       subHighlightLayerRef.current = subHighlight;
     }
 
-    return zoomCleanup;
+    return () => controller.abort();
   }, [selectedFeature, adminLevel, featureCodeProperty]);
 
   // --- Update choropleth style in place when data changes -----------------
