@@ -13,11 +13,11 @@ const SWEDEN_EXTENT = transformExtent([10.0, 55.0, 25.0, 70.5], 'EPSG:4326', 'EP
 
 export const baseVectorStyle = new Style({
   fill: new Fill({
-    color: 'rgba(100, 149, 237, 0.2)',
+    color: 'rgba(225, 218, 205, 0.8)',
   }),
   stroke: new Stroke({
-    color: '#1f3f81',
-    width: 1.5,
+    color: '#7898a8',
+    width: 1.2,
   }),
 });
 
@@ -27,9 +27,9 @@ const hoverHighlightStyle = new Style({
   stroke: new Stroke({ color: 'rgba(255, 255, 255, 0.9)', width: 2.5 }),
 });
 
-const choroplethStroke = new Stroke({ color: '#444', width: 0.5 });
+const choroplethStroke = new Stroke({ color: '#8a9ea8', width: 0.7 });
 const noDataStyle = new Style({
-  fill: new Fill({ color: 'rgba(200, 200, 200, 0.4)' }),
+  fill: new Fill({ color: 'rgba(200, 193, 182, 0.9)' }),
   stroke: choroplethStroke,
 });
 
@@ -183,7 +183,7 @@ export function createSubBoundaryLayer(
     // Near-transparent fill makes the whole polygon interior hit-detectable.
     // Without it, forEachFeatureAtPixel only detects the stroke boundary pixels.
     fill: new Fill({ color: 'rgba(0, 0, 0, 0.01)' }),
-    stroke: new Stroke({ color: 'rgba(60, 60, 60, 0.3)', width: 0.75 }),
+    stroke: new Stroke({ color: 'rgba(50, 70, 90, 0.3)', width: 0.75 }),
   });
   return new VectorTileLayer({
     source,

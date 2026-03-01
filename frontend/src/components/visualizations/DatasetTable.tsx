@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { DatasetResult } from '@/datasets/types';
+import { stripLanSuffix } from '@/utils/labelFormatting';
 
 interface DatasetTableProps {
   data: DatasetResult;
@@ -14,7 +15,7 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data }) => {
 
   const rows = Object.entries(data.values).map(([code, value]) => ({
     code,
-    name: data.labels[code] ?? code,
+    name: stripLanSuffix(data.labels[code] ?? code),
     value,
   }));
 

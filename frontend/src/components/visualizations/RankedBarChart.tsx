@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface Hovered { name: string; value: number; x: number; y: number; }
 
@@ -21,12 +22,13 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
   const hoveredElRef = useRef<SVGRectElement | null>(null);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const sorted = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-      .sort((a, b) => b.value - a.value),
-    [data.values, data.labels],
-  );
+  const sorted = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
+      .sort((a, b) => b.value - a.value);
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   const idealHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
   const containerH  = dimensions?.height ?? 0;

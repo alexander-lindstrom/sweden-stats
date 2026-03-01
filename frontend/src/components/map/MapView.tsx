@@ -3,7 +3,6 @@ import Map from "ol/Map";
 import View from "ol/View";
 import TileLayer from "ol/layer/Tile";
 import DoubleClickZoom from "ol/interaction/DoubleClickZoom";
-import OSM from "ol/source/OSM";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
 import { getCenter } from "ol/extent";
@@ -32,6 +31,7 @@ import VectorTileLayer from "ol/layer/VectorTile";
 import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { cleanCountyLabel } from "@/utils/labelFormatting";
 
 const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
   Country:      5,
@@ -119,8 +119,8 @@ const MapView: React.FC<MapViewProps> = ({
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<Map | null>(null);
-  const baseLayerRef     = useRef<TileLayer<OSM | XYZ>>(
-    new TileLayer({ source: baseMaps.EsriNatGeo, visible: false })
+  const baseLayerRef     = useRef<TileLayer<XYZ>>(
+    new TileLayer({ visible: false })
   );
   const overlayLayerRef  = useRef<VectorTileLayer | null>(null);
   // Separate lightweight layer for hover highlight — shares the same source as
@@ -202,7 +202,8 @@ const MapView: React.FC<MapViewProps> = ({
       evt.pixel,
       (feature) => {
         clickedCode  = String(feature.get(featureCodeProperty) ?? '');
-        clickedLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        const rawClickLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        clickedLabel = adminLevel === 'Region' ? cleanCountyLabel(rawClickLabel) : rawClickLabel;
         if (featureParentProperty) {
           const p = feature.get(featureParentProperty);
           if (p) { clickedParentCode = String(p); }
@@ -233,7 +234,7 @@ const MapView: React.FC<MapViewProps> = ({
     const map = new Map({
       target: mapRef.current,
       layers: [baseLayerRef.current],
-      view: new View({ center: SWEDEN_CENTER, zoom: 6 }),
+      view: new View({ center: SWEDEN_CENTER, zoom: 5.5 }),
     });
 
     // Disable OL's built-in double-click zoom — it fires two single clicks
@@ -345,9 +346,10 @@ const MapView: React.FC<MapViewProps> = ({
         map.forEachFeatureAtPixel(
           pixel,
           (feature) => {
-            const code  = String(feature.get(featureCodeProperty) ?? '');
-            const label = String(feature.get(featureLabelProperty) ?? code);
-            const value = choroplethData?.[code] ?? null;
+            const code     = String(feature.get(featureCodeProperty) ?? '');
+            const rawLabel = String(feature.get(featureLabelProperty) ?? code);
+            const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
+            const value    = choroplethData?.[code] ?? null;
             result = { code, label, value };
             return true;
           },
@@ -470,13 +472,17 @@ const MapView: React.FC<MapViewProps> = ({
     if (!map) {return;}
 
     map.removeLayer(baseLayerRef.current);
-    baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });
+    if (selectedBase === 'None') {
+      baseLayerRef.current = new TileLayer({ visible: false });
+    } else {
+      baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });
+    }
     baseLayerRef.current.setZIndex(0);
     map.addLayer(baseLayerRef.current);
   }, [selectedBase]);
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full" style={{ backgroundColor: '#b8d4e4' }}>
       <div ref={mapRef} className="w-full h-full" />
       <Tooltip ref={tooltipRef} visible={hoveredFeature !== null}>
         {hoveredFeature && (
