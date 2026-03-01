@@ -9,13 +9,15 @@ interface Hovered { name: string; value: number; x: number; y: number; }
 interface RankedBarChartProps {
   data: DatasetResult;
   colorScale?: ((value: number) => string) | null;
+  selectedFeature?: { code: string; label: string } | null;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
-export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale }) => {
+export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -75,9 +77,12 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('fill', d =>
         colorScale ? colorScale(d.value) : '#3b82f6'
       )
-      .attr('stroke', '#000')
-      .attr('stroke-width', 0.5)
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
+      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
+      .on('click', (_event: MouseEvent, d) => {
+        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
         if (hoveredElRef.current !== el) {
@@ -163,7 +168,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('stroke', '#f3f4f6')
       .attr('stroke-width', 1);
 
-  }, [sorted, svgWidth, svgHeight, colorScale]);
+  }, [sorted, svgWidth, svgHeight, colorScale, selectedFeature, onFeatureSelect]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">
