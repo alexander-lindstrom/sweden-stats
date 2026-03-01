@@ -4,12 +4,14 @@ import { stripLanSuffix } from '@/utils/labelFormatting';
 
 interface DatasetTableProps {
   data: DatasetResult;
+  selectedFeature?: { code: string; label: string } | null;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 type SortKey = 'name' | 'value';
 type SortDir = 'asc' | 'desc';
 
-export const DatasetTable: React.FC<DatasetTableProps> = ({ data }) => {
+export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect }) => {
   const [sortKey, setSortKey] = useState<SortKey>('value');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -69,7 +71,12 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data }) => {
           {sorted.map((row, i) => (
             <tr
               key={row.code}
-              className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+              onClick={() => onFeatureSelect?.(row.code === selectedFeature?.code ? null : { code: row.code, label: row.name })}
+              className={[
+                'border-b border-gray-100 transition-colors',
+                onFeatureSelect ? 'cursor-pointer' : '',
+                row.code === selectedFeature?.code ? 'bg-blue-50' : 'hover:bg-gray-50',
+              ].join(' ')}
             >
               <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">
                 {i + 1}

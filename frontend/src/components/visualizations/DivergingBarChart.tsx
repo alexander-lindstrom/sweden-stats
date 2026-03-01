@@ -8,6 +8,8 @@ interface Hovered { name: string; value: number; deviation: number; x: number; y
 
 interface Props {
   data: DatasetResult;
+  selectedFeature?: { code: string; label: string } | null;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 const MARGIN     = { top: 28, right: 76, bottom: 24, left: 152 };
@@ -30,7 +32,7 @@ function fmtAbs(v: number): string {
   return v.toFixed(1);
 }
 
-export const DivergingBarChart: React.FC<Props> = ({ data }) => {
+export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -106,8 +108,12 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill',   d => d.value >= mean ? COLOR_ABOVE : COLOR_BELOW)
-      .attr('stroke', '#000').attr('stroke-width', 0.5)
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
+      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
+      .on('click', (_event: MouseEvent, d) => {
+        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
         if (hoveredElRef.current !== el) {
@@ -190,7 +196,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
 
-  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels]);
+  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect]);
 
   const svgH = Math.max(dimensions?.height ?? 0, needed + MARGIN.top + MARGIN.bottom);
 

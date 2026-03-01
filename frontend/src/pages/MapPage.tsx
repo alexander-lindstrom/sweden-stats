@@ -507,7 +507,7 @@ export default function MapPage() {
 
             {activeView === 'chart' && activeChartType === 'bar' && datasetResult && (
               <div className="w-full h-full p-6">
-                <RankedBarChart data={datasetResult} colorScale={colorScale} />
+                <RankedBarChart data={datasetResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
               </div>
             )}
             {activeView === 'chart' && activeChartType === 'histogram' && datasetResult && (
@@ -517,7 +517,7 @@ export default function MapPage() {
             )}
             {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
               <div className="w-full h-full p-6">
-                <DivergingBarChart data={filteredForDiverging} />
+                <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
               </div>
             )}
             {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
@@ -542,7 +542,7 @@ export default function MapPage() {
 
             {activeView === 'table' && datasetResult && (
               <div className="w-full h-full p-6">
-                <DatasetTable data={datasetResult} />
+                <DatasetTable data={datasetResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
               </div>
             )}
             {activeView === 'table' && !datasetResult && (
