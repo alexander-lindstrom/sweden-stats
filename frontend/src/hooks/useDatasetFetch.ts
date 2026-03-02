@@ -41,14 +41,18 @@ export function useDatasetFetch(
       .then((result) => {
         if (gen !== fetchGenRef.current) { return; }
 
-        const vals  = Object.values(result.values).filter(Number.isFinite);
-        const scale = d3
-          .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
-          .domain([Math.min(...vals), Math.max(...vals)])
-          .clamp(true);
-
+        const vals = Object.values(result.values).filter(Number.isFinite);
         setDatasetResult(result);
-        setColorScale(() => scale); // wrap: colorScale is a function type
+
+        if (vals.length > 0) {
+          const scale = d3
+            .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
+            .domain([Math.min(...vals), Math.max(...vals)])
+            .clamp(true);
+          setColorScale(() => scale); // wrap: colorScale is a function type
+        } else {
+          setColorScale(null);
+        }
         setLoading(false);
 
         // Preload neighbouring levels in the background.

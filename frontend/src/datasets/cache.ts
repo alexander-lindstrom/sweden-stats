@@ -10,13 +10,15 @@
  * second network request.
  */
 
-import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode } from './types';
+import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode, TimeSeriesNode } from './types';
 
-const resultCache    = new Map<string, DatasetResult>();
-const hierarchyCache = new Map<string, GeoHierarchyNode>();
+const resultCache      = new Map<string, DatasetResult>();
+const hierarchyCache   = new Map<string, GeoHierarchyNode>();
+const timeSeriesCache  = new Map<string, TimeSeriesNode[]>();
 
-const resultInFlight    = new Map<string, Promise<DatasetResult>>();
-const hierarchyInFlight = new Map<string, Promise<GeoHierarchyNode>>();
+const resultInFlight      = new Map<string, Promise<DatasetResult>>();
+const hierarchyInFlight   = new Map<string, Promise<GeoHierarchyNode>>();
+const timeSeriesInFlight  = new Map<string, Promise<TimeSeriesNode[]>>();
 
 function resultKey(datasetId: string, level: AdminLevel, year: number): string {
   return `${datasetId}:${level}:${year}`;
@@ -24,6 +26,10 @@ function resultKey(datasetId: string, level: AdminLevel, year: number): string {
 
 function hierarchyKey(datasetId: string, year: number): string {
   return `${datasetId}:${year}`;
+}
+
+function timeSeriesKey(datasetId: string, level: AdminLevel): string {
+  return `${datasetId}:${level}`;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -86,6 +92,37 @@ export async function fetchHierarchyCached(
     });
 
   hierarchyInFlight.set(key, promise);
+  return promise;
+}
+
+/** Fetch a TimeSeriesNode[], using cache or deduplicating in-flight requests. */
+export async function fetchTimeSeriesCached(
+  descriptor: DatasetDescriptor,
+  level: AdminLevel,
+): Promise<TimeSeriesNode[] | null> {
+  if (!descriptor.fetchTimeSeries) { return null; }
+
+  const key = timeSeriesKey(descriptor.id, level);
+
+  const cached = timeSeriesCache.get(key);
+  if (cached) { return cached; }
+
+  const inflight = timeSeriesInFlight.get(key);
+  if (inflight) { return inflight; }
+
+  const promise = descriptor
+    .fetchTimeSeries(level)
+    .then(result => {
+      timeSeriesCache.set(key, result);
+      timeSeriesInFlight.delete(key);
+      return result;
+    })
+    .catch(err => {
+      timeSeriesInFlight.delete(key);
+      throw err;
+    });
+
+  timeSeriesInFlight.set(key, promise);
   return promise;
 }
 

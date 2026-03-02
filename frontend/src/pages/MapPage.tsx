@@ -7,6 +7,7 @@ import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
 import { Histogram } from '@/components/visualizations/Histogram';
 import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
+import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import {
   AdminLevel, ChartType, ViewType,
@@ -17,6 +18,7 @@ import { COUNTY_NAMES } from '@/datasets/adminLevels';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
+import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 
 // Feature property used for choropleth lookup — matches the direct boundary
@@ -72,6 +74,7 @@ export default function MapPage() {
   const { datasetResult, colorScale, loading } = useDatasetFetch(selectedDatasetId, selectedLevel, selectedYear);
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const hierarchyData    = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
+  const timeSeriesData   = useTimeSeriesFetch(activeDescriptor, activeChartType, selectedLevel);
 
   useMapKeyboardNavigation(
     selectedFeature,
@@ -365,9 +368,9 @@ export default function MapPage() {
                     root={hierarchyData}
                     unit={datasetResult?.unit ?? ''}
                     label={activeDescriptor?.label ?? ''}
-                    onFeatureSelect={setSelectedFeature}
-                    depthToLevel={['Country', 'Region', 'Municipality']}
-                    onSelectionLevelChange={setSelectionLevel}
+                    onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? setSelectedFeature : undefined}
+                    depthToLevel={activeDescriptor?.sunburstDepthToLevel}
+                    onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
                   />
                 </div>
               )}
@@ -376,7 +379,17 @@ export default function MapPage() {
                   Laddar hierarki…
                 </div>
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && !datasetResult && (
+              {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
+                <div className="w-full h-full p-4">
+                  <MultiLineChart data={timeSeriesData} label={activeDescriptor?.label} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
+                  Laddar tidsserie…
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>

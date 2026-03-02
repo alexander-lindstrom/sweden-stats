@@ -85,8 +85,8 @@ export function MapSidebar({
         )}
       </section>
 
-      {/* Year slider — hidden at RegSO/DeSO (boundary-locked) */}
-      {activeDescriptor && !['RegSO', 'DeSO'].includes(selectedLevel) && (
+      {/* Year slider — hidden at RegSO/DeSO (boundary-locked) and for datasets with no year dimension */}
+      {activeDescriptor && activeDescriptor.availableYears.length > 1 && !['RegSO', 'DeSO'].includes(selectedLevel) && (
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
             År: {displayYear}

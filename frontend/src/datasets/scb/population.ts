@@ -332,6 +332,7 @@ export const population: DatasetDescriptor = {
     Municipality: ['histogram'],
     RegSO:        ['histogram'],
   },
+  sunburstDepthToLevel: ['Country', 'Region', 'Municipality'],
   fetch: fetchPopulation,
   fetchHierarchy: fetchPopulationHierarchy,
 };
