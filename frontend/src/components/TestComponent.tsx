@@ -87,8 +87,8 @@ export const PopulationDataViewer: React.FC = () => {
         <div style={styles.error}>
           <p>Error fetching data:</p>
           <pre>
-            {('status' in error ? `Status: ${(error as any).status}\n` : '') +
-             ('data' in error ? JSON.stringify((error as any).data, null, 2) : JSON.stringify(error, null, 2))}
+            {('status' in error ? `Status: ${(error as Record<string, unknown>).status}\n` : '') +
+             ('data' in error ? JSON.stringify((error as Record<string, unknown>).data, null, 2) : JSON.stringify(error, null, 2))}
           </pre>
         </div>
       )}

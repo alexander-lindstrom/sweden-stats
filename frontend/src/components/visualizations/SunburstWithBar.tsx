@@ -16,8 +16,6 @@ interface Props {
 }
 
 interface TT {
-  x: number;
-  y: number;
   visible: boolean;
   name: string;
   value: number;
@@ -29,8 +27,8 @@ const MAX_BAR_H  = 20;   // max bar height in px — matches budget chart densit
 const BAR_GAP    = 1;    // gap between bars in px
 
 function fmtShort(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}k`;
+  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
+  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
   return v.toLocaleString('sv-SE');
 }
 
@@ -38,6 +36,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
   const containerRef               = useRef<HTMLDivElement>(null);
   const sunRef                     = useRef<SVGSVGElement>(null);
   const barRef                     = useRef<SVGSVGElement>(null);
+  const tooltipRef                 = useRef<HTMLDivElement>(null);
   const dims                       = useResizeObserver(containerRef);
   const onFeatureSelectRef         = useRef(onFeatureSelect);
   const onSelectionLevelChangeRef  = useRef(onSelectionLevelChange);
@@ -48,12 +47,12 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   const emitLevel = (depth: number) => {
     const level = depthToLevelRef.current?.[depth];
-    if (level) onSelectionLevelChangeRef.current?.(level);
+    if (level) {onSelectionLevelChangeRef.current?.(level);}
   };
 
   const [focus,   setFocus]   = useState<GeoHierarchyNode>(root);
   const [history, setHistory] = useState<GeoHierarchyNode[]>([]);
-  const [tt,      setTT]      = useState<TT>({ x: 0, y: 0, visible: false, name: '', value: 0 });
+  const [tt,      setTT]      = useState<TT>({ visible: false, name: '', value: 0 });
 
   // Reset when root data changes.
   useEffect(() => { setFocus(root); setHistory([]); }, [root]);
@@ -63,7 +62,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
   const historyRef = useRef(history); historyRef.current = history;
 
   const drillDown = useCallback((node: GeoHierarchyNode) => {
-    if (!node.children?.length) return;
+    if (!node.children?.length) {return;}
     const depth = historyRef.current.length + 1;
     setHistory(h => [...h, focusRef.current]);
     setFocus(node);
@@ -73,7 +72,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   const drillUp = useCallback(() => {
     const prev = historyRef.current[historyRef.current.length - 1];
-    if (!prev) return;
+    if (!prev) {return;}
     const depth = historyRef.current.length - 1;
     setHistory(h => h.slice(0, -1));
     setFocus(prev);
@@ -98,7 +97,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   // ── Sunburst ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!sunRef.current || !dims) return;
+    if (!sunRef.current || !dims) {return;}
 
     const w      = Math.floor(dims.width / 2);
     const h      = dims.height;
@@ -118,9 +117,9 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     const nodes = hier.descendants() as PN[];
 
     function nodeColor(d: PN): string {
-      if (d.depth === 0) return '#e0e0e0';
+      if (d.depth === 0) {return '#e0e0e0';}
       let a: PN = d;
-      while (a.depth > 1 && a.parent) a = a.parent as PN;
+      while (a.depth > 1 && a.parent) {a = a.parent as PN;}
       return colorScale(a.data.name);
     }
 
@@ -144,7 +143,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .style('cursor', d => (drillable(d) ? 'pointer' : 'default'))
       .on('click', (_e, d) => {
         if (d.depth === 0) { drillUp(); return; }
-        if (d.children?.length) drillDown(d.data);
+        if (d.children?.length) {drillDown(d.data);}
         else {
           emitLevel(historyRef.current.length + d.depth);
           onFeatureSelectRef.current?.({ code: d.data.code, label: d.data.name });
@@ -153,8 +152,11 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);
         const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        setTT({ x: e.clientX - rect.left, y: e.clientY - rect.top, visible: true, name: d.data.name, value: d.data.value });
+        if (rect && tooltipRef.current) {
+          tooltipRef.current.style.left = `${e.clientX - rect.left + 12}px`;
+          tooltipRef.current.style.top  = `${e.clientY - rect.top  - 28}px`;
+        }
+        setTT({ visible: true, name: d.data.name, value: d.data.value });
       })
       .on('mouseout', e => {
         d3.select(e.currentTarget).attr('fill-opacity', 1);
@@ -184,13 +186,13 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   // ── Bar chart ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!barRef.current || !dims) return;
+    if (!barRef.current || !dims) {return;}
 
     const w      = dims.width - Math.floor(dims.width / 2);
     const h      = dims.height;
     const innerW = w - BAR_M.left - BAR_M.right;
     const innerH = h - BAR_M.top  - BAR_M.bottom;
-    if (innerW <= 0 || innerH <= 0) return;
+    if (innerW <= 0 || innerH <= 0) {return;}
 
     const sorted = [...(focus.children ?? [])]
       .sort((a, b) => b.value - a.value)
@@ -200,7 +202,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     svg.selectAll('*').remove();
     svg.attr('width', w).attr('height', h);
 
-    if (!sorted.length) return;
+    if (!sorted.length) {return;}
 
     const g = svg.append('g').attr('transform', `translate(${BAR_M.left},${BAR_M.top})`);
 
@@ -240,7 +242,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('stroke', '#000').attr('stroke-width', 0.5)
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
       .on('click', (_e, d) => {
-        if (d.children?.length) drillDown(d);
+        if (d.children?.length) {drillDown(d);}
         else {
           emitLevel(historyRef.current.length + 1);
           onFeatureSelectRef.current?.({ code: d.code, label: d.name });
@@ -249,8 +251,11 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);
         const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        setTT({ x: e.clientX - rect.left, y: e.clientY - rect.top, visible: true, name: d.name, value: d.value });
+        if (rect && tooltipRef.current) {
+          tooltipRef.current.style.left = `${e.clientX - rect.left + 12}px`;
+          tooltipRef.current.style.top  = `${e.clientY - rect.top  - 28}px`;
+        }
+        setTT({ visible: true, name: d.name, value: d.value });
       })
       .on('mouseout', e => {
         d3.select(e.currentTarget).attr('fill-opacity', 1);
@@ -278,7 +283,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
         .each(function() {
           const el  = this as SVGTextElement;
           const max = BAR_M.left - 16;
-          if (el.getComputedTextLength() <= max) return;
+          if (el.getComputedTextLength() <= max) {return;}
           let t = el.textContent ?? '';
           while (t.length > 2 && el.getComputedTextLength() > max) {
             t = t.slice(0, -1);
@@ -313,7 +318,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       <svg ref={sunRef} className="flex-shrink-0" />
       <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
       <svg ref={barRef} className="flex-1 min-w-0" />
-      <Tooltip x={tt.x} y={tt.y} visible={tt.visible}>
+      <Tooltip ref={tooltipRef} visible={tt.visible}>
         <div className="font-medium">{tt.name}</div>
         <div className="text-gray-400 mt-0.5">{fmtShort(tt.value)} {unit}</div>
       </Tooltip>

@@ -1,13 +1,25 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar:       'Rankningslista',
   histogram: 'Fördelning',
   sunburst:  'Soldiagram',
   diverging: 'Avvikelse',
+  multiline: 'Tidsserie',
 };
+
+export interface TimeSeriesPoint {
+  date: string;   // ISO date: YYYY-MM-DD
+  value: number;
+}
+
+export interface TimeSeriesNode {
+  id: string;
+  label: string;
+  points: TimeSeriesPoint[];
+}
 
 export interface DatasetResult {
   values: Record<string, number>; // boundary code → value
@@ -34,8 +46,12 @@ export interface DatasetDescriptor {
   supportedViews: ViewType[];
   supportedViewsByLevel?: Partial<Record<AdminLevel, ViewType[]>>;
   chartTypes?: Partial<Record<AdminLevel, ChartType[]>>;
+  /** Maps sunburst drill depth to AdminLevel for geographic navigation.
+   *  Omit for non-geographic datasets (e.g. state expenses). */
+  sunburstDepthToLevel?: AdminLevel[];
   fetch: (level: AdminLevel, year: number) => Promise<DatasetResult>;
   fetchHierarchy?: (year: number) => Promise<GeoHierarchyNode>;
+  fetchTimeSeries?: (level: AdminLevel) => Promise<TimeSeriesNode[]>;
 }
 
 /** Returns which views are available for a descriptor at a given level. */

@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AdminLevel, DatasetResult } from '@/datasets/types';
+import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
-
-const LEVEL_LABELS: Record<AdminLevel, string> = {
-  Country:      'Nationell',
-  Region:       'Län',
-  Municipality: 'Kommun',
-  RegSO:        'RegSO',
-  DeSO:         'DeSO',
-};
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
   Country:      'bg-gray-100 text-gray-600',
