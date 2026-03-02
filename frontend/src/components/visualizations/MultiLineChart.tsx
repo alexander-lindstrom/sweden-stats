@@ -3,10 +3,11 @@ import * as d3 from 'd3';
 import { TimeSeriesNode } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 
-const MARGIN    = { top: 20, right: 40, bottom: 60, left: 60 };
+const MARGIN    = { top: 12, right: 24, bottom: 44, left: 62 };
 const parseDate = d3.timeParse('%Y-%m-%d');
-const fmtDate   = d3.timeFormat('%Y-%m');
-const fmtValue  = d3.format(',.2f');
+const fmtYear   = d3.timeFormat('%Y');
+const fmtTip    = d3.timeFormat('%b %Y');
+const fmtVal    = d3.format(',.1f');
 
 interface Props {
   data:   TimeSeriesNode[];
@@ -16,6 +17,7 @@ interface Props {
 interface ParsedSeries {
   id:    string;
   label: string;
+  color: string;
   pts:   Array<{ parsed: Date; value: number }>;
 }
 
@@ -25,10 +27,10 @@ export function MultiLineChart({ data, label }: Props) {
   const tooltipRef   = useRef<HTMLDivElement>(null);
   const dims         = useResizeObserver(containerRef);
 
-  const [visible, setVisible] = useState<Record<string, boolean>>({});
+  const [visible,     setVisible]     = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
 
-  // Initialise visibility on first data load (all series visible).
+  // Initialise all series as visible on first data load.
   useEffect(() => {
     if (!initialized && data.length > 0) {
       setVisible(Object.fromEntries(data.map(s => [s.id, true])));
@@ -40,62 +42,86 @@ export function MultiLineChart({ data, label }: Props) {
     setVisible(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const colorScale = useMemo(
-    () => d3.scaleOrdinal(d3.schemeCategory10).domain(data.map(s => s.id)),
+  // Stable per-series color from Tableau10 — more distinct than schemeCategory10.
+  const colorMap = useMemo(
+    () => new Map(data.map((s, i) => [s.id, d3.schemeTableau10[i % 10] as string])),
     [data],
   );
 
-  // Pre-parse dates once per render so both the chart and tooltip share the same arrays.
   const parsedSeries = useMemo<ParsedSeries[]>(() => {
     return data
       .filter(s => visible[s.id])
       .map(s => ({
         id:    s.id,
         label: s.label,
+        color: colorMap.get(s.id) ?? '#888',
         pts:   s.points
           .map(p => ({ parsed: parseDate(p.date), value: p.value }))
           .filter((p): p is { parsed: Date; value: number } => p.parsed !== null),
       }))
       .filter(s => s.pts.length > 0);
-  }, [data, visible]);
+  }, [data, visible, colorMap]);
 
   useEffect(() => {
-    if (!svgRef.current || !tooltipRef.current || !initialized || !dims) { return; }
-    if (parsedSeries.length === 0) { return; }
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    if (!initialized || !dims || parsedSeries.length === 0) { return; }
 
     const { width, height } = dims;
     const adjW = width  - MARGIN.left - MARGIN.right;
     const adjH = height - MARGIN.top  - MARGIN.bottom;
     if (adjW <= 0 || adjH <= 0) { return; }
 
-    const svg = d3.select(svgRef.current);
-    svg.selectAll('*').remove();
     svg.attr('width', width).attr('height', height);
 
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
     const allPts = parsedSeries.flatMap(s => s.pts);
+    const minVal = d3.min(allPts, p => p.value) ?? 0;
+    const maxVal = d3.max(allPts, p => p.value) ?? 1;
+    const yPad   = (maxVal - minVal) * 0.04;
 
     const xScale = d3.scaleTime()
       .domain(d3.extent(allPts, p => p.parsed) as [Date, Date])
       .range([0, adjW]);
 
+    // Y starts near the actual minimum — avoids wasting space when data doesn't start at 0.
     const yScale = d3.scaleLinear()
-      .domain([0, d3.max(allPts, p => p.value) ?? 1])
-      .range([adjH, 0])
-      .nice();
+      .domain([minVal - yPad, maxVal + yPad])
+      .range([adjH, 0]);
 
-    // Axes
+    // ── Gridlines ─────────────────────────────────────────────────────────────
+    g.selectAll<SVGLineElement, number>('line.grid')
+      .data(yScale.ticks(6))
+      .join('line').attr('class', 'grid')
+      .attr('x1', 0).attr('x2', adjW)
+      .attr('y1', d => yScale(d)).attr('y2', d => yScale(d))
+      .attr('stroke', '#f0f0f0').attr('stroke-width', 1);
+
+    // ── X axis ────────────────────────────────────────────────────────────────
     g.append('g')
       .attr('transform', `translate(0,${adjH})`)
-      .call(d3.axisBottom(xScale).ticks(8).tickFormat(d => fmtDate(d as Date)))
-      .selectAll('text')
-        .attr('transform', 'rotate(-45)')
-        .style('text-anchor', 'end');
+      .call(
+        d3.axisBottom(xScale)
+          .ticks(8)
+          .tickFormat(d => fmtYear(d as Date))
+          .tickSize(4),
+      )
+      .call(ax => ax.select('.domain').attr('stroke', '#e5e7eb'))
+      .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
+        .attr('fill', '#9ca3af').attr('font-size', 12))
+      .call(ax => ax.selectAll<SVGLineElement, unknown>('.tick line')
+        .attr('stroke', '#e5e7eb'));
 
-    g.append('g').call(d3.axisLeft(yScale));
+    // ── Y axis ────────────────────────────────────────────────────────────────
+    g.append('g')
+      .call(d3.axisLeft(yScale).ticks(6).tickSize(0))
+      .call(ax => ax.select('.domain').remove())
+      .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
+        .attr('fill', '#9ca3af').attr('font-size', 11).attr('dx', '-2'));
 
-    // Lines
+    // ── Lines ─────────────────────────────────────────────────────────────────
     const line = d3.line<{ parsed: Date; value: number }>()
       .x(p => xScale(p.parsed))
       .y(p => yScale(p.value))
@@ -105,95 +131,138 @@ export function MultiLineChart({ data, label }: Props) {
       g.append('path')
         .datum(series.pts)
         .attr('fill', 'none')
-        .attr('stroke', colorScale(series.id) as string)
+        .attr('stroke', series.color)
         .attr('stroke-width', 2)
         .attr('d', line(series.pts));
     });
 
-    // Hover overlay
-    const tooltip   = d3.select(tooltipRef.current);
-    const bisect    = d3.bisector((p: { parsed: Date }) => p.parsed).left;
-    const vertLine  = g.append('line')
+    // ── Hover elements ────────────────────────────────────────────────────────
+    const crosshair = g.append('line')
       .attr('y1', 0).attr('y2', adjH)
-      .style('stroke', '#999').style('stroke-dasharray', '4,4').style('opacity', 0);
+      .attr('stroke', '#94a3b8').attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4 3')
+      .style('opacity', 0);
 
-    g.append('rect')
+    const hoverDots = parsedSeries.map(series =>
+      g.append('circle')
+        .attr('r', 3.5)
+        .attr('fill', series.color)
+        .attr('stroke', '#fff').attr('stroke-width', 1.5)
+        .style('opacity', 0),
+    );
+
+    const bisect  = d3.bisector((p: { parsed: Date }) => p.parsed).left;
+    const tooltip = d3.select(tooltipRef.current);
+
+    // Overlay rect on the SVG (not inside g) so pointer coords are in SVG space.
+    svg.append('rect')
+      .attr('x', MARGIN.left).attr('y', MARGIN.top)
       .attr('width', adjW).attr('height', adjH)
       .style('fill', 'none').style('pointer-events', 'all')
-      .on('mousemove', function(event) {
-        const mx = d3.pointer(event)[0];
-        if (mx < 0 || mx > adjW) {
-          tooltip.style('opacity', 0);
-          vertLine.style('opacity', 0);
+      .on('mousemove', (event: MouseEvent) => {
+        const [svgX]  = d3.pointer(event, svgRef.current);
+        const chartX  = svgX - MARGIN.left;
+
+        if (chartX < 0 || chartX > adjW) {
+          crosshair.style('opacity', 0);
+          hoverDots.forEach(dot => dot.style('opacity', 0));
+          tooltip.style('opacity', '0');
           return;
         }
 
-        const x0  = xScale.invert(mx);
-        const rows = parsedSeries.map(series => {
-          const i  = bisect(series.pts, x0, 1);
-          const d0 = series.pts[i - 1];
-          const d1 = series.pts[i] ?? d0;
-          const pt = x0.getTime() - d0.parsed.getTime() > d1.parsed.getTime() - x0.getTime() ? d1 : d0;
-          return { label: series.label, value: pt.value, color: colorScale(series.id) as string, date: fmtDate(pt.parsed) };
+        const x0 = xScale.invert(chartX);
+        crosshair.attr('x1', chartX).attr('x2', chartX).style('opacity', 1);
+
+        const rows = parsedSeries.map((series, i) => {
+          const idx = bisect(series.pts, x0, 1);
+          const d0  = series.pts[idx - 1];
+          const d1  = series.pts[idx] ?? d0;
+          const pt  = !d1 || x0.getTime() - d0.parsed.getTime() <= d1.parsed.getTime() - x0.getTime() ? d0 : d1;
+          hoverDots[i]
+            .attr('cx', xScale(pt.parsed))
+            .attr('cy', yScale(pt.value))
+            .style('opacity', 1);
+          return { label: series.label, color: series.color, value: pt.value, date: pt.parsed };
         });
 
-        vertLine.attr('x1', mx).attr('x2', mx).style('opacity', 1);
+        // Sort by value descending so highest series is at the top.
+        const sorted   = [...rows].sort((a, b) => b.value - a.value);
+        const dateStr  = fmtTip(sorted[0]?.date ?? new Date());
+        const rowsHtml = sorted.map(r =>
+          `<div style="display:flex;align-items:center;gap:6px;padding:1px 0;">` +
+            `<span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></span>` +
+            `<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">${r.label}</span>` +
+            `<span style="font-variant-numeric:tabular-nums;margin-left:8px;">${fmtVal(r.value)}</span>` +
+          `</div>`,
+        ).join('');
 
-        const html = `
-          <strong>${rows[0]?.date ?? ''}</strong>
-          <ul style="padding-left:0;margin:4px 0;list-style:none;">
-            ${rows.map(r => `<li style="margin:2px 0;"><span style="color:${r.color}">●</span> ${r.label}: ${fmtValue(r.value)}</li>`).join('')}
-          </ul>`;
+        tooltip.html(
+          `<div style="color:#94a3b8;font-size:10px;font-weight:600;margin-bottom:5px;letter-spacing:0.05em;">` +
+            `${dateStr}</div>${rowsHtml}`,
+        );
 
-        const [px, py] = d3.pointer(event, svg.node());
-        tooltip
-          .html(html)
-          .style('left',    `${px + 90}px`)
-          .style('top',     `${py - 40}px`)
-          .style('opacity', '1');
+        // Smart tooltip positioning: flip left/right to stay on screen.
+        const cEl = containerRef.current;
+        if (!cEl) { return; }
+        const cRect = cEl.getBoundingClientRect();
+        const ex    = event.clientX - cRect.left;
+        const ey    = event.clientY - cRect.top;
+        const tEl   = tooltipRef.current;
+        const tipW  = tEl?.offsetWidth  ?? 240;
+        const tipH  = tEl?.offsetHeight ?? 200;
+        const tipX  = ex + 20 + tipW > cRect.width ? ex - tipW - 8 : ex + 20;
+        const tipY  = Math.max(4, Math.min(ey - tipH / 2, cRect.height - tipH - 4));
+
+        tooltip.style('left', `${tipX}px`).style('top', `${tipY}px`).style('opacity', '1');
       })
-      .on('mouseout', () => {
+      .on('mouseleave', () => {
+        crosshair.style('opacity', 0);
+        hoverDots.forEach(dot => dot.style('opacity', 0));
         tooltip.style('opacity', '0');
-        vertLine.style('opacity', 0);
       });
 
-  }, [parsedSeries, dims, colorScale, initialized]);
+  }, [parsedSeries, dims, initialized]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full flex flex-col">
+
       {label && (
-        <div className="text-sm font-semibold text-gray-700 px-2 pt-2 flex-shrink-0">{label}</div>
+        <div className="px-3 pt-3 flex-shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500">
+          {label}
+        </div>
       )}
 
-      {/* Series toggle legend */}
-      <div className="flex flex-wrap gap-1.5 px-2 py-1.5 flex-shrink-0">
-        {data.map(series => (
-          <button
-            key={series.id}
-            onClick={() => toggle(series.id)}
-            className={[
-              'flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-opacity',
-              visible[series.id] ? 'opacity-100' : 'opacity-35',
-            ].join(' ')}
-          >
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: colorScale(series.id) as string }}
-            />
-            {series.label}
-          </button>
-        ))}
+      {/* Legend — line-segment indicators, not dots */}
+      <div className="flex flex-wrap gap-x-5 gap-y-2 px-3 py-2.5 flex-shrink-0">
+        {data.map(series => {
+          const color = colorMap.get(series.id) ?? '#888';
+          const on    = visible[series.id] !== false;
+          return (
+            <button
+              key={series.id}
+              onClick={() => toggle(series.id)}
+              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-opacity"
+              style={{ opacity: on ? 1 : 0.3 }}
+            >
+              <svg width="22" height="12" viewBox="0 0 22 12" className="flex-shrink-0">
+                <line x1="0" y1="6" x2="22" y2="6" stroke={color} strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              {series.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Chart area */}
+      {/* Chart */}
       <div className="flex-1 relative min-h-0">
         <svg ref={svgRef} className="w-full h-full" />
         <div
           ref={tooltipRef}
-          className="absolute z-10 pointer-events-none bg-white border border-gray-200 rounded shadow-sm text-xs px-2 py-1.5"
-          style={{ opacity: 0 }}
+          className="absolute z-10 pointer-events-none bg-gray-900 text-white text-xs px-3 py-2 rounded-lg shadow-xl"
+          style={{ opacity: 0, maxWidth: '260px' }}
         />
       </div>
+
     </div>
   );
 }

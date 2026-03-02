@@ -90,7 +90,7 @@ const EMPTY_RESULT: DatasetResult = { values: {}, labels: {}, label: 'KPI', unit
 
 export const kpi: DatasetDescriptor = {
   id:              'kpi',
-  label:           'KPI (inflation)',
+  label:           'KPI',
   source:          'SCB',
   availableYears:  [],         // no year slider — always fetches full time series
   supportedLevels: ['Country'],
