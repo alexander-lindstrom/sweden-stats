@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { TransformedKPIData } from './KpiTypes';
 import ResponsiveChartWrapper from '../charts/ResponsiveChartWrapper';
@@ -48,11 +48,11 @@ function KpiLineChartInner({
   };
 
   // Filter data for selected categories
-  const getFilteredData = () => {
-    return data.byCategory.filter(category => 
+  const getFilteredData = useCallback(() => {
+    return data.byCategory.filter(category =>
       selectedCategories[category.categoryCode]
     );
-  };
+  }, [data, selectedCategories]);
 
   // Format date strings to Date objects for D3
   const parseDate = (dateStr: string) => {
@@ -63,10 +63,10 @@ function KpiLineChartInner({
   };
 
   // Create color scale for categories
-  const getColorScale = () => {
+  const getColorScale = useCallback(() => {
     return d3.scaleOrdinal(d3.schemeCategory10)
       .domain(data.byCategory.map(c => c.categoryCode));
-  };
+  }, [data]);
 
   // D3 chart rendering
   useEffect(() => {
@@ -270,7 +270,7 @@ function KpiLineChartInner({
       verticalLine.style('opacity', 0);
     });
 
-  }, [data, selectedCategories, isInitialized, width, height]);
+  }, [data, selectedCategories, isInitialized, width, height, getFilteredData, getColorScale]);
 
   const colorScale = getColorScale();
 

@@ -37,10 +37,10 @@ export async function fetchCached(
   const key = resultKey(descriptor.id, level, year);
 
   const cached = resultCache.get(key);
-  if (cached) return cached;
+  if (cached) {return cached;}
 
   const inflight = resultInFlight.get(key);
-  if (inflight) return inflight;
+  if (inflight) {return inflight;}
 
   const promise = descriptor
     .fetch(level, year)
@@ -63,15 +63,15 @@ export async function fetchHierarchyCached(
   descriptor: DatasetDescriptor,
   year: number,
 ): Promise<GeoHierarchyNode | null> {
-  if (!descriptor.fetchHierarchy) return null;
+  if (!descriptor.fetchHierarchy) {return null;}
 
   const key = hierarchyKey(descriptor.id, year);
 
   const cached = hierarchyCache.get(key);
-  if (cached) return cached;
+  if (cached) {return cached;}
 
   const inflight = hierarchyInFlight.get(key);
-  if (inflight) return inflight;
+  if (inflight) {return inflight;}
 
   const promise = descriptor
     .fetchHierarchy(year)
@@ -95,9 +95,9 @@ export async function fetchHierarchyCached(
  */
 export function preload(descriptor: DatasetDescriptor, levels: AdminLevel[], year: number): void {
   for (const level of levels) {
-    if (!descriptor.supportedLevels.includes(level)) continue;
+    if (!descriptor.supportedLevels.includes(level)) {continue;}
     const key = resultKey(descriptor.id, level, year);
-    if (resultCache.has(key) || resultInFlight.has(key)) continue;
+    if (resultCache.has(key) || resultInFlight.has(key)) {continue;}
     fetchCached(descriptor, level, year).catch(() => { /* ignore background errors */ });
   }
 }

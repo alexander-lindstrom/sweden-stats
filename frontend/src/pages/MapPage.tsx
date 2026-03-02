@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import * as d3 from 'd3';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
+import { MapSidebar } from '@/components/map/MapSidebar';
 import { SelectionPanel } from '@/components/map/SelectionPanel';
 import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
 import { Histogram } from '@/components/visualizations/Histogram';
 import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
-import YearSlider from '@/components/common/YearSlider';
 import {
-  AdminLevel, ChartType, DatasetResult, GeoHierarchyNode,
-  ViewType, viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
+  AdminLevel, ChartType, ViewType,
+  viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
 } from '@/datasets/types';
-import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
-import { fetchCached, fetchHierarchyCached, preload } from '@/datasets/cache';
-import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
+import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
+import { COUNTY_NAMES } from '@/datasets/adminLevels';
+import { BaseMapKey } from '@/components/map/BaseMaps';
+import { useDatasetFetch } from '@/hooks/useDatasetFetch';
+import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
+import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 
 // Feature property used for choropleth lookup — matches the direct boundary
 // layer shown for each admin level.
@@ -35,32 +37,11 @@ const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
   DeSO:         'desokod',
 };
 
-const ADMIN_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'];
-
-// Stable county code → short name mapping (without "län" suffix or genitive "s").
-const COUNTY_NAMES: Record<string, string> = {
-  '01': 'Stockholm',       '03': 'Uppsala',           '04': 'Södermanland',
-  '05': 'Östergötland',    '06': 'Jönköping',         '07': 'Kronoberg',
-  '08': 'Kalmar',          '09': 'Gotland',            '10': 'Blekinge',
-  '12': 'Skåne',           '13': 'Halland',            '14': 'Västra Götaland',
-  '17': 'Värmland',        '18': 'Örebro',             '19': 'Västmanland',
-  '20': 'Dalarna',         '21': 'Gävleborg',          '22': 'Västernorrland',
-  '23': 'Jämtland',        '24': 'Västerbotten',       '25': 'Norrbotten',
-};
-
 // Property on sub-level features that holds the parent feature's code.
 // Used to store parentCode on selectedFeature so Escape can navigate up.
 const FEATURE_PARENT_PROP: Partial<Record<AdminLevel, string>> = {
   RegSO: 'kommunkod',
   DeSO:  'regsokod',  // DeSO parent is RegSO, not Municipality
-};
-
-const LEVEL_LABELS: Record<AdminLevel, string> = {
-  Country:      'Nationell',
-  Region:       'Län',
-  Municipality: 'Kommun',
-  RegSO:        'RegSO',
-  DeSO:         'DeSO',
 };
 
 const ALL_VIEWS: { key: ViewType; label: string }[] = [
@@ -76,26 +57,34 @@ export default function MapPage() {
   const [displayYear,       setDisplayYear]        = useState<number>(2024); // immediate — drives slider UI
   const [activeView,        setActiveView]         = useState<ViewType>('map');
   const [activeChartType,   setActiveChartType]   = useState<ChartType>('bar');
-  const [datasetResult,     setDatasetResult]      = useState<DatasetResult | null>(null);
-  const [hierarchyData,     setHierarchyData]      = useState<GeoHierarchyNode | null>(null);
-  const [colorScale,        setColorScale]         = useState<d3.ScaleSequential<string> | null>(null);
-  const [loading,           setLoading]            = useState(false);
   const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('None');
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
-  // Generation counter — incremented on every new fetch; stale responses are ignored.
-  const fetchGenRef         = useRef(0);
-  const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // When drill-down changes the admin level, this carries the clicked sub-feature
-  // through the [selectedLevel] effect so it isn't cleared by the level-change reset.
+
+  const yearDebounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Carries a clicked sub-feature through the [selectedLevel] effect so it
+  // isn't cleared by the level-change reset.
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
+
+  const { datasetResult, colorScale, loading } = useDatasetFetch(selectedDatasetId, selectedLevel, selectedYear);
+  const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
+  const hierarchyData    = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
+
+  useMapKeyboardNavigation(
+    selectedFeature,
+    selectedLevel,
+    datasetResult,
+    setSelectedLevel,
+    setSelectedFeature,
+    pendingSelectionRef,
+  );
 
   const handleYearChange = (y: number) => {
     setDisplayYear(y);
-    if (yearDebounceRef.current) {clearTimeout(yearDebounceRef.current);}
+    if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); }
     yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
   };
 
@@ -123,54 +112,11 @@ export default function MapPage() {
     }
   }, [selectedFeature, selectedLevel]);
 
-  // Escape: go up one admin level and auto-select the parent feature.
-  // Municipality → Region:   parent code = first 2 digits of municipality code.
-  // RegSO / DeSO → Municipality: parent code stored on selectedFeature.parentCode (kommunkod).
-  // Region → (nothing above worth navigating to): just deselect.
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || !selectedFeature) { return; }
-
-      if (selectedLevel === 'Municipality') {
-        const parentCode  = selectedFeature.code.slice(0, 2);
-        const parentLabel = COUNTY_NAMES[parentCode];
-        if (parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
-        setSelectedLevel('Region');
-      } else if (selectedLevel === 'RegSO') {
-        const parentCode  = selectedFeature.parentCode;
-        const parentLabel = parentCode ? datasetResult?.parentLabels?.[parentCode] : undefined;
-        if (parentCode && parentLabel) { pendingSelectionRef.current = { code: parentCode, label: parentLabel }; }
-        setSelectedLevel('Municipality');
-      } else if (selectedLevel === 'DeSO') {
-        // parentCode is regsokod; RegSO labels aren't in parentLabels at DeSO level,
-        // so navigate up without pre-selecting.
-        setSelectedLevel('RegSO');
-      } else {
-        setSelectedFeature(null);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedFeature, selectedLevel, datasetResult]);
-
-  const availableDatasets = getDatasetsForLevel(selectedLevel);
-
-  const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
-  const availableViews   = activeDescriptor
-    ? viewsForLevel(activeDescriptor, selectedLevel)
-    : ['map' as ViewType];
-  const availableChartTypes = activeDescriptor
-    ? chartTypesForLevel(activeDescriptor, selectedLevel)
-    : ['bar' as ChartType];
-
   // When admin level changes, preserve dataset if still available; otherwise reset.
   // If the change came from a drill-down, honour the pending selection instead of clearing it.
   useEffect(() => {
     const datasets = getDatasetsForLevel(selectedLevel);
     setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
-    setDatasetResult(null);
-    setHierarchyData(null);
-    setColorScale(null);
     setSelectionLevel(selectedLevel);
     if (pendingSelectionRef.current) {
       setSelectedFeature(pendingSelectionRef.current);
@@ -182,16 +128,25 @@ export default function MapPage() {
 
   // When dataset changes, clamp year to the new dataset's available range.
   useEffect(() => {
-    if (!selectedDatasetId) {return;}
+    if (!selectedDatasetId) { return; }
     const descriptor = DATASETS.find(d => d.id === selectedDatasetId);
-    if (!descriptor) {return;}
+    if (!descriptor) { return; }
     const latest   = descriptor.availableYears.at(-1)!;
     const earliest = descriptor.availableYears[0];
     if (selectedYear > latest || selectedYear < earliest) {
       setSelectedYear(latest);
       setDisplayYear(latest);
     }
-  }, [selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedDatasetId, selectedYear]);
+
+  const availableViews = useMemo(
+    () => activeDescriptor ? viewsForLevel(activeDescriptor, selectedLevel) : ['map' as ViewType],
+    [activeDescriptor, selectedLevel],
+  );
+  const availableChartTypes = useMemo(
+    () => activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType],
+    [activeDescriptor, selectedLevel],
+  );
 
   // If the active view is no longer supported at the current level, fall back to first available.
   useEffect(() => {
@@ -204,63 +159,7 @@ export default function MapPage() {
   useEffect(() => {
     const types = activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType];
     setActiveChartType(ct => types.includes(ct) ? ct : (types[0] ?? 'bar'));
-  }, [selectedLevel, selectedDatasetId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-
-  // Fetch flat data when selected dataset or level changes.
-  useEffect(() => {
-    if (!selectedDatasetId) {
-      setDatasetResult(null);
-      setColorScale(null);
-      return;
-    }
-
-    const descriptor = DATASETS.find((d) => d.id === selectedDatasetId);
-    if (!descriptor) {return;}
-
-    const gen = ++fetchGenRef.current;
-    setLoading(true);
-
-    fetchCached(descriptor, selectedLevel, selectedYear)
-      .then((result) => {
-        if (gen !== fetchGenRef.current) {return;} // superseded by a newer fetch
-
-        const vals = Object.values(result.values).filter(Number.isFinite);
-        const scale = d3
-          .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
-          .domain([Math.min(...vals), Math.max(...vals)])
-          .clamp(true);
-
-        setDatasetResult(result);
-        setColorScale(() => scale);
-        setLoading(false);
-
-        // Preload neighbouring admin levels in the background.
-        const idx = ADMIN_LEVELS.indexOf(selectedLevel);
-        const neighbours = [ADMIN_LEVELS[idx - 1], ADMIN_LEVELS[idx + 1]]
-          .filter((l): l is AdminLevel => l !== undefined);
-        preload(descriptor, neighbours, selectedYear);
-      })
-      .catch((err) => {
-        if (gen === fetchGenRef.current) {
-          console.error('Dataset fetch failed:', err);
-          setLoading(false);
-        }
-      });
-  }, [selectedDatasetId, selectedLevel, selectedYear]);
-
-  // Fetch hierarchy data when sunburst is active and descriptor supports it.
-  useEffect(() => {
-    if (activeChartType !== 'sunburst' || !activeDescriptor?.fetchHierarchy) {return;}
-
-    const gen = ++fetchGenRef.current;
-    fetchHierarchyCached(activeDescriptor, selectedYear)
-      .then(result => {
-        if (gen !== fetchGenRef.current) {return;}
-        setHierarchyData(result);
-      })
-      .catch(err => console.error('Hierarchy fetch failed:', err));
-  }, [activeChartType, activeDescriptor, selectedYear]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedLevel, activeDescriptor]);
 
   // ── Diverging chart filter (Municipality / RegSO / DeSO) ──────────────────
   const needsLanFilter  = activeChartType === 'diverging' &&
@@ -269,19 +168,19 @@ export default function MapPage() {
     (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
 
   const availableLans = useMemo(() => {
-    if (!datasetResult || !needsLanFilter) {return [];}
+    if (!datasetResult || !needsLanFilter) { return []; }
     const codes = new Set(Object.keys(datasetResult.values).map(c => c.slice(0, 2)));
     return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
   }, [datasetResult, needsLanFilter]);
 
   // Effective Lan: honour stored selection if still valid, otherwise first in list.
   const effectiveLan = useMemo(() => {
-    if (availableLans.length === 0) {return null;}
+    if (availableLans.length === 0) { return null; }
     return availableLans.some(l => l.code === selectedLan) ? selectedLan : availableLans[0].code;
   }, [availableLans, selectedLan]);
 
   const availableMunis = useMemo(() => {
-    if (!datasetResult?.parentLabels || !effectiveLan || !needsMuniFilter) {return [];}
+    if (!datasetResult?.parentLabels || !effectiveLan || !needsMuniFilter) { return []; }
     return Object.entries(datasetResult.parentLabels)
       .filter(([code]) => code.startsWith(effectiveLan))
       .sort(([a], [b]) => a.localeCompare(b))
@@ -290,15 +189,15 @@ export default function MapPage() {
 
   // Effective muni: honour stored selection if still valid, otherwise first in list.
   const effectiveMuni = useMemo(() => {
-    if (availableMunis.length === 0) {return null;}
+    if (availableMunis.length === 0) { return null; }
     return availableMunis.some(m => m.code === selectedMuni) ? selectedMuni : availableMunis[0].code;
   }, [availableMunis, selectedMuni]);
 
-  const filteredForDiverging = useMemo((): DatasetResult | null => {
-    if (!datasetResult) {return null;}
-    if (!needsLanFilter) {return datasetResult;}
+  const filteredForDiverging = useMemo(() => {
+    if (!datasetResult) { return null; }
+    if (!needsLanFilter) { return datasetResult; }
     const filterCode = needsMuniFilter ? effectiveMuni : effectiveLan;
-    if (!filterCode) {return null;}
+    if (!filterCode) { return null; }
     const values = Object.fromEntries(
       Object.entries(datasetResult.values).filter(([code]) => code.startsWith(filterCode))
     );
@@ -310,94 +209,17 @@ export default function MapPage() {
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
-      {/* ── Left sidebar ─────────────────────────────────────────────────── */}
-      <aside className="w-56 flex-shrink-0 border-r border-gray-200 bg-gray-50 flex flex-col p-4 gap-6 overflow-y-auto">
-        {/* Admin level */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Nivå
-          </h2>
-          <ul className="flex flex-col gap-1">
-            {ADMIN_LEVELS.map((level) => (
-              <li key={level}>
-                <button
-                  onClick={() => setSelectedLevel(level)}
-                  className={[
-                    'w-full text-left px-3 py-1.5 rounded text-sm transition-colors',
-                    selectedLevel === level
-                      ? 'bg-blue-100 text-blue-800 font-medium'
-                      : 'text-gray-700 hover:bg-gray-100',
-                  ].join(' ')}
-                >
-                  {LEVEL_LABELS[level]}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        {/* Dataset list */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Dataset
-          </h2>
-          {availableDatasets.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">
-              Inga dataset för denna nivå.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-1">
-              {availableDatasets.map((ds) => (
-                <li key={ds.id}>
-                  <button
-                    onClick={() => setSelectedDatasetId(ds.id)}
-                    className={[
-                      'w-full text-left px-3 py-1.5 rounded text-sm transition-colors',
-                      selectedDatasetId === ds.id
-                        ? 'bg-blue-100 text-blue-800 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100',
-                    ].join(' ')}
-                  >
-                    {ds.label}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Year slider — hidden at RegSO/DeSO (boundary-locked) */}
-        {activeDescriptor && !['RegSO', 'DeSO'].includes(selectedLevel) && (
-          <section>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">
-              År: {displayYear}
-            </h2>
-            <YearSlider
-              years={activeDescriptor.availableYears.map(String)}
-              selectedYear={String(displayYear)}
-              onYearChange={(y) => handleYearChange(Number(y))}
-            />
-          </section>
-        )}
-
-        {/* Base map */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">
-            Bakgrundskarta
-          </h2>
-          <select
-            value={selectedBase}
-            onChange={(e) => setSelectedBase(e.target.value as BaseMapKey)}
-            className="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white text-gray-700"
-          >
-            {(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map((key) => (
-              <option key={key} value={key}>
-                {baseMapLabels[key]}
-              </option>
-            ))}
-          </select>
-        </section>
-      </aside>
+      <MapSidebar
+        selectedLevel={selectedLevel}
+        onLevelChange={setSelectedLevel}
+        selectedDatasetId={selectedDatasetId}
+        onDatasetChange={setSelectedDatasetId}
+        activeDescriptor={activeDescriptor}
+        displayYear={displayYear}
+        onYearChange={handleYearChange}
+        selectedBase={selectedBase}
+        onBaseChange={setSelectedBase}
+      />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
@@ -501,77 +323,77 @@ export default function MapPage() {
 
           <div className="flex-1 flex min-h-0 overflow-hidden">
             <div className="flex-1 relative overflow-hidden min-w-0" style={{ isolation: 'isolate' }}>
-            {activeView === 'map' && (
-              <MapView
-                adminLevel={selectedLevel}
-                selectedBase={selectedBase}
-                choroplethData={datasetResult?.values ?? null}
-                colorScale={colorScale}
-                featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
-                featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
-                featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
-                unit={datasetResult?.unit ?? ''}
-                selectedFeature={selectedFeature}
-                onFeatureSelect={setSelectedFeature}
-                onDrillDown={handleDrillDown}
-              />
-            )}
-            {activeView === 'map' && datasetResult && (
-              <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
-                <MapLegend data={datasetResult} scale={colorScale} />
-              </div>
-            )}
-
-            {activeView === 'chart' && activeChartType === 'bar' && datasetResult && (
-              <div className="w-full h-full p-6">
-                <RankedBarChart data={datasetResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
-              </div>
-            )}
-            {activeView === 'chart' && activeChartType === 'histogram' && datasetResult && (
-              <div className="w-full h-full p-6">
-                <Histogram data={datasetResult} colorScale={colorScale} />
-              </div>
-            )}
-            {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
-              <div className="w-full h-full p-6">
-                <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
-              </div>
-            )}
-            {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
-              <div className="w-full h-full p-4">
-                <SunburstWithBar
-                  root={hierarchyData}
+              {activeView === 'map' && (
+                <MapView
+                  adminLevel={selectedLevel}
+                  selectedBase={selectedBase}
+                  choroplethData={datasetResult?.values ?? null}
+                  colorScale={colorScale}
+                  featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
+                  featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+                  featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                   unit={datasetResult?.unit ?? ''}
-                  label={activeDescriptor?.label ?? ''}
+                  selectedFeature={selectedFeature}
                   onFeatureSelect={setSelectedFeature}
-                  depthToLevel={['Country', 'Region', 'Municipality']}
-                  onSelectionLevelChange={setSelectionLevel}
+                  onDrillDown={handleDrillDown}
                 />
-              </div>
-            )}
-            {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
-                Laddar hierarki…
-              </div>
-            )}
-            {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && !datasetResult && (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                Välj ett dataset för att visa diagram.
-              </div>
-            )}
+              )}
+              {activeView === 'map' && datasetResult && (
+                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+                  <MapLegend data={datasetResult} scale={colorScale} />
+                </div>
+              )}
 
-            {activeView === 'table' && datasetResult && (
-              <div className="w-full h-full p-6">
-                <DatasetTable data={datasetResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
-              </div>
-            )}
-            {activeView === 'table' && !datasetResult && (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                Välj ett dataset för att visa tabell.
-              </div>
-            )}
+              {activeView === 'chart' && activeChartType === 'bar' && datasetResult && (
+                <div className="w-full h-full p-6">
+                  <RankedBarChart data={datasetResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'histogram' && datasetResult && (
+                <div className="w-full h-full p-6">
+                  <Histogram data={datasetResult} colorScale={colorScale} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
+                <div className="w-full h-full p-6">
+                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
+                <div className="w-full h-full p-4">
+                  <SunburstWithBar
+                    root={hierarchyData}
+                    unit={datasetResult?.unit ?? ''}
+                    label={activeDescriptor?.label ?? ''}
+                    onFeatureSelect={setSelectedFeature}
+                    depthToLevel={['Country', 'Region', 'Municipality']}
+                    onSelectionLevelChange={setSelectionLevel}
+                  />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
+                  Laddar hierarki…
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && !datasetResult && (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                  Välj ett dataset för att visa diagram.
+                </div>
+              )}
 
+              {activeView === 'table' && datasetResult && (
+                <div className="w-full h-full p-6">
+                  <DatasetTable data={datasetResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                </div>
+              )}
+              {activeView === 'table' && !datasetResult && (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                  Välj ett dataset för att visa tabell.
+                </div>
+              )}
             </div>
+
             <SelectionPanel
               selectedFeature={selectedFeature}
               adminLevel={selectionLevel}

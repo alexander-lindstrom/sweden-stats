@@ -14,6 +14,7 @@ interface BarChartProps {
   onBarClick: (node: HierarchyDataNode) => void;
 }
 
+const BAR_MARGIN = { top: 20, right: 30, bottom: 40, left: 150 };
 const LABEL_MAX_LENGTH = 25;
 const MAX_BAR_HEIGHT = 20;
 const MAX_BARS = 40;
@@ -54,9 +55,8 @@ export const BarChart: React.FC<BarChartProps> = ({
   onBarClick,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const margin = { top: 20, right: 30, bottom: 40, left: 150 };
-  const adjustedWidth = width - margin.left - margin.right;
-  const adjustedHeight = height - margin.top - margin.bottom;
+  const adjustedWidth = width - BAR_MARGIN.left - BAR_MARGIN.right;
+  const adjustedHeight = height - BAR_MARGIN.top - BAR_MARGIN.bottom;
 
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export const BarChart: React.FC<BarChartProps> = ({
     svg.selectAll("*").remove();
 
     const chart = svg.append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+      .attr("transform", `translate(${BAR_MARGIN.left},${BAR_MARGIN.top})`);
 
     // Sort and limit the number of bars
     const sortedData = [...data]
@@ -127,7 +127,7 @@ export const BarChart: React.FC<BarChartProps> = ({
     if (data.length > MAX_BARS) {
       chart.append("text")
         .attr("x", adjustedWidth / 2)
-        .attr("y", verticalOffset + effectiveHeight + margin.bottom - 5)
+        .attr("y", verticalOffset + effectiveHeight + BAR_MARGIN.bottom - 5)
         .attr("text-anchor", "middle")
         .attr("font-size", "12px")
         .attr("fill", "#666")
@@ -145,7 +145,7 @@ export const BarChart: React.FC<BarChartProps> = ({
     }
 
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const bars = chart.selectAll(".bar")
       .data(sortedData, (d: unknown) => (d as HierarchyDataNode).data.name)
       .join("rect")
@@ -197,7 +197,7 @@ export const BarChart: React.FC<BarChartProps> = ({
 
     bars.attr("data-name", d => d.data.name);
 
-  }, [data, width, height, margin, adjustedWidth, adjustedHeight, onBarClick, levelColorScale]);
+  }, [data, width, height, adjustedWidth, adjustedHeight, onBarClick, levelColorScale]);
 
   return (
     <div className="w-full max-w-[1100px] mx-auto">
