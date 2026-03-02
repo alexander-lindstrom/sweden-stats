@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { GeoHierarchyNode } from '@/datasets/types';
+import { AdminLevel, GeoHierarchyNode } from '@/datasets/types';
 import { Tooltip } from '@/components/ui/Tooltip';
 import useResizeObserver from '@/hooks/useResizeObserver';
 
@@ -9,6 +9,10 @@ interface Props {
   unit: string;
   label: string;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  /** Maps drill depth (0 = root, 1 = first ring, 2 = second ring, …) to AdminLevel.
+   *  When provided, onSelectionLevelChange fires with the level for each click. */
+  depthToLevel?: AdminLevel[];
+  onSelectionLevelChange?: (level: AdminLevel) => void;
 }
 
 interface TT {
@@ -30,13 +34,22 @@ function fmtShort(v: number): string {
   return v.toLocaleString('sv-SE');
 }
 
-export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect }) => {
-  const containerRef        = useRef<HTMLDivElement>(null);
-  const sunRef              = useRef<SVGSVGElement>(null);
-  const barRef              = useRef<SVGSVGElement>(null);
-  const dims                = useResizeObserver(containerRef);
-  const onFeatureSelectRef  = useRef(onFeatureSelect);
-  onFeatureSelectRef.current = onFeatureSelect;
+export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, depthToLevel, onSelectionLevelChange }) => {
+  const containerRef               = useRef<HTMLDivElement>(null);
+  const sunRef                     = useRef<SVGSVGElement>(null);
+  const barRef                     = useRef<SVGSVGElement>(null);
+  const dims                       = useResizeObserver(containerRef);
+  const onFeatureSelectRef         = useRef(onFeatureSelect);
+  const onSelectionLevelChangeRef  = useRef(onSelectionLevelChange);
+  const depthToLevelRef            = useRef(depthToLevel);
+  onFeatureSelectRef.current        = onFeatureSelect;
+  onSelectionLevelChangeRef.current = onSelectionLevelChange;
+  depthToLevelRef.current           = depthToLevel;
+
+  const emitLevel = (depth: number) => {
+    const level = depthToLevelRef.current?.[depth];
+    if (level) onSelectionLevelChangeRef.current?.(level);
+  };
 
   const [focus,   setFocus]   = useState<GeoHierarchyNode>(root);
   const [history, setHistory] = useState<GeoHierarchyNode[]>([]);
@@ -51,20 +64,24 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   const drillDown = useCallback((node: GeoHierarchyNode) => {
     if (!node.children?.length) return;
+    const depth = historyRef.current.length + 1;
     setHistory(h => [...h, focusRef.current]);
     setFocus(node);
+    emitLevel(depth);
     onFeatureSelectRef.current?.({ code: node.code, label: node.name });
   }, []);
 
   const drillUp = useCallback(() => {
     const prev = historyRef.current[historyRef.current.length - 1];
     if (!prev) return;
+    const depth = historyRef.current.length - 1;
     setHistory(h => h.slice(0, -1));
     setFocus(prev);
     // Going back to root (history empties) → clear selection; otherwise select the parent node.
     if (historyRef.current.length === 1) {
       onFeatureSelectRef.current?.(null);
     } else {
+      emitLevel(depth);
       onFeatureSelectRef.current?.({ code: prev.code, label: prev.name });
     }
   }, []);
@@ -128,7 +145,10 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .on('click', (_e, d) => {
         if (d.depth === 0) { drillUp(); return; }
         if (d.children?.length) drillDown(d.data);
-        else onFeatureSelectRef.current?.({ code: d.data.code, label: d.data.name });
+        else {
+          emitLevel(historyRef.current.length + d.depth);
+          onFeatureSelectRef.current?.({ code: d.data.code, label: d.data.name });
+        }
       })
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);
@@ -221,7 +241,10 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
       .on('click', (_e, d) => {
         if (d.children?.length) drillDown(d);
-        else onFeatureSelectRef.current?.({ code: d.code, label: d.name });
+        else {
+          emitLevel(historyRef.current.length + 1);
+          onFeatureSelectRef.current?.({ code: d.code, label: d.name });
+        }
       })
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);

@@ -84,6 +84,7 @@ export default function MapPage() {
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
+  const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
   // Generation counter — incremented on every new fetch; stale responses are ignored.
   const fetchGenRef         = useRef(0);
@@ -170,6 +171,7 @@ export default function MapPage() {
     setDatasetResult(null);
     setHierarchyData(null);
     setColorScale(null);
+    setSelectionLevel(selectedLevel);
     if (pendingSelectionRef.current) {
       setSelectedFeature(pendingSelectionRef.current);
       pendingSelectionRef.current = null;
@@ -542,6 +544,8 @@ export default function MapPage() {
                   unit={datasetResult?.unit ?? ''}
                   label={activeDescriptor?.label ?? ''}
                   onFeatureSelect={setSelectedFeature}
+                  depthToLevel={['Country', 'Region', 'Municipality']}
+                  onSelectionLevelChange={setSelectionLevel}
                 />
               </div>
             )}
@@ -570,7 +574,7 @@ export default function MapPage() {
             </div>
             <SelectionPanel
               selectedFeature={selectedFeature}
-              adminLevel={selectedLevel}
+              adminLevel={selectionLevel}
               isOpen={isPanelOpen}
               onClose={() => setIsPanelOpen(false)}
             />

@@ -1,5 +1,6 @@
 import { JsonStat2Response } from '@/util/scb';
 import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode } from '../types';
+import { stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 // ── TAB5444 constants (Country → Region, Region → Municipality) ──────────────
 
@@ -268,7 +269,7 @@ export async function fetchPopulationHierarchy(year: number): Promise<GeoHierarc
 
   // Build läns nodes with their kommuner as children.
   const lans: GeoHierarchyNode[] = REGION_CODES.map((countyCode) => {
-    const countyName  = countyResult.labels[countyCode] ?? countyCode;
+    const countyName  = stripLanSuffix(countyResult.labels[countyCode] ?? countyCode);
     const countyValue = countyResult.values[countyCode] ?? 0;
 
     // Municipalities whose 4-digit code starts with the 2-digit county code.
@@ -276,7 +277,7 @@ export async function fetchPopulationHierarchy(year: number): Promise<GeoHierarc
       .filter(([mCode]) => mCode.startsWith(countyCode))
       .map(([mCode, mValue]) => ({
         code:  mCode,
-        name:  municipalityResult.labels[mCode] ?? mCode,
+        name:  stripOuterParens(municipalityResult.labels[mCode] ?? mCode),
         value: mValue,
       }))
       .sort((a, b) => b.value - a.value);
