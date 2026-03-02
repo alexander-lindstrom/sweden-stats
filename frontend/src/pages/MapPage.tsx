@@ -497,7 +497,8 @@ export default function MapPage() {
             </div>
           )}
 
-          <div className="flex-1 relative overflow-hidden" style={{ isolation: 'isolate' }}>
+          <div className="flex-1 flex min-h-0 overflow-hidden">
+            <div className="flex-1 relative overflow-hidden min-w-0" style={{ isolation: 'isolate' }}>
             {activeView === 'map' && (
               <MapView
                 adminLevel={selectedLevel}
@@ -540,6 +541,7 @@ export default function MapPage() {
                   root={hierarchyData}
                   unit={datasetResult?.unit ?? ''}
                   label={activeDescriptor?.label ?? ''}
+                  onFeatureSelect={setSelectedFeature}
                 />
               </div>
             )}
@@ -565,6 +567,7 @@ export default function MapPage() {
               </div>
             )}
 
+            </div>
             <SelectionPanel
               selectedFeature={selectedFeature}
               adminLevel={selectedLevel}

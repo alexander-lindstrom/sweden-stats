@@ -204,7 +204,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
   if (!isOpen) { return null; }
 
   return (
-    <div className="absolute right-0 top-0 h-full w-72 bg-white border-l border-gray-200 shadow-xl flex flex-col z-20">
+    <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 flex flex-col">
 
       {/* Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 p-4 border-b border-gray-100 flex-shrink-0">

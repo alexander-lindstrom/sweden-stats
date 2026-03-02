@@ -321,7 +321,7 @@ export const population: DatasetDescriptor = {
   supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
-    Country: ['chart', 'table'],
+    Country: ['chart'],
     RegSO:   ['map', 'table'],
     DeSO:    ['map', 'table'],
   },

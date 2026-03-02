@@ -8,6 +8,7 @@ interface Props {
   root: GeoHierarchyNode;
   unit: string;
   label: string;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 interface TT {
@@ -29,11 +30,13 @@ function fmtShort(v: number): string {
   return v.toLocaleString('sv-SE');
 }
 
-export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sunRef       = useRef<SVGSVGElement>(null);
-  const barRef       = useRef<SVGSVGElement>(null);
-  const dims         = useResizeObserver(containerRef);
+export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect }) => {
+  const containerRef        = useRef<HTMLDivElement>(null);
+  const sunRef              = useRef<SVGSVGElement>(null);
+  const barRef              = useRef<SVGSVGElement>(null);
+  const dims                = useResizeObserver(containerRef);
+  const onFeatureSelectRef  = useRef(onFeatureSelect);
+  onFeatureSelectRef.current = onFeatureSelect;
 
   const [focus,   setFocus]   = useState<GeoHierarchyNode>(root);
   const [history, setHistory] = useState<GeoHierarchyNode[]>([]);
@@ -50,6 +53,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
     if (!node.children?.length) return;
     setHistory(h => [...h, focusRef.current]);
     setFocus(node);
+    onFeatureSelectRef.current?.({ code: node.code, label: node.name });
   }, []);
 
   const drillUp = useCallback(() => {
@@ -57,6 +61,12 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
     if (!prev) return;
     setHistory(h => h.slice(0, -1));
     setFocus(prev);
+    // Going back to root (history empties) → clear selection; otherwise select the parent node.
+    if (historyRef.current.length === 1) {
+      onFeatureSelectRef.current?.(null);
+    } else {
+      onFeatureSelectRef.current?.({ code: prev.code, label: prev.name });
+    }
   }, []);
 
   // Shared color scale — same keys and colors in both charts.
@@ -118,6 +128,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
       .on('click', (_e, d) => {
         if (d.depth === 0) { drillUp(); return; }
         if (d.children?.length) drillDown(d.data);
+        else onFeatureSelectRef.current?.({ code: d.data.code, label: d.data.name });
       })
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);
@@ -208,7 +219,10 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label }) => {
       .attr('fill', d => colorScale(d.name))
       .attr('stroke', '#000').attr('stroke-width', 0.5)
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
-      .on('click', (_e, d) => { if (d.children?.length) drillDown(d); })
+      .on('click', (_e, d) => {
+        if (d.children?.length) drillDown(d);
+        else onFeatureSelectRef.current?.({ code: d.code, label: d.name });
+      })
       .on('mouseover', (e, d) => {
         d3.select(e.currentTarget).attr('fill-opacity', 0.6);
         const rect = containerRef.current?.getBoundingClientRect();
