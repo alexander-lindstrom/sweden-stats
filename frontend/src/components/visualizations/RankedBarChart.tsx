@@ -2,31 +2,35 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface Hovered { name: string; value: number; x: number; y: number; }
 
 interface RankedBarChartProps {
   data: DatasetResult;
   colorScale?: ((value: number) => string) | null;
+  selectedFeature?: { code: string; label: string } | null;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
-export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale }) => {
+export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
   const hoveredElRef = useRef<SVGRectElement | null>(null);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const sorted = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-      .sort((a, b) => b.value - a.value),
-    [data.values, data.labels],
-  );
+  const sorted = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
+      .sort((a, b) => b.value - a.value);
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   const idealHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
   const containerH  = dimensions?.height ?? 0;
@@ -73,9 +77,12 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('fill', d =>
         colorScale ? colorScale(d.value) : '#3b82f6'
       )
-      .attr('stroke', '#000')
-      .attr('stroke-width', 0.5)
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
+      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
+      .on('click', (_event: MouseEvent, d) => {
+        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
         if (hoveredElRef.current !== el) {
@@ -161,7 +168,15 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('stroke', '#f3f4f6')
       .attr('stroke-width', 1);
 
-  }, [sorted, svgWidth, svgHeight, colorScale]);
+    // Scroll the selected bar into view.
+    if (selectedFeature && containerRef.current) {
+      const idx = sorted.findIndex(d => d.code === selectedFeature.code);
+      if (idx >= 0) {
+        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+      }
+    }
+  }, [sorted, svgWidth, svgHeight, colorScale, selectedFeature, onFeatureSelect]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">

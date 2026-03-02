@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface HistogramProps {
   data: DatasetResult;
@@ -18,8 +19,8 @@ const MARGIN   = { top: 16, right: 24, bottom: 36, left: 52 };
 const NUM_BINS = 15;
 
 function formatValue(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000)     return `${(v / 1_000).toFixed(0)}k`;
+  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
+  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
   return String(Math.round(v));
 }
 
@@ -31,21 +32,22 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
 
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const entries = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
-      .filter(d => Number.isFinite(d.value)),
-    [data.values, data.labels],
-  );
+  const entries = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
+      .filter(d => Number.isFinite(d.value));
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   useEffect(() => {
-    if (!svgRef.current || !dimensions || entries.length === 0) return;
+    if (!svgRef.current || !dimensions || entries.length === 0) {return;}
 
     const { width, height } = dimensions;
     const innerW = width  - MARGIN.left - MARGIN.right;
     const innerH = height - MARGIN.top  - MARGIN.bottom;
 
-    if (innerW <= 0 || innerH <= 0) return;
+    if (innerW <= 0 || innerH <= 0) {return;}
 
     const values = entries.map(d => d.value);
     const [minVal, maxVal] = d3.extent(values) as [number, number];
@@ -93,7 +95,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('height', d => innerH - yScale(d.length))
       .attr('rx', 2)
       .attr('fill', d => {
-        if (!colorScale) return '#3b82f6';
+        if (!colorScale) {return '#3b82f6';}
         const mid = ((d.x0 ?? 0) + (d.x1 ?? 0)) / 2;
         return colorScale(mid);
       })

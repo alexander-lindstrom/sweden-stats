@@ -36,14 +36,14 @@ interface CodeCache {
 let codeCache: CodeCache | null = null;
 
 async function getCodesByLevel(): Promise<CodeCache> {
-  if (codeCache) return codeCache;
+  if (codeCache) {return codeCache;}
 
   const res = await fetch(METADATA_URL);
-  if (!res.ok) throw new Error(`TAB6679 metadata fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB6679 metadata fetch failed: ${res.status}`);}
 
   const metadata: MetadataResponse = await res.json();
   const regionCat = metadata.dimension['Region']?.category;
-  if (!regionCat) throw new Error('TAB6679: Region dimension not found');
+  if (!regionCat) {throw new Error('TAB6679: Region dimension not found');}
 
   const countyCodes:        string[] = [];
   const municipalityCodes:  string[] = [];
@@ -52,14 +52,14 @@ async function getCodesByLevel(): Promise<CodeCache> {
   const municipalityLabels: Record<string, string> = {};
 
   for (const code of Object.keys(regionCat.index)) {
-    if (code === '00') continue; // skip Riket — single value, not useful for charts
-    if      (code.includes('_RegSO')) regsoCodes.push(code);
-    else if (code.includes('_DeSO'))  desoCodes.push(code);
+    if (code === '00') {continue;} // skip Riket — single value, not useful for charts
+    if      (code.includes('_RegSO')) {regsoCodes.push(code);}
+    else if (code.includes('_DeSO'))  {desoCodes.push(code);}
     else if (code.length === 4) {
       municipalityCodes.push(code);
       municipalityLabels[code] = regionCat.label[code] ?? code;
     }
-    else if (code.length === 2) countyCodes.push(code);
+    else if (code.length === 2) {countyCodes.push(code);}
   }
 
   codeCache = { countyCodes, municipalityCodes, regsoCodes, desoCodes, municipalityLabels };
@@ -81,7 +81,7 @@ function aggregateByRegion(
   }
 
   const regionDimIdx = dimIds.indexOf('Region');
-  if (regionDimIdx === -1) throw new Error('TAB6679 response missing "Region" dimension');
+  if (regionDimIdx === -1) {throw new Error('TAB6679 response missing "Region" dimension');}
 
   const regionDim = data.dimension['Region'];
   const indexToCode: Record<number, string> = {};
@@ -92,12 +92,12 @@ function aggregateByRegion(
   const values: Record<string, number> = {};
   for (let i = 0; i < data.value.length; i++) {
     const raw = data.value[i];
-    if (raw === null || raw === undefined) continue;
+    if (raw === null || raw === undefined) {continue;}
     const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) continue;
+    if (isNaN(num)) {continue;}
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
-    if (code) values[code] = (values[code] ?? 0) + num;
+    if (code) {values[code] = (values[code] ?? 0) + num;}
   }
 
   const responseLabels = { ...regionDim.category.label } as Record<string, string>;
@@ -133,7 +133,7 @@ async function postQuery(codes: string[], year: number): Promise<JsonStat2Respon
       ],
     }),
   });
-  if (!res.ok) throw new Error(`TAB6679 data fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB6679 data fetch failed: ${res.status}`);}
   return res.json();
 }
 

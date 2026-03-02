@@ -1,32 +1,28 @@
-import { OSM, XYZ } from "ol/source";
+import { XYZ } from "ol/source";
 
 export const baseMaps = {
-  OSM: new OSM(),
+  CartoGray: new XYZ({
+    url: 'https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+    attributions: '© <a href="https://carto.com/">CARTO</a> & © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }),
+  CartoPositron: new XYZ({
+    url: 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    attributions: '© <a href="https://carto.com/">CARTO</a> & © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+  }),
   Satellite: new XYZ({
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attributions: '© Esri & contributors',
     maxZoom: 19,
   }),
-  EsriTopo: new XYZ({
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-    attributions: '© Esri & contributors',
-    maxZoom: 19
-  }),
-  EsriWorldGray: new XYZ({
-    url: "https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png",
-    attributions: '© Esri & contributors',
-    maxZoom: 16
-  }),
-  CartoPositron: new XYZ({
-    url: "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
-    attributions: '© CARTO & OpenStreetMap contributors',
-    maxZoom: 19
-  }),
-  EsriNatGeo: new XYZ({
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}",
-    attributions: '© Esri & contributors',
-    maxZoom: 16
-  })
 };
 
-export type BaseMapKey = keyof typeof baseMaps;
+export type BaseMapKey = keyof typeof baseMaps | 'None';
+
+export const baseMapLabels: Record<BaseMapKey, string> = {
+  None:          'Ingen',
+  CartoGray:     'Grå (utan etiketter)',
+  CartoPositron: 'Ljus (med etiketter)',
+  Satellite:     'Satellit',
+};

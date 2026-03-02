@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AdminLevel, DatasetResult } from '@/datasets/types';
+import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
-
-const LEVEL_LABELS: Record<AdminLevel, string> = {
-  Country:      'Nationell',
-  Region:       'Län',
-  Municipality: 'Kommun',
-  RegSO:        'RegSO',
-  DeSO:         'DeSO',
-};
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
   Country:      'bg-gray-100 text-gray-600',
@@ -204,7 +197,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
   if (!isOpen) { return null; }
 
   return (
-    <div className="absolute right-0 top-0 h-full w-72 bg-white border-l border-gray-200 shadow-xl flex flex-col z-20">
+    <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 flex flex-col">
 
       {/* Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3 p-4 border-b border-gray-100 flex-shrink-0">
@@ -259,8 +252,8 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               )}
             </section>
 
-            {/* Population sparkline ───────────────────────────────────── */}
-            <section>
+            {/* Population sparkline — hidden for RegSO/DeSO (SCB only provides 2024 data at those levels) */}
+            {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && <section>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">
                 Befolkningstrend
               </h3>
@@ -282,7 +275,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               {!sparkLoading && sparkline.length < 2 && (
                 <p className="text-sm text-gray-400">Ingen data tillgänglig.</p>
               )}
-            </section>
+            </section>}
           </>
         )}
       </div>

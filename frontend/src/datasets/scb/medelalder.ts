@@ -60,18 +60,18 @@ interface MetadataResponse {
 let municipalityCodeCache637: { codes: string[]; labels: Record<string, string> } | null = null;
 
 async function getMunicipalityCodes637(): Promise<{ codes: string[]; labels: Record<string, string> }> {
-  if (municipalityCodeCache637) return municipalityCodeCache637;
+  if (municipalityCodeCache637) {return municipalityCodeCache637;}
 
   const res = await fetch(METADATA_URL_637);
-  if (!res.ok) throw new Error(`TAB637 metadata fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB637 metadata fetch failed: ${res.status}`);}
 
   const metadata: MetadataResponse = await res.json();
   const regionCat = metadata.dimension['Region']?.category;
-  if (!regionCat) throw new Error('TAB637: Region dimension not found');
+  if (!regionCat) {throw new Error('TAB637: Region dimension not found');}
 
   const labels: Record<string, string> = {};
   for (const [code, label] of Object.entries(regionCat.label)) {
-    if (code.length === 4) labels[code] = label;
+    if (code.length === 4) {labels[code] = label;}
   }
 
   municipalityCodeCache637 = { codes: Object.keys(labels), labels };
@@ -83,20 +83,20 @@ async function getMunicipalityCodes637(): Promise<{ codes: string[]; labels: Rec
 let regsoDesoCache: { regsoCodes: string[]; desoCodes: string[] } | null = null;
 
 async function getRegsoDeso(): Promise<{ regsoCodes: string[]; desoCodes: string[] }> {
-  if (regsoDesoCache) return regsoDesoCache;
+  if (regsoDesoCache) {return regsoDesoCache;}
 
   const res = await fetch(METADATA_URL_6574);
-  if (!res.ok) throw new Error(`TAB6574 metadata fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB6574 metadata fetch failed: ${res.status}`);}
 
   const metadata: MetadataResponse = await res.json();
   const regionCat = metadata.dimension['Region']?.category;
-  if (!regionCat) throw new Error('TAB6574: Region dimension not found');
+  if (!regionCat) {throw new Error('TAB6574: Region dimension not found');}
 
   const regsoCodes: string[] = [];
   const desoCodes:  string[] = [];
   for (const code of Object.keys(regionCat.index)) {
-    if (code.includes('_RegSO')) regsoCodes.push(code);
-    else if (code.includes('_DeSO')) desoCodes.push(code);
+    if (code.includes('_RegSO')) {regsoCodes.push(code);}
+    else if (code.includes('_DeSO')) {desoCodes.push(code);}
   }
 
   regsoDesoCache = { regsoCodes, desoCodes };
@@ -118,7 +118,7 @@ function aggregateByRegion(
   }
 
   const regionDimIdx = dimIds.indexOf('Region');
-  if (regionDimIdx === -1) throw new Error('SCB response missing "Region" dimension');
+  if (regionDimIdx === -1) {throw new Error('SCB response missing "Region" dimension');}
 
   const regionDim = data.dimension['Region'];
   const indexToCode: Record<number, string> = {};
@@ -129,12 +129,12 @@ function aggregateByRegion(
   const values: Record<string, number> = {};
   for (let i = 0; i < data.value.length; i++) {
     const raw = data.value[i];
-    if (raw === null || raw === undefined) continue;
+    if (raw === null || raw === undefined) {continue;}
     const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) continue;
+    if (isNaN(num)) {continue;}
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
-    if (code) values[code] = (values[code] ?? 0) + num;
+    if (code) {values[code] = (values[code] ?? 0) + num;}
   }
 
   const responseLabels = { ...regionDim.category.label } as Record<string, string>;
@@ -169,7 +169,7 @@ async function fetchByCounty(year: number): Promise<DatasetResult> {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`TAB637 fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB637 fetch failed: ${res.status}`);}
   const data: JsonStat2Response = await res.json();
   const { values, labels } = aggregateByRegion(data);
   return { values, labels, label: 'Medelålder', unit: 'år' };
@@ -189,7 +189,7 @@ async function fetchByMunicipality(year: number): Promise<DatasetResult> {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`TAB637 municipality fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB637 municipality fetch failed: ${res.status}`);}
   const data: JsonStat2Response = await res.json();
   const { values, labels } = aggregateByRegion(data, metaLabels);
   return { values, labels, label: 'Medelålder', unit: 'år' };
@@ -211,7 +211,7 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`TAB6574 medelålder fetch failed: ${res.status}`);
+  if (!res.ok) {throw new Error(`TAB6574 medelålder fetch failed: ${res.status}`);}
 
   const data: JsonStat2Response = await res.json();
   const dimIds = data.id;
@@ -240,7 +240,7 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
   const indexToMidpoint: Record<number, number> = {};
   for (const [code, idx] of Object.entries(alderDim.category.index)) {
     const band = AGE_BANDS.find(b => b.code === code);
-    if (band) indexToMidpoint[idx as number] = band.midpoint;
+    if (band) {indexToMidpoint[idx as number] = band.midpoint;}
   }
 
   // Accumulate weighted sum and total count per region.
@@ -249,16 +249,16 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
 
   for (let i = 0; i < data.value.length; i++) {
     const raw = data.value[i];
-    if (raw === null || raw === undefined) continue;
+    if (raw === null || raw === undefined) {continue;}
     const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num) || num === 0) continue;
+    if (isNaN(num) || num === 0) {continue;}
 
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const alderIdx  = Math.floor(i / strides[alderDimIdx])  % sizes[alderDimIdx];
     const regionCode = indexToRegion[regionIdx];
     const midpoint   = indexToMidpoint[alderIdx];
 
-    if (regionCode === undefined || midpoint === undefined) continue;
+    if (regionCode === undefined || midpoint === undefined) {continue;}
 
     weightedSum[regionCode] = (weightedSum[regionCode] ?? 0) + midpoint * num;
     totalCount[regionCode]  = (totalCount[regionCode]  ?? 0) + num;
@@ -267,7 +267,7 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
   const values: Record<string, number> = {};
   for (const [code, sum] of Object.entries(weightedSum)) {
     const total = totalCount[code];
-    if (total > 0) values[code] = Math.round((sum / total) * 10) / 10; // 1 decimal
+    if (total > 0) {values[code] = Math.round((sum / total) * 10) / 10;} // 1 decimal
   }
 
   const labels = { ...regionDim.category.label } as Record<string, string>;

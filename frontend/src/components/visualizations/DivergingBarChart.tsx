@@ -2,11 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 interface Hovered { name: string; value: number; deviation: number; x: number; y: number; }
 
 interface Props {
   data: DatasetResult;
+  selectedFeature?: { code: string; label: string } | null;
+  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 const MARGIN     = { top: 28, right: 76, bottom: 24, left: 152 };
@@ -29,7 +32,7 @@ function fmtAbs(v: number): string {
   return v.toFixed(1);
 }
 
-export const DivergingBarChart: React.FC<Props> = ({ data }) => {
+export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -37,13 +40,14 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
   // Sort descending by value (highest at top — e.g. oldest counties first).
-  const sorted = useMemo(() =>
-    Object.entries(data.values)
-      .map(([code, value]) => ({ code, value, name: data.labels[code] ?? code }))
+  const sorted = useMemo(() => {
+    const raw = Object.entries(data.values)
+      .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
       .filter(d => Number.isFinite(d.value))
-      .sort((a, b) => b.value - a.value),
-    [data.values, data.labels],
-  );
+      .sort((a, b) => b.value - a.value);
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    return raw.map((d, i) => ({ ...d, name: stripped[i] }));
+  }, [data.values, data.labels]);
 
   const mean = d3.mean(sorted, d => d.value) ?? 0;
 
@@ -104,8 +108,12 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill',   d => d.value >= mean ? COLOR_ABOVE : COLOR_BELOW)
-      .attr('stroke', '#000').attr('stroke-width', 0.5)
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
+      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
+      .on('click', (_event: MouseEvent, d) => {
+        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
         if (hoveredElRef.current !== el) {
@@ -162,9 +170,10 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .text(d => fmtDev(d.value - mean, data.unit));
 
     // Y-axis — names, truncated with getComputedTextLength.
+    const nameByCode = new Map(sorted.map(d => [d.code, d.name]));
     g.append('g')
       .call(d3.axisLeft(yScale).tickSize(0).tickPadding(8)
-        .tickFormat(code => data.labels[code] ?? code))
+        .tickFormat(code => nameByCode.get(code) ?? code))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll<SVGTextElement, string>('text')
         .attr('font-size', 12).attr('fill', '#374151')
@@ -187,7 +196,15 @@ export const DivergingBarChart: React.FC<Props> = ({ data }) => {
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
 
-  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels]);
+    // Scroll the selected bar into view.
+    if (selectedFeature && containerRef.current) {
+      const idx = sorted.findIndex(d => d.code === selectedFeature.code);
+      if (idx >= 0) {
+        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+      }
+    }
+  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect]);
 
   const svgH = Math.max(dimensions?.height ?? 0, needed + MARGIN.top + MARGIN.bottom);
 
