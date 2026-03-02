@@ -16,7 +16,6 @@ import {
   adminWfsLayers,
   baseVectorStyle,
   buildChoroplethStyle,
-  createChoroplethLayer,
   createHighlightLayer,
   createSelectionLayer,
   createSubBoundaryLayer,
@@ -213,6 +212,127 @@ const MapView: React.FC<MapViewProps> = ({
     onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
   }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
 
+  // --- Pointer-move handler: hover tooltip + highlight ----------------------
+  // Defined as a useCallback so the registration effect stays a clean 3-liner.
+  // Deps mirror the pointermove effect below — the handler re-creates (and the
+  // effect re-binds) only when the values it reads from props change.
+  const handlePointerMove = useCallback((evt: MapBrowserEvent) => {
+    const map = mapInstanceRef.current;
+    if (!map) { return; }
+
+    if (evt.dragging) {
+      if (throttleRef.current !== null) {
+        clearTimeout(throttleRef.current);
+        throttleRef.current = null;
+      }
+      if (hoveredCodeRef.current !== null) {
+        hoveredCodeRef.current = null;
+        highlightLayerRef.current?.changed();
+      }
+      if (hoveredSubCodeRef.current !== null) {
+        hoveredSubCodeRef.current = null;
+        subHighlightLayerRef.current?.changed();
+      }
+      setHoveredFeature(null);
+      mapRef.current!.style.cursor = '';
+      return;
+    }
+
+    // Update tooltip position immediately — cheap direct DOM, no React re-render
+    lastPixelRef.current = evt.pixel as [number, number];
+    if (tooltipRef.current) {
+      tooltipRef.current.style.left = `${evt.pixel[0] + 14}px`;
+      tooltipRef.current.style.top  = `${evt.pixel[1] + 14}px`;
+    }
+
+    // Throttle expensive hit detection to ~20/s
+    if (throttleRef.current !== null) { return; }
+    throttleRef.current = window.setTimeout(() => {
+      throttleRef.current = null;
+      const pixel = lastPixelRef.current;
+      if (!pixel) { return; }
+
+      // -- Priority 1: sub-layer (when a feature is selected) --
+      const subLayer = subLayerRef.current;
+      if (subLayer && selectedCodeRef.current) {
+        const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
+        const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
+        const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
+
+        if (subCodeProp && subLabelProp && filterProp) {
+          let subCode: string | null = null;
+          let subLabel: string | null = null;
+
+          map.forEachFeatureAtPixel(
+            pixel,
+            (feature) => {
+              if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) { return; }
+              subCode  = String(feature.get(subCodeProp) ?? '');
+              subLabel = String(feature.get(subLabelProp) ?? subCode);
+              return true;
+            },
+            { layerFilter: (l) => l === subLayer, hitTolerance: 3 },
+          );
+
+          if (subCode) {
+            if (subCode !== hoveredSubCodeRef.current) {
+              hoveredSubCodeRef.current = subCode;
+              subHighlightLayerRef.current?.changed();
+              setHoveredFeature({ label: subLabel!, value: null });
+            }
+            // Clear main highlight while hovering a sub-feature.
+            if (hoveredCodeRef.current !== null) {
+              hoveredCodeRef.current = null;
+              highlightLayerRef.current?.changed();
+            }
+            mapRef.current!.style.cursor = 'pointer';
+            return;
+          }
+        }
+      }
+
+      // Leaving sub-layer territory — clear sub highlight.
+      if (hoveredSubCodeRef.current !== null) {
+        hoveredSubCodeRef.current = null;
+        subHighlightLayerRef.current?.changed();
+      }
+
+      // -- Priority 2: main overlay layer --
+      let result: { code: string; label: string; value: number | null } | null = null;
+
+      map.forEachFeatureAtPixel(
+        pixel,
+        (feature) => {
+          const code     = String(feature.get(featureCodeProperty) ?? '');
+          const rawLabel = String(feature.get(featureLabelProperty) ?? code);
+          const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
+          const value    = choroplethData?.[code] ?? null;
+          result = { code, label, value };
+          return true;
+        },
+        { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 },
+      );
+
+      if (result !== null) {
+        const { code, label, value } = result;
+        if (code !== hoveredCodeRef.current) {
+          hoveredCodeRef.current = code;
+          // Only re-render the thin highlight layer, not the full choropleth layer
+          highlightLayerRef.current?.changed();
+          setHoveredFeature({ label, value });
+        }
+        mapRef.current!.style.cursor = 'pointer';
+      } else {
+        if (hoveredCodeRef.current !== null) {
+          hoveredCodeRef.current = null;
+          highlightLayerRef.current?.changed();
+          setHoveredFeature(null);
+        }
+        mapRef.current!.style.cursor = '';
+      }
+    }, 50);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData]);
+
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
     if (!mapRef.current) {return;}
@@ -243,125 +363,10 @@ const MapView: React.FC<MapViewProps> = ({
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
 
-  // --- Pointermove: hover tooltip + highlight -------------------------------
+  // --- Register pointermove handler ----------------------------------------
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {return;}
-
-    const handlePointerMove = (evt: MapBrowserEvent) => {
-      if (evt.dragging) {
-        if (throttleRef.current !== null) {
-          clearTimeout(throttleRef.current);
-          throttleRef.current = null;
-        }
-        if (hoveredCodeRef.current !== null) {
-          hoveredCodeRef.current = null;
-          highlightLayerRef.current?.changed();
-        }
-        if (hoveredSubCodeRef.current !== null) {
-          hoveredSubCodeRef.current = null;
-          subHighlightLayerRef.current?.changed();
-        }
-        setHoveredFeature(null);
-        mapRef.current!.style.cursor = '';
-        return;
-      }
-
-      // Update tooltip position immediately — cheap direct DOM, no React re-render
-      lastPixelRef.current = evt.pixel as [number, number];
-      if (tooltipRef.current) {
-        tooltipRef.current.style.left = `${evt.pixel[0] + 14}px`;
-        tooltipRef.current.style.top  = `${evt.pixel[1] + 14}px`;
-      }
-
-      // Throttle expensive hit detection to ~20/s
-      if (throttleRef.current !== null) { return; }
-      throttleRef.current = window.setTimeout(() => {
-        throttleRef.current = null;
-        const pixel = lastPixelRef.current;
-        if (!pixel || !map) { return; }
-
-        // -- Priority 1: sub-layer (when a feature is selected) --
-        const subLayer = subLayerRef.current;
-        if (subLayer && selectedCodeRef.current) {
-          const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
-          const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
-          const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
-
-          if (subCodeProp && subLabelProp && filterProp) {
-            let subCode: string | null = null;
-            let subLabel: string | null = null;
-
-            map.forEachFeatureAtPixel(
-              pixel,
-              (feature) => {
-                if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) {return;}
-                subCode  = String(feature.get(subCodeProp) ?? '');
-                subLabel = String(feature.get(subLabelProp) ?? subCode);
-                return true;
-              },
-              { layerFilter: (l) => l === subLayer, hitTolerance: 3 },
-            );
-
-            if (subCode) {
-              if (subCode !== hoveredSubCodeRef.current) {
-                hoveredSubCodeRef.current = subCode;
-                subHighlightLayerRef.current?.changed();
-                setHoveredFeature({ label: subLabel!, value: null });
-              }
-              // Clear main highlight while hovering a sub-feature.
-              if (hoveredCodeRef.current !== null) {
-                hoveredCodeRef.current = null;
-                highlightLayerRef.current?.changed();
-              }
-              mapRef.current!.style.cursor = 'pointer';
-              return;
-            }
-          }
-        }
-
-        // Leaving sub-layer territory — clear sub highlight.
-        if (hoveredSubCodeRef.current !== null) {
-          hoveredSubCodeRef.current = null;
-          subHighlightLayerRef.current?.changed();
-        }
-
-        // -- Priority 2: main overlay layer --
-        let result: { code: string; label: string; value: number | null } | null = null;
-
-        map.forEachFeatureAtPixel(
-          pixel,
-          (feature) => {
-            const code     = String(feature.get(featureCodeProperty) ?? '');
-            const rawLabel = String(feature.get(featureLabelProperty) ?? code);
-            const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
-            const value    = choroplethData?.[code] ?? null;
-            result = { code, label, value };
-            return true;
-          },
-          { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 },
-        );
-
-        if (result !== null) {
-          const { code, label, value } = result;
-          if (code !== hoveredCodeRef.current) {
-            hoveredCodeRef.current = code;
-            // Only re-render the thin highlight layer, not the full choropleth layer
-            highlightLayerRef.current?.changed();
-            setHoveredFeature({ label, value });
-          }
-          mapRef.current!.style.cursor = 'pointer';
-        } else {
-          if (hoveredCodeRef.current !== null) {
-            hoveredCodeRef.current = null;
-            highlightLayerRef.current?.changed();
-            setHoveredFeature(null);
-          }
-          mapRef.current!.style.cursor = '';
-        }
-      }, 50);
-    };
-
+    if (!map) { return; }
     map.on('pointermove', handlePointerMove);
     return () => {
       map.un('pointermove', handlePointerMove);
@@ -370,14 +375,17 @@ const MapView: React.FC<MapViewProps> = ({
         throttleRef.current = null;
       }
     };
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData]);
+  }, [handlePointerMove]);
 
   // --- Swap boundary layer when admin level changes -----------------------
+  // Creates a plain (un-styled) layer; the choropleth-update effect below
+  // applies the colour scale immediately after in the same render cycle.
+  // featureCodeProperty changes in lockstep with adminLevel (one value per level).
   useEffect(() => {
     const map = mapInstanceRef.current;
-    if (!map) {return;}
+    if (!map) { return; }
 
-    if (overlayLayerRef.current)  { map.removeLayer(overlayLayerRef.current);  overlayLayerRef.current  = null; }
+    if (overlayLayerRef.current)   { map.removeLayer(overlayLayerRef.current);   overlayLayerRef.current  = null; }
     if (highlightLayerRef.current) { map.removeLayer(highlightLayerRef.current); highlightLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
@@ -386,11 +394,7 @@ const MapView: React.FC<MapViewProps> = ({
     const source = createVectorTileSource(url);
     sourceRef.current = source;
 
-    const mainLayer =
-      choroplethData && colorScale
-        ? createChoroplethLayer(source, buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty))
-        : createVectorTileLayer(source);
-
+    const mainLayer      = createVectorTileLayer(source);
     const highlightLayer = createHighlightLayer(source, featureCodeProperty, hoveredCodeRef);
 
     mainLayer.setZIndex(1);
@@ -399,8 +403,7 @@ const MapView: React.FC<MapViewProps> = ({
     map.addLayer(highlightLayer);
     overlayLayerRef.current  = mainLayer;
     highlightLayerRef.current = highlightLayer;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminLevel]);
+  }, [adminLevel, featureCodeProperty]);
 
   // --- Show selection outline + sub-boundary when a feature is selected ----
   useEffect(() => {
