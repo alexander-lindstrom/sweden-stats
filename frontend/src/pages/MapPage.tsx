@@ -21,6 +21,13 @@ import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 
+// Sub-level for tooltip value lookup — when a feature is selected, fetch data
+// one level down so hovering sub-boundaries can show their values.
+const SUB_LEVEL_FOR_FETCH: Partial<Record<AdminLevel, AdminLevel>> = {
+  Region:       'Municipality',
+  Municipality: 'RegSO',
+};
+
 // Feature property used for choropleth lookup — matches the direct boundary
 // layer shown for each admin level.
 const FEATURE_CODE_PROP: Record<AdminLevel, string> = {
@@ -72,6 +79,16 @@ export default function MapPage() {
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
 
   const { datasetResult, colorScale, loading } = useDatasetFetch(selectedDatasetId, selectedLevel, selectedYear);
+
+  // Fetch sub-level data so hovering sub-boundaries (e.g. municipalities within a
+  // selected Lan) can show their own values, not just their label.
+  const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
+  const { datasetResult: subDatasetResult } = useDatasetFetch(
+    selectedFeature && subLevel ? selectedDatasetId : null,
+    subLevel ?? selectedLevel,
+    selectedYear,
+  );
+
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const hierarchyData    = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
   const timeSeriesData   = useTimeSeriesFetch(activeDescriptor, activeChartType, selectedLevel);
@@ -336,6 +353,7 @@ export default function MapPage() {
                   featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                   unit={datasetResult?.unit ?? ''}
+                  subChoroplethData={subDatasetResult?.values ?? null}
                   selectedFeature={selectedFeature}
                   onFeatureSelect={setSelectedFeature}
                   onDrillDown={handleDrillDown}

@@ -56,6 +56,9 @@ export interface MapViewProps {
   featureLabelProperty: string;
   featureParentProperty?: string;
   unit: string;
+  /** Values keyed by sub-level codes (e.g. municipality codes when adminLevel=Region).
+   *  Used to show data values when hovering sub-boundary features. */
+  subChoroplethData?: Record<string, number> | null;
   selectedFeature: { code: string; label: string; parentCode?: string } | null;
   onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
   onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
@@ -113,6 +116,7 @@ const MapView: React.FC<MapViewProps> = ({
   featureLabelProperty,
   featureParentProperty,
   unit,
+  subChoroplethData,
   selectedFeature,
   onFeatureSelect,
   onDrillDown,
@@ -134,6 +138,11 @@ const MapView: React.FC<MapViewProps> = ({
   const subHighlightLayerRef = useRef<VectorTileLayer | null>(null);
   const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef    = useRef<string | null>(null);
+
+  // Keep latest subChoroplethData in a ref so the pointer-move handler always
+  // sees the current value without needing it in the useCallback dep array.
+  const subChoroplethDataRef = useRef(subChoroplethData);
+  subChoroplethDataRef.current = subChoroplethData;
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -278,7 +287,7 @@ const MapView: React.FC<MapViewProps> = ({
             if (subCode !== hoveredSubCodeRef.current) {
               hoveredSubCodeRef.current = subCode;
               subHighlightLayerRef.current?.changed();
-              setHoveredFeature({ label: subLabel!, value: null });
+              setHoveredFeature({ label: subLabel!, value: subChoroplethDataRef.current?.[subCode] ?? null });
             }
             // Clear main highlight while hovering a sub-feature.
             if (hoveredCodeRef.current !== null) {
