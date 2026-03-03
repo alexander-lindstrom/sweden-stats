@@ -20,6 +20,8 @@ import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
+import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
+import { Spinner } from '@/components/ui/Spinner';
 
 // Sub-level for tooltip value lookup — when a feature is selected, fetch data
 // one level down so hovering sub-boundaries can show their values.
@@ -90,8 +92,8 @@ export default function MapPage() {
   );
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
-  const hierarchyData    = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
-  const timeSeriesData   = useTimeSeriesFetch(activeDescriptor, activeChartType, selectedLevel);
+  const { data: hierarchyData,   loading: hierarchyLoading   } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
+  const { data: timeSeriesData,  loading: timeSeriesLoading  } = useTimeSeriesFetch(activeDescriptor, activeChartType, selectedLevel);
 
   useMapKeyboardNavigation(
     selectedFeature,
@@ -229,6 +231,7 @@ export default function MapPage() {
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
+      <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
       <MapSidebar
         selectedLevel={selectedLevel}
         onLevelChange={setSelectedLevel}
@@ -265,11 +268,6 @@ export default function MapPage() {
               </button>
             );
           })}
-          {loading && (
-            <span className="ml-4 text-xs text-gray-400 animate-pulse">
-              Laddar data…
-            </span>
-          )}
           {activeDescriptor && (
             <span className="ml-auto text-xs text-gray-400">
               Källa: {activeDescriptor.source} · {selectedYear}
@@ -392,20 +390,16 @@ export default function MapPage() {
                   />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
-                  Laddar hierarki…
-                </div>
+              {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && hierarchyLoading && (
+                <Spinner />
               )}
               {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
                 <div className="w-full h-full p-4">
                   <MultiLineChart data={timeSeriesData} label={activeDescriptor?.label} />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm animate-pulse">
-                  Laddar tidsserie…
-                </div>
+              {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
+                <Spinner />
               )}
               {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">

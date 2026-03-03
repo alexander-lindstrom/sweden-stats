@@ -3,6 +3,7 @@ import { AdminLevel, DatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
+import { Spinner } from '@/components/ui/Spinner';
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
   Country:      'bg-gray-100 text-gray-600',
@@ -168,12 +169,14 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     }
 
     Promise.all(statFetches).then(() => {
-      if (id !== fetchIdRef.current || popStat === null) { return; }
-      setStats({
-        population: popStat,
-        income:     wantsIncome ? incomeStat : null,
-        age:        wantsAge    ? ageStat    : null,
-      });
+      if (id !== fetchIdRef.current) { return; }
+      if (popStat !== null) {
+        setStats({
+          population: popStat,
+          income:     wantsIncome ? incomeStat : null,
+          age:        wantsAge    ? ageStat    : null,
+        });
+      }
       setStatsLoading(false);
     });
 
@@ -235,9 +238,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
                 Nyckeltal {STAT_YEAR}
               </h3>
 
-              {statsLoading && (
-                <p className="text-sm text-gray-400 animate-pulse">Laddar…</p>
-              )}
+              {statsLoading && <Spinner />}
 
               {!statsLoading && !stats && (
                 <p className="text-sm text-gray-400">Ingen data tillgänglig.</p>
@@ -258,9 +259,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
                 Befolkningstrend
               </h3>
 
-              {sparkLoading && (
-                <p className="text-sm text-gray-400 animate-pulse">Laddar…</p>
-              )}
+              {sparkLoading && <Spinner />}
 
               {!sparkLoading && sparkline.length >= 2 && (
                 <>
