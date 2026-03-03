@@ -130,6 +130,9 @@ const MapView: React.FC<MapViewProps> = ({
     new TileLayer({ visible: false })
   );
   const overlayLayerRef  = useRef<VectorTileLayer | null>(null);
+  // Holds the previous overlay layer during a level transition — kept visible
+  // until the incoming layer's first tile fires, then discarded.
+  const outgoingLayerRef = useRef<VectorTileLayer | null>(null);
   // Separate lightweight layer for hover highlight — shares the same source as
   // overlayLayerRef so no extra tile fetches. Only re-renders this layer on
   // hover changes instead of the full (expensive) choropleth layer.
@@ -390,14 +393,27 @@ const MapView: React.FC<MapViewProps> = ({
   }, [handlePointerMove]);
 
   // --- Swap boundary layer when admin level changes -----------------------
-  // Creates a plain (un-styled) layer; the choropleth-update effect below
-  // applies the colour scale immediately after in the same render cycle.
-  // featureCodeProperty changes in lockstep with adminLevel (one value per level).
+  // The outgoing layer is kept alive until the incoming source fires its first
+  // tileloadend, hiding the blank-tile flash during drill-down transitions.
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) { return; }
 
-    if (overlayLayerRef.current)   { map.removeLayer(overlayLayerRef.current);   overlayLayerRef.current  = null; }
+    // Drop any previous outgoing layer that is still waiting (rapid level changes).
+    if (outgoingLayerRef.current) {
+      map.removeLayer(outgoingLayerRef.current);
+      outgoingLayerRef.current = null;
+    }
+
+    // Demote the current overlay to "outgoing" — keep it in the map so the old
+    // level's tiles remain visible while the new source is loading.
+    if (overlayLayerRef.current) {
+      outgoingLayerRef.current = overlayLayerRef.current;
+      overlayLayerRef.current  = null;
+      // outgoing layer stays in the map; removed once new tiles arrive (below)
+    }
+
+    // Highlight layer is source-coupled — always recreated, remove immediately.
     if (highlightLayerRef.current) { map.removeLayer(highlightLayerRef.current); highlightLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
@@ -413,8 +429,31 @@ const MapView: React.FC<MapViewProps> = ({
     highlightLayer.setZIndex(5);
     map.addLayer(mainLayer);
     map.addLayer(highlightLayer);
-    overlayLayerRef.current  = mainLayer;
+    overlayLayerRef.current   = mainLayer;
     highlightLayerRef.current = highlightLayer;
+
+    // Remove the outgoing layer as soon as the first tile from the new source
+    // has painted — at that point there is something to show in its place.
+    let settled = false;
+    const onTileLoad = () => {
+      if (settled) { return; }
+      settled = true;
+      if (outgoingLayerRef.current) {
+        map.removeLayer(outgoingLayerRef.current);
+        outgoingLayerRef.current = null;
+      }
+      source.un('tileloadend', onTileLoad);
+    };
+    source.on('tileloadend', onTileLoad);
+
+    return () => {
+      source.un('tileloadend', onTileLoad);
+      // Effect re-ran before tiles arrived — remove outgoing layer now.
+      if (!settled && outgoingLayerRef.current) {
+        map.removeLayer(outgoingLayerRef.current);
+        outgoingLayerRef.current = null;
+      }
+    };
   }, [adminLevel, featureCodeProperty]);
 
   // --- Show selection outline + sub-boundary when a feature is selected ----
