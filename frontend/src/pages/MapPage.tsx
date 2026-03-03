@@ -74,6 +74,7 @@ export default function MapPage() {
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
+  const [mapResetToken,     setMapResetToken]       = useState(0);
 
   const yearDebounceRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Carries a clicked sub-feature through the [selectedLevel] effect so it
@@ -103,6 +104,14 @@ export default function MapPage() {
     setSelectedFeature,
     pendingSelectionRef,
   );
+
+  const handleReset = () => {
+    setSelectedLevel('Region');
+    setSelectedFeature(null);
+    setActiveView('map');
+    setIsPanelOpen(false);
+    setMapResetToken(t => t + 1);
+  };
 
   const handleYearChange = (y: number) => {
     setDisplayYear(y);
@@ -242,12 +251,13 @@ export default function MapPage() {
         onYearChange={handleYearChange}
         selectedBase={selectedBase}
         onBaseChange={setSelectedBase}
+        onReset={handleReset}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* View toggle bar */}
-        <div className="flex items-center gap-1 border-b border-gray-200 px-4 py-2 bg-white flex-shrink-0">
+        <div className="flex items-center border-b border-slate-200 px-4 bg-white flex-shrink-0">
           {ALL_VIEWS.map(({ key, label }) => {
             const supported = availableViews.includes(key);
             return (
@@ -256,12 +266,12 @@ export default function MapPage() {
                 onClick={() => { if (supported) { setActiveView(key); } }}
                 disabled={!supported}
                 className={[
-                  'px-4 py-1 rounded text-sm font-medium transition-colors',
+                  'px-4 py-3 text-sm font-medium transition-colors -mb-px border-b-2',
                   !supported
-                    ? 'text-gray-300 cursor-not-allowed'
+                    ? 'text-slate-300 border-transparent cursor-not-allowed'
                     : activeView === key
-                      ? 'bg-blue-600 text-white'
-                      : 'text-gray-600 hover:bg-gray-100',
+                      ? 'text-blue-600 border-blue-600'
+                      : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300',
                 ].join(' ')}
               >
                 {label}
@@ -269,7 +279,7 @@ export default function MapPage() {
             );
           })}
           {activeDescriptor && (
-            <span className="ml-auto text-xs text-gray-400">
+            <span className="ml-auto text-xs text-slate-400">
               Källa: {activeDescriptor.source} · {selectedYear}
             </span>
           )}
@@ -277,10 +287,10 @@ export default function MapPage() {
             onClick={() => setIsPanelOpen(p => !p)}
             title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
             className={[
-              'ml-2 flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
+              'ml-3 flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
               isPanelOpen
-                ? 'bg-blue-50 border-blue-200 text-blue-700'
-                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50',
+                ? 'bg-blue-50 border-blue-100 text-blue-600'
+                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
             ].join(' ')}
           >
             {isPanelOpen ? '▶ Dölj' : '◀ Detaljer'}
@@ -291,7 +301,7 @@ export default function MapPage() {
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Chart type sub-selector — only shown in chart view with >1 type */}
           {activeView === 'chart' && availableChartTypes.length > 1 && (
-            <div className="flex gap-1 px-6 pt-3 pb-1 border-b border-gray-100 flex-shrink-0">
+            <div className="flex gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
               {availableChartTypes.map(ct => (
                 <button
                   key={ct}
@@ -299,8 +309,8 @@ export default function MapPage() {
                   className={[
                     'px-3 py-1 rounded-full text-xs font-medium transition-colors',
                     activeChartType === ct
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-500 hover:bg-gray-100',
+                      ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200'
+                      : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700',
                   ].join(' ')}
                 >
                   {CHART_TYPE_LABELS[ct]}
@@ -311,12 +321,12 @@ export default function MapPage() {
 
           {/* Län / Municipality filter — shown for diverging chart at sub-county levels */}
           {activeView === 'chart' && needsLanFilter && (
-            <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 bg-gray-50 flex-shrink-0 text-sm">
-              <label className="text-gray-500 whitespace-nowrap">Län:</label>
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
               <select
                 value={effectiveLan ?? ''}
                 onChange={e => setSelectedLan(e.target.value || null)}
-                className="border border-gray-300 rounded px-2 py-1 text-sm bg-white text-gray-700"
+                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {availableLans.map(({ code, name }) => (
                   <option key={code} value={code}>{name}</option>
@@ -324,11 +334,11 @@ export default function MapPage() {
               </select>
               {needsMuniFilter && (
                 <>
-                  <label className="text-gray-500 whitespace-nowrap ml-2">Kommun:</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
                   <select
                     value={effectiveMuni ?? ''}
                     onChange={e => setSelectedMuni(e.target.value || null)}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm bg-white text-gray-700"
+                    className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {availableMunis.map(({ code, name }) => (
                       <option key={code} value={code}>{name}</option>
@@ -352,6 +362,7 @@ export default function MapPage() {
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                   unit={datasetResult?.unit ?? ''}
                   subChoroplethData={subDatasetResult?.values ?? null}
+                  resetToken={mapResetToken}
                   selectedFeature={selectedFeature}
                   onFeatureSelect={setSelectedFeature}
                   onDrillDown={handleDrillDown}

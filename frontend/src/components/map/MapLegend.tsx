@@ -14,7 +14,7 @@ const STOPS = 10;
 export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
   if (!data || !scale) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 text-sm text-center p-4">
+      <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm text-center p-4">
         Välj ett dataset för att visa teckenförklaringen.
       </div>
     );
@@ -41,7 +41,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-gray-700">{data.label}</p>
+      <p className="text-sm font-semibold text-slate-700">{data.label}</p>
       <div className="flex items-stretch gap-3">
         {/* Gradient bar */}
         <svg width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT}>
@@ -65,7 +65,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
 
         {/* Labels */}
         <div
-          className="flex flex-col justify-between text-xs text-gray-600"
+          className="flex flex-col justify-between text-xs text-slate-600"
           style={{ height: GRADIENT_HEIGHT }}
         >
           <span>{fmt(maxVal)}</span>
@@ -73,7 +73,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
           <span>{fmt(minVal)}</span>
         </div>
       </div>
-      <p className="text-xs text-gray-400">{data.unit}</p>
+      <p className="text-xs text-slate-400">{data.unit}</p>
     </div>
   );
 };

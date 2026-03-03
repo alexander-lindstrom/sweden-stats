@@ -62,6 +62,8 @@ export interface MapViewProps {
   selectedFeature: { code: string; label: string; parentCode?: string } | null;
   onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
   onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
+  /** Increment to trigger an animated reset of the map view to the initial Sweden overview. */
+  resetToken?: number;
 }
 
 // Module-level helper — zoom the OL view to a WFS feature, falling back to a
@@ -120,6 +122,7 @@ const MapView: React.FC<MapViewProps> = ({
   selectedFeature,
   onFeatureSelect,
   onDrillDown,
+  resetToken,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<Map | null>(null);
@@ -460,6 +463,12 @@ const MapView: React.FC<MapViewProps> = ({
 
     return () => controller.abort();
   }, [selectedFeature, adminLevel, featureCodeProperty]);
+
+  // --- Reset map view to Sweden overview when resetToken increments --------
+  useEffect(() => {
+    if (!resetToken) { return; }
+    mapInstanceRef.current?.getView().animate({ center: SWEDEN_CENTER, zoom: 5.5, duration: 600 });
+  }, [resetToken]);
 
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {

@@ -6,7 +6,7 @@ import { DATASETS } from '@/datasets/registry';
 import { Spinner } from '@/components/ui/Spinner';
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
-  Country:      'bg-gray-100 text-gray-600',
+  Country:      'bg-gray-100 text-slate-600',
   Region:       'bg-blue-100 text-blue-700',
   Municipality: 'bg-teal-100 text-teal-700',
   RegSO:        'bg-orange-100 text-orange-700',
@@ -51,21 +51,21 @@ interface PanelStats {
 function StatRow({ label, stat }: { label: string; stat: StatData }) {
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-0.5">
+      <div className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-0.5">
         {label}
       </div>
       {stat.value === null ? (
-        <div className="text-sm text-gray-400">—</div>
+        <div className="text-sm text-slate-400">—</div>
       ) : (
         <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-gray-900 tabular-nums">
+          <span className="text-xl font-bold text-slate-900 tabular-nums">
             {stat.value.toLocaleString('sv-SE')}
           </span>
-          <span className="text-xs text-gray-500">{stat.unit}</span>
+          <span className="text-xs text-slate-500">{stat.unit}</span>
           {stat.rank !== null && stat.total !== null && (
-            <span className="ml-auto text-xs text-gray-500 tabular-nums">
+            <span className="ml-auto text-xs text-slate-500 tabular-nums">
               #{stat.rank}
-              <span className="text-gray-400">/{stat.total}</span>
+              <span className="text-slate-400">/{stat.total}</span>
             </span>
           )}
         </div>
@@ -200,22 +200,22 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
   if (!isOpen) { return null; }
 
   return (
-    <div className="w-72 flex-shrink-0 bg-white border-l border-gray-200 flex flex-col">
+    <div className="w-72 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
 
       {/* Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start gap-3 p-4 border-b border-gray-100 flex-shrink-0">
+      <div className="flex items-start gap-3 p-4 border-b border-slate-100 flex-shrink-0">
         <div className="flex-1 min-w-0">
           <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1.5 ${LEVEL_BADGE[adminLevel]}`}>
             {LEVEL_LABELS[adminLevel]}
           </span>
-          <h2 className="text-sm font-semibold text-gray-900 leading-snug">
-            {selectedFeature?.label ?? <span className="text-gray-400 italic">Inget valt</span>}
+          <h2 className="text-sm font-semibold text-slate-900 leading-snug">
+            {selectedFeature?.label ?? <span className="text-slate-400 italic">Inget valt</span>}
           </h2>
         </div>
         <button
           onClick={onClose}
           aria-label="Stäng panel"
-          className="flex-shrink-0 mt-0.5 text-gray-400 hover:text-gray-700 transition-colors text-lg leading-none"
+          className="flex-shrink-0 mt-0.5 text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
         >
           ×
         </button>
@@ -225,7 +225,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
         {!selectedFeature && (
-          <p className="text-sm text-gray-400 italic">
+          <p className="text-sm text-slate-400 italic">
             Klicka på ett område på kartan för att se en sammanfattning.
           </p>
         )}
@@ -234,14 +234,14 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
           <>
             {/* Key stats ─────────────────────────────────────────────── */}
             <section>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">
                 Nyckeltal {STAT_YEAR}
               </h3>
 
               {statsLoading && <Spinner />}
 
               {!statsLoading && !stats && (
-                <p className="text-sm text-gray-400">Ingen data tillgänglig.</p>
+                <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
 
               {!statsLoading && stats && (
@@ -255,7 +255,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
             {/* Population sparkline — hidden for RegSO/DeSO (SCB only provides 2024 data at those levels) */}
             {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && <section>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              <h3 className="text-sm font-semibold text-slate-700 mb-2">
                 Befolkningstrend
               </h3>
 
@@ -264,7 +264,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               {!sparkLoading && sparkline.length >= 2 && (
                 <>
                   <Sparkline data={sparkline} />
-                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                  <div className="flex justify-between text-xs text-slate-400 mt-1">
                     <span>{sparkline[0].year}</span>
                     <span>{sparkline[sparkline.length - 1].year}</span>
                   </div>
@@ -272,7 +272,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               )}
 
               {!sparkLoading && sparkline.length < 2 && (
-                <p className="text-sm text-gray-400">Ingen data tillgänglig.</p>
+                <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
             </section>}
           </>
