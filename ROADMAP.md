@@ -12,15 +12,13 @@ Make the map the most compelling way to explore Swedish public data. The differe
 
 ## Near-term
 
-### Selected area panel
-When a feature is clicked, slide out a panel showing a summary for that area across multiple datasets — not just one metric, but a snapshot of the place.
+### Selected area panel *(in progress)*
+A panel slides out when a feature is clicked and shows population stats for the selected area. Basic structure is in place.
 
-What to show:
-- Key stats (population, median income, employment rate) with a visual indicator of how they compare to the national average
-- Trend sparkline for 2–3 metrics (lean on the existing year data)
-- Internal spread: if a region/municipality is selected, show the distribution across its sub-areas (e.g. this municipality's DeSOs range from X to Y on income) — surfaces within-area inequality
-
-This makes every click feel rewarding and creates a narrative around place.
+Still to do:
+- National average comparison — visual indicator of how the area sits relative to Sweden as a whole
+- Trend sparkline — a small time-series line for 2–3 key metrics using existing year data
+- Internal spread — if a region/municipality is selected, show how its sub-areas vary (e.g. this municipality's DeSOs range from X to Y on income), surfacing within-area inequality
 
 ### DeSO-level income and demographics
 SCB has DeSO-level data for disposable income, country of birth/foreign background, age distribution, housing tenure, and employment rate. Loading this unlocks the most genuinely interesting story in the dataset: two DeSOs a kilometer apart in a Swedish city can look completely different. Hard to find visualized elsewhere.
@@ -82,7 +80,5 @@ This is high-effort, low-generalisation work. Worth doing only if the time-serie
 ## Ideas parking lot
 
 - **"Find areas like this"** — given a selected area, surface the N most similar areas nationally (by statistical profile). Useful and unusual.
-- **Ranking view** — sortable list of all municipalities/regions on a chosen metric, linked to the map (hover list item → highlight on map)
 - **Percentile bands** — instead of raw choropleth values, show which quintile each area falls into, making cross-metric comparison more intuitive
 - **Mobile** — the map works on mobile but the UI isn't optimized for it
-- **Select from chart/table → update right panel** — clicking a bar or row in the ranked list, histogram, or diverging chart selects that feature in the right sidebar (same panel as clicking on the map), without triggering a map zoom. Makes it easy to look up a specific area by name and see its full stats profile. Requires threading `selectedFeature`/`onFeatureSelect` down to chart and table components.

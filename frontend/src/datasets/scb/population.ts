@@ -323,8 +323,8 @@ export const population: DatasetDescriptor = {
   supportedViews: ['map', 'chart', 'table'],
   supportedViewsByLevel: {
     Country: ['chart'],
-    RegSO:   ['map', 'table'],
-    DeSO:    ['map', 'table'],
+    RegSO:   ['map', 'chart', 'table'],
+    DeSO:    ['map', 'chart', 'table'],
   },
   chartTypes: {
     Country:      ['sunburst'],

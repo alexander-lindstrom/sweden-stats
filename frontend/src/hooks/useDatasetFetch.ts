@@ -35,6 +35,7 @@ export function useDatasetFetch(
     if (!descriptor) { return; }
 
     const gen = ++fetchGenRef.current;
+
     setLoading(true);
 
     fetchCached(descriptor, selectedLevel, selectedYear)
