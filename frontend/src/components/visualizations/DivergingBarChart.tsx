@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
-import { stripCommonPrefix, stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
+import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 
 interface Hovered { name: string; value: number; deviation: number; x: number; y: number; }
 
@@ -45,7 +45,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .map(([code, value]) => ({ code, value, name: stripLanSuffix(data.labels[code] ?? code) }))
       .filter(d => Number.isFinite(d.value))
       .sort((a, b) => b.value - a.value);
-    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens);
+    const stripped = stripCommonPrefix(raw.map(d => d.name)).map(stripOuterParens).map(stripOrphanParens);
     return raw.map((d, i) => ({ ...d, name: stripped[i] }));
   }, [data.values, data.labels]);
 

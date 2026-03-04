@@ -37,6 +37,20 @@ export function stripOuterParens(label: string): string {
 }
 
 /**
+ * Strip an unmatched trailing ')' or leading '(' that can be left behind
+ * after stripCommonPrefix removes part of a parenthetical token.
+ *
+ * "(Dorotea tätort)" → stripCommonPrefix → "tätort)" → stripOrphanParens → "tätort"
+ */
+export function stripOrphanParens(label: string): string {
+  const opens  = (label.match(/\(/g) ?? []).length;
+  const closes = (label.match(/\)/g) ?? []).length;
+  if (closes > opens) { return label.replace(/\)\s*$/, '').trim(); }
+  if (opens > closes) { return label.replace(/^\s*\(/, '').trim(); }
+  return label;
+}
+
+/**
  * Strip a common leading word-prefix shared by every label in the array.
  * Useful for removing the redundant municipality name from RegSO labels
  * when all labels in view belong to the same municipality.
