@@ -328,9 +328,10 @@ export const population: DatasetDescriptor = {
   },
   chartTypes: {
     Country:      ['sunburst'],
-    Region:       ['bar', 'histogram'],
-    Municipality: ['histogram'],
-    RegSO:        ['histogram'],
+    Region:       ['bar', 'diverging', 'histogram'],
+    Municipality: ['diverging', 'histogram'],
+    RegSO:        ['diverging', 'histogram'],
+    DeSO:         ['diverging', 'histogram'],
   },
   sunburstDepthToLevel: ['Country', 'Region', 'Municipality'],
   fetch: fetchPopulation,

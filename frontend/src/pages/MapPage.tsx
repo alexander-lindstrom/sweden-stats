@@ -300,7 +300,7 @@ export default function MapPage() {
         {/* Main view area */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Chart type sub-selector — only shown in chart view with >1 type */}
-          {activeView === 'chart' && availableChartTypes.length > 1 && (
+          {activeView === 'chart' && availableChartTypes.length > 0 && (
             <div className="flex gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
               {availableChartTypes.map(ct => (
                 <button
