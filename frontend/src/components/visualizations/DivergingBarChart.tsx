@@ -22,8 +22,13 @@ const COLOR_BELOW = '#60a5fa';
 const COLOR_ABOVE = '#fb923c';
 
 function fmtDev(dev: number, unit: string): string {
-  const sign = dev >= 0 ? '+' : '−'; // proper minus sign
-  return `${sign}${Math.abs(dev).toFixed(1)} ${unit}`;
+  const sign = dev >= 0 ? '+' : '−';
+  const abs  = Math.abs(dev);
+  let num: string;
+  if      (abs >= 1_000_000) { num = `${(abs / 1_000_000).toFixed(1)}M`; }
+  else if (abs >= 1_000)     { num = `${Math.round(abs / 1_000)}k`; }
+  else                       { num = abs >= 10 ? String(Math.round(abs)) : abs.toFixed(1); }
+  return `${sign}${num} ${unit}`;
 }
 
 function fmtAbs(v: number): string {
