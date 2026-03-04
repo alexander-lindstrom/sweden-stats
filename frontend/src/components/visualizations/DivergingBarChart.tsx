@@ -69,9 +69,16 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
 
     const maxDev = d3.max(sorted, d => Math.abs(d.value - mean)) ?? 1;
 
+    // Cap the domain at the 90th-percentile deviation × 1.5 so a single outlier
+    // (e.g. Stockholm at Region level) doesn't compress all other bars. Bars
+    // that exceed the domain are clipped; their labels are clamped to the edge.
+    const sortedDevs = sorted.map(d => Math.abs(d.value - mean)).sort(d3.ascending);
+    const p90Dev     = d3.quantile(sortedDevs, 0.9) ?? maxDev;
+    const extent     = Math.min(p90Dev * 1.5, maxDev * 1.1);
+
     // Symmetric domain centred on mean.
     const xScale = d3.scaleLinear()
-      .domain([mean - maxDev * 1.1, mean + maxDev * 1.1])
+      .domain([mean - extent, mean + extent])
       .range([0, innerW]);
 
     const center = xScale(mean);
@@ -89,17 +96,34 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
 
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
-    // Subtle horizontal grid at every other bar for readability.
-    g.selectAll('line.stripe')
-      .data(sorted.filter((_, i) => i % 2 === 0))
-      .join('line').attr('class', 'stripe')
-      .attr('x1', 0).attr('x2', innerW)
-      .attr('y1', d => yScale(d.code)! - BAR_GAP / 2)
-      .attr('y2', d => yScale(d.code)! + yScale.bandwidth() + BAR_GAP / 2)
-      .attr('fill', '#f9fafb').attr('stroke', 'none');
+    // Vertical grid lines at x-axis tick positions — drawn first so they sit behind bars.
+    g.append('g')
+      .attr('transform', `translate(0,${vOffset})`)
+      .call(d3.axisBottom(xScale).ticks(5).tickSize(effH).tickFormat(() => ''))
+      .call(ax => ax.select('.domain').remove())
+      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb').attr('stroke-width', 1));
 
-    // Bars.
-    g.selectAll<SVGRectElement, typeof sorted[0]>('rect.bar')
+    // Subtle horizontal stripe at every other bar for readability.
+    g.selectAll('rect.stripe')
+      .data(sorted.filter((_, i) => i % 2 === 0))
+      .join('rect').attr('class', 'stripe')
+      .attr('x', 0).attr('width', innerW)
+      .attr('y',      d => yScale(d.code)! - BAR_GAP / 2)
+      .attr('height', yScale.bandwidth() + BAR_GAP)
+      .attr('fill', '#f8fafc').attr('stroke', 'none');
+
+    // Clip bars to the plot area so outliers don't overflow into the margins.
+    const clipId = 'diverging-bars-clip';
+    svg.append('defs')
+      .append('clipPath').attr('id', clipId)
+      .append('rect')
+        .attr('x', MARGIN.left).attr('y', 0)
+        .attr('width', innerW)
+        .attr('height', Math.max(height, needed + MARGIN.top + MARGIN.bottom));
+
+    // Bars (inside clipped group).
+    g.append('g').attr('clip-path', `url(#${clipId})`)
+      .selectAll<SVGRectElement, typeof sorted[0]>('rect.bar')
       .data(sorted)
       .join('rect').attr('class', 'bar')
       .attr('x',      d => Math.min(xScale(d.value), center))
@@ -159,12 +183,16 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .data(sorted)
       .join('text').attr('class', 'dev')
       .attr('x', d => {
-        const barEnd = d.value >= mean ? xScale(d.value) : xScale(d.value);
-        return d.value >= mean ? barEnd + 5 : Math.min(xScale(d.value), center) - 5;
+        const tipX = xScale(d.value);
+        if (d.value >= mean) { return Math.min(tipX + 5, innerW - 4); }
+        return Math.max(tipX - 5, 4);
       })
       .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
       .attr('dy', '0.35em')
-      .attr('text-anchor', d => d.value >= mean ? 'start' : 'end')
+      .attr('text-anchor', d => {
+        if (d.value >= mean) { return xScale(d.value) > innerW ? 'end' : 'start'; }
+        return xScale(d.value) < 0 ? 'start' : 'end';
+      })
       .attr('font-size', 10).attr('fill', '#6b7280')
       .attr('pointer-events', 'none')
       .text(d => fmtDev(d.value - mean, data.unit));
