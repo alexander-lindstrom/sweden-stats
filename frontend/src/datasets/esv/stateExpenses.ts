@@ -1,4 +1,4 @@
-import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode } from '../types';
+import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
 
 const EXPENSES_URL = 'http://localhost:3001/api/expenses';
 
@@ -30,9 +30,9 @@ async function fetchExpensesHierarchy(year: number): Promise<GeoHierarchyNode> {
   return mapNode(data);
 }
 
-const EMPTY_RESULT: DatasetResult = { values: {}, labels: {}, label: 'Statens utgifter', unit: 'mnkr' };
+const EMPTY_RESULT: ScalarDatasetResult = { kind: 'scalar', values: {}, labels: {}, label: 'Statens utgifter', unit: 'mnkr' };
 
-async function fetchExpenses(_level: AdminLevel, _year: number): Promise<DatasetResult> {
+async function fetchExpenses(_level: AdminLevel, _year: number): Promise<ScalarDatasetResult> {
   return EMPTY_RESULT;
 }
 

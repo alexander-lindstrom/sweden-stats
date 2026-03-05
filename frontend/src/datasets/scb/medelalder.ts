@@ -1,5 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
-import { AdminLevel, DatasetDescriptor, DatasetResult } from '../types';
+import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
 
 // ── TAB637 constants (Country → Region → Municipality) ────────────────────────
 
@@ -156,7 +156,7 @@ function stripSuffixes(raw: { values: Record<string, number>; labels: Record<str
 
 // ── Fetch functions ───────────────────────────────────────────────────────────
 
-async function fetchByCounty(year: number): Promise<DatasetResult> {
+async function fetchByCounty(year: number): Promise<ScalarDatasetResult> {
   const res = await fetch(DATA_URL_637, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -172,10 +172,10 @@ async function fetchByCounty(year: number): Promise<DatasetResult> {
   if (!res.ok) {throw new Error(`TAB637 fetch failed: ${res.status}`);}
   const data: JsonStat2Response = await res.json();
   const { values, labels } = aggregateByRegion(data);
-  return { values, labels, label: 'Medelålder', unit: 'år' };
+  return { kind: 'scalar', values, labels, label: 'Medelålder', unit: 'år' };
 }
 
-async function fetchByMunicipality(year: number): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<ScalarDatasetResult> {
   const { codes, labels: metaLabels } = await getMunicipalityCodes637();
   const res = await fetch(DATA_URL_637, {
     method: 'POST',
@@ -192,10 +192,10 @@ async function fetchByMunicipality(year: number): Promise<DatasetResult> {
   if (!res.ok) {throw new Error(`TAB637 municipality fetch failed: ${res.status}`);}
   const data: JsonStat2Response = await res.json();
   const { values, labels } = aggregateByRegion(data, metaLabels);
-  return { values, labels, label: 'Medelålder', unit: 'år' };
+  return { kind: 'scalar', values, labels, label: 'Medelålder', unit: 'år' };
 }
 
-async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
+async function fetchBySmallArea(codes: string[]): Promise<ScalarDatasetResult> {
   // TAB6574 has no pre-computed medelålder — compute as weighted mean from age bands.
   // Boundary-locked: RegSO/DeSO boundaries are stable only at 2024.
   const res = await fetch(DATA_URL_6574, {
@@ -272,10 +272,10 @@ async function fetchBySmallArea(codes: string[]): Promise<DatasetResult> {
 
   const labels = { ...regionDim.category.label } as Record<string, string>;
   const stripped = stripSuffixes({ values, labels });
-  return { ...stripped, label: 'Medelålder', unit: 'år' };
+  return { kind: 'scalar', ...stripped, label: 'Medelålder', unit: 'år' };
 }
 
-async function fetchByRegso(): Promise<DatasetResult> {
+async function fetchByRegso(): Promise<ScalarDatasetResult> {
   const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes637(),
@@ -284,7 +284,7 @@ async function fetchByRegso(): Promise<DatasetResult> {
   return { ...result, parentLabels };
 }
 
-async function fetchByDeso(): Promise<DatasetResult> {
+async function fetchByDeso(): Promise<ScalarDatasetResult> {
   const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes637(),
@@ -295,7 +295,7 @@ async function fetchByDeso(): Promise<DatasetResult> {
 
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
-async function fetchMedelalder(level: AdminLevel, year: number): Promise<DatasetResult> {
+async function fetchMedelalder(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
   switch (level) {
     case 'Region':       return fetchByCounty(year);
     case 'Municipality': return fetchByMunicipality(year);

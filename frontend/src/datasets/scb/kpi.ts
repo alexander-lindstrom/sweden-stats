@@ -1,4 +1,4 @@
-import { AdminLevel, DatasetDescriptor, DatasetResult, TimeSeriesNode } from '../types';
+import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, TimeSeriesNode } from '../types';
 import { fetchScbData } from '@/api/backend/ScbApi';
 
 const QUERY_BODY = {
@@ -86,7 +86,7 @@ async function fetchKpiTimeSeries(): Promise<TimeSeriesNode[]> {
   });
 }
 
-const EMPTY_RESULT: DatasetResult = { values: {}, labels: {}, label: 'KPI', unit: '' };
+const EMPTY_RESULT: ScalarDatasetResult = { kind: 'scalar', values: {}, labels: {}, label: 'KPI', unit: '' };
 
 export const kpi: DatasetDescriptor = {
   id:              'kpi',

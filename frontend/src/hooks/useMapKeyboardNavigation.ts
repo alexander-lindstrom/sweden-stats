@@ -1,5 +1,5 @@
 import { useEffect, type MutableRefObject } from 'react';
-import type { AdminLevel, DatasetResult } from '@/datasets/types';
+import type { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
 
 interface SelectedFeature {
@@ -20,7 +20,7 @@ interface SelectedFeature {
 export function useMapKeyboardNavigation(
   selectedFeature:    SelectedFeature | null,
   selectedLevel:      AdminLevel,
-  datasetResult:      DatasetResult | null,
+  datasetResult:      ScalarDatasetResult | null,
   setSelectedLevel:   (level: AdminLevel) => void,
   setSelectedFeature: (feature: SelectedFeature | null) => void,
   pendingSelectionRef: MutableRefObject<SelectedFeature | null>,

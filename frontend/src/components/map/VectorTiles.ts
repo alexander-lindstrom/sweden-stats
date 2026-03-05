@@ -87,6 +87,31 @@ export function createHighlightLayer(
   });
 }
 
+/**
+ * Build a style function that colors features by category (e.g. winning party).
+ * The colorFn receives the feature code and returns a CSS color string.
+ */
+export function buildCategoricalStyle(
+  colorFn: (code: string) => string,
+  codeProperty: string,
+): (feature: FeatureLike) => Style {
+  const styleCache = new Map<string, Style>();
+
+  return (feature: FeatureLike): Style => {
+    const code = String(feature.get(codeProperty) ?? '');
+    const cached = styleCache.get(code);
+    if (cached) { return cached; }
+
+    const color = colorFn(code);
+    const style = new Style({
+      fill: new Fill({ color }),
+      stroke: choroplethStroke,
+    });
+    styleCache.set(code, style);
+    return style;
+  };
+}
+
 export function buildChoroplethStyle(
   data: Record<string, number>,
   colorScale: (value: number) => string,

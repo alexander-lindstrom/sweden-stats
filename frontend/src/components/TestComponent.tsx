@@ -1,4 +1,4 @@
-import { useGetPopulationStatisticsQuery } from "@/api/ScbApi";
+import { useGetPopulationStatisticsQuery } from "@/api/scbApi";
 import { PopulationQueryArgs } from "@/util/scb";
 import { useState } from "react";
 

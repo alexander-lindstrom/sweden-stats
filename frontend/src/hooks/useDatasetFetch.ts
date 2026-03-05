@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import type { AdminLevel, DatasetResult } from '@/datasets/types';
+import type { AdminLevel, DatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 import { fetchCached, preload } from '@/datasets/cache';
 import { ADMIN_LEVELS } from '@/datasets/adminLevels';
+import { PARTY_COLORS } from '@/datasets/parties';
 
 interface DatasetFetchResult {
   datasetResult: DatasetResult | null;
   colorScale:    d3.ScaleSequential<string> | null;
+  /** Non-null for election datasets: maps geo code → party color of the winning party. */
+  mapColorFn:    ((code: string) => string) | null;
   loading:       boolean;
 }
 
@@ -18,6 +21,7 @@ export function useDatasetFetch(
 ): DatasetFetchResult {
   const [datasetResult, setDatasetResult] = useState<DatasetResult | null>(null);
   const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
+  const [mapColorFn,    setMapColorFn]    = useState<((code: string) => string) | null>(null);
   const [loading,       setLoading]       = useState(false);
   const fetchGenRef = useRef(0);
 
@@ -26,6 +30,7 @@ export function useDatasetFetch(
   useEffect(() => {
     setDatasetResult(null);
     setColorScale(null);
+    setMapColorFn(null);
   }, [selectedDatasetId, selectedLevel]);
 
   useEffect(() => {
@@ -42,18 +47,29 @@ export function useDatasetFetch(
       .then((result) => {
         if (gen !== fetchGenRef.current) { return; }
 
-        const vals = Object.values(result.values).filter(Number.isFinite);
         setDatasetResult(result);
 
-        if (vals.length > 0) {
-          const scale = d3
-            .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
-            .domain([Math.min(...vals), Math.max(...vals)])
-            .clamp(true);
-          setColorScale(() => scale); // wrap: colorScale is a function type
-        } else {
+        if (result.kind === 'election') {
+          // Election: color by winning party.
+          const winnerByGeo = result.winnerByGeo;
           setColorScale(null);
+          // Wrap in arrow so React doesn't treat the function itself as a state updater.
+          setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#ccc');
+        } else {
+          // Scalar: sequential color scale.
+          const vals = Object.values((result as ScalarDatasetResult).values).filter(Number.isFinite);
+          setMapColorFn(null);
+          if (vals.length > 0) {
+            const scale = d3
+              .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
+              .domain([Math.min(...vals), Math.max(...vals)])
+              .clamp(true);
+            setColorScale(() => scale); // wrap: colorScale is a function type
+          } else {
+            setColorScale(null);
+          }
         }
+
         setLoading(false);
 
         // Preload neighbouring levels in the background.
@@ -70,5 +86,5 @@ export function useDatasetFetch(
       });
   }, [selectedDatasetId, selectedLevel, selectedYear]);
 
-  return { datasetResult, colorScale, loading };
+  return { datasetResult, colorScale, mapColorFn, loading };
 }

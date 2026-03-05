@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { DatasetResult } from '@/datasets/types';
+import { ScalarDatasetResult } from '@/datasets/types';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 
 interface DatasetTableProps {
-  data: DatasetResult;
+  data: ScalarDatasetResult;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }

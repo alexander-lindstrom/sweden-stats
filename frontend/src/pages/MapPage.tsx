@@ -9,12 +9,14 @@ import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
+import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
 import {
-  AdminLevel, ChartType, ViewType,
+  AdminLevel, ChartType, ViewType, ScalarDatasetResult,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
 } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
+import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
@@ -81,7 +83,11 @@ export default function MapPage() {
   // isn't cleared by the level-change reset.
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
 
-  const { datasetResult, colorScale, loading } = useDatasetFetch(selectedDatasetId, selectedLevel, selectedYear);
+  const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(selectedDatasetId, selectedLevel, selectedYear);
+
+  // Narrow to scalar/election for type-safe consumption downstream.
+  const scalarResult   = datasetResult?.kind === 'scalar'   ? datasetResult as ScalarDatasetResult : null;
+  const electionResult = datasetResult?.kind === 'election' ? datasetResult : null;
 
   // Fetch sub-level data so hovering sub-boundaries (e.g. municipalities within a
   // selected Lan) can show their own values, not just their label.
@@ -91,6 +97,7 @@ export default function MapPage() {
     subLevel ?? selectedLevel,
     selectedYear,
   );
+  const subScalarResult = subDatasetResult?.kind === 'scalar' ? subDatasetResult as ScalarDatasetResult : null;
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,   loading: hierarchyLoading   } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
@@ -99,7 +106,7 @@ export default function MapPage() {
   useMapKeyboardNavigation(
     selectedFeature,
     selectedLevel,
-    datasetResult,
+    scalarResult,
     setSelectedLevel,
     setSelectedFeature,
     pendingSelectionRef,
@@ -157,16 +164,18 @@ export default function MapPage() {
     }
   }, [selectedLevel]);
 
-  // When dataset changes, clamp year to the new dataset's available range.
+  // When dataset changes, clamp/snap year to the new dataset's available years.
+  // Election datasets have discrete years (not contiguous), so snap to nearest.
   useEffect(() => {
     if (!selectedDatasetId) { return; }
     const descriptor = DATASETS.find(d => d.id === selectedDatasetId);
-    if (!descriptor) { return; }
-    const latest   = descriptor.availableYears.at(-1)!;
-    const earliest = descriptor.availableYears[0];
-    if (selectedYear > latest || selectedYear < earliest) {
-      setSelectedYear(latest);
-      setDisplayYear(latest);
+    if (!descriptor || descriptor.availableYears.length === 0) { return; }
+    if (!descriptor.availableYears.includes(selectedYear)) {
+      const nearest = descriptor.availableYears.reduce((prev, curr) =>
+        Math.abs(curr - selectedYear) < Math.abs(prev - selectedYear) ? curr : prev,
+      );
+      setSelectedYear(nearest);
+      setDisplayYear(nearest);
     }
   }, [selectedDatasetId, selectedYear]);
 
@@ -198,11 +207,31 @@ export default function MapPage() {
   const needsMuniFilter = activeChartType === 'diverging' &&
     (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
 
+  // Tooltip strings for election map hover (winning party name + share).
+  const tooltipData = useMemo(() => {
+    if (!electionResult) { return null; }
+    return Object.fromEntries(
+      Object.entries(electionResult.winnerByGeo).map(([code, winner]) => {
+        const share = electionResult.partyVotes[code]?.[winner] ?? 0;
+        const name  = PARTY_LABELS[winner] ?? winner;
+        return [code, `${name} — ${share.toFixed(1)}%`];
+      }),
+    );
+  }, [electionResult]);
+
+  // Color overrides for MultiLineChart when showing election time series.
+  const partyColorOverrides = useMemo(
+    () => electionResult || activeDescriptor?.id.endsWith('val')
+      ? new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]))
+      : undefined,
+    [electionResult, activeDescriptor],
+  );
+
   const availableLans = useMemo(() => {
-    if (!datasetResult || !needsLanFilter) { return []; }
-    const codes = new Set(Object.keys(datasetResult.values).map(c => c.slice(0, 2)));
+    if (!scalarResult || !needsLanFilter) { return []; }
+    const codes = new Set(Object.keys(scalarResult.values).map(c => c.slice(0, 2)));
     return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
-  }, [datasetResult, needsLanFilter]);
+  }, [scalarResult, needsLanFilter]);
 
   // Effective Lan: honour stored selection if still valid, otherwise first in list.
   const effectiveLan = useMemo(() => {
@@ -211,8 +240,8 @@ export default function MapPage() {
   }, [availableLans, selectedLan]);
 
   const availableMunis = useMemo(() => {
-    if (!datasetResult?.parentLabels || !effectiveLan || !needsMuniFilter) { return []; }
-    return Object.entries(datasetResult.parentLabels)
+    if (!scalarResult?.parentLabels || !effectiveLan || !needsMuniFilter) { return []; }
+    return Object.entries(scalarResult.parentLabels)
       .filter(([code]) => code.startsWith(effectiveLan))
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([code, name]) => ({ code, name }));
@@ -225,18 +254,18 @@ export default function MapPage() {
   }, [availableMunis, selectedMuni]);
 
   const filteredForDiverging = useMemo(() => {
-    if (!datasetResult) { return null; }
-    if (!needsLanFilter) { return datasetResult; }
+    if (!scalarResult) { return null; }
+    if (!needsLanFilter) { return scalarResult; }
     const filterCode = needsMuniFilter ? effectiveMuni : effectiveLan;
     if (!filterCode) { return null; }
     const values = Object.fromEntries(
-      Object.entries(datasetResult.values).filter(([code]) => code.startsWith(filterCode))
+      Object.entries(scalarResult.values).filter(([code]) => code.startsWith(filterCode))
     );
     const labels = Object.fromEntries(
-      Object.entries(datasetResult.labels).filter(([code]) => code.startsWith(filterCode))
+      Object.entries(scalarResult.labels).filter(([code]) => code.startsWith(filterCode))
     );
-    return { ...datasetResult, values, labels };
-  }, [datasetResult, needsLanFilter, needsMuniFilter, effectiveLan, effectiveMuni]);
+    return { ...scalarResult, values, labels };
+  }, [scalarResult, needsLanFilter, needsMuniFilter, effectiveLan, effectiveMuni]);
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
@@ -355,13 +384,15 @@ export default function MapPage() {
                 <MapView
                   adminLevel={selectedLevel}
                   selectedBase={selectedBase}
-                  choroplethData={datasetResult?.values ?? null}
+                  choroplethData={scalarResult?.values ?? null}
                   colorScale={colorScale}
+                  mapColorFn={mapColorFn}
+                  tooltipData={tooltipData}
                   featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                   featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                   unit={datasetResult?.unit ?? ''}
-                  subChoroplethData={subDatasetResult?.values ?? null}
+                  subChoroplethData={subScalarResult?.values ?? null}
                   resetToken={mapResetToken}
                   selectedFeature={selectedFeature}
                   onFeatureSelect={setSelectedFeature}
@@ -374,19 +405,24 @@ export default function MapPage() {
                 </div>
               )}
 
-              {activeView === 'chart' && activeChartType === 'bar' && datasetResult && (
+              {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <RankedBarChart data={datasetResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'histogram' && datasetResult && (
+              {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <Histogram data={datasetResult} colorScale={colorScale} />
+                  <Histogram data={scalarResult} colorScale={colorScale} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
                 <div className="w-full h-full p-6">
                   <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'election-bar' && electionResult && (
+                <div className="w-full h-full p-6">
+                  <PartyShareBarChart data={electionResult} selectedFeature={selectedFeature} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
@@ -406,21 +442,21 @@ export default function MapPage() {
               )}
               {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
                 <div className="w-full h-full p-4">
-                  <MultiLineChart data={timeSeriesData} label={activeDescriptor?.label} />
+                  <MultiLineChart data={timeSeriesData} label={activeDescriptor?.label} colorOverrides={partyColorOverrides} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>
               )}
 
-              {activeView === 'table' && datasetResult && (
+              {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={datasetResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
                 </div>
               )}
               {activeView === 'table' && !datasetResult && (

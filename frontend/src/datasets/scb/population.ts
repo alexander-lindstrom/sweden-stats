@@ -1,5 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
-import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode } from '../types';
+import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
 import { stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
 
 // ── TAB5444 constants (Country → Region, Region → Municipality) ──────────────
@@ -216,7 +216,7 @@ async function postDataQuery6574(codes: string[]): Promise<JsonStat2Response> {
   return res.json();
 }
 
-async function fetchByCounty(year: number): Promise<DatasetResult> {
+async function fetchByCounty(year: number): Promise<ScalarDatasetResult> {
   const data = await postDataQuery5444([
     { variableCode: 'Region',       valueCodes: REGION_CODES },
     { variableCode: 'Kon',          valueCodes: ['1', '2'] },
@@ -224,10 +224,10 @@ async function fetchByCounty(year: number): Promise<DatasetResult> {
     { variableCode: 'Tid',          valueCodes: [`${year}M12`] },
   ]);
   const { values, labels } = aggregateByRegion(data);
-  return { values, labels, label: 'Folkmängd', unit: 'personer' };
+  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer' };
 }
 
-async function fetchByMunicipality(year: number): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<ScalarDatasetResult> {
   const { codes, labels: metaLabels } = await getMunicipalityCodes();
   const data = await postDataQuery5444([
     { variableCode: 'Region',       valueCodes: codes },
@@ -236,27 +236,27 @@ async function fetchByMunicipality(year: number): Promise<DatasetResult> {
     { variableCode: 'Tid',          valueCodes: [`${year}M12`] },
   ]);
   const { values, labels } = aggregateByRegion(data, metaLabels);
-  return { values, labels, label: 'Folkmängd', unit: 'personer' };
+  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer' };
 }
 
-async function fetchByRegso(): Promise<DatasetResult> {
+async function fetchByRegso(): Promise<ScalarDatasetResult> {
   const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes(),
   ]);
   const data = await postDataQuery6574(regsoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
+  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
-async function fetchByDeso(): Promise<DatasetResult> {
+async function fetchByDeso(): Promise<ScalarDatasetResult> {
   const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes(),
   ]);
   const data = await postDataQuery6574(desoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
+  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
 // ── Hierarchy builder ────────────────────────────────────────────────────────
@@ -302,7 +302,7 @@ export async function fetchPopulationHierarchy(year: number): Promise<GeoHierarc
 
 // ── Descriptor ───────────────────────────────────────────────────────────────
 
-async function fetchPopulation(level: AdminLevel, year: number): Promise<DatasetResult> {
+async function fetchPopulation(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
   switch (level) {
     case 'Country':      return fetchByCounty(year);
     case 'Region':       return fetchByCounty(year);

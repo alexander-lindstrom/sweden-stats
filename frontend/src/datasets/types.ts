@@ -1,13 +1,14 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
-  bar:       'Rankningslista',
-  histogram: 'Fördelning',
-  sunburst:  'Soldiagram',
-  diverging: 'Avvikelse',
-  multiline: 'Tidsserie',
+  bar:           'Rankningslista',
+  histogram:     'Fördelning',
+  sunburst:      'Soldiagram',
+  diverging:     'Avvikelse',
+  multiline:     'Tidsserie',
+  'election-bar': 'Partier',
 };
 
 export interface TimeSeriesPoint {
@@ -21,7 +22,8 @@ export interface TimeSeriesNode {
   points: TimeSeriesPoint[];
 }
 
-export interface DatasetResult {
+export interface ScalarDatasetResult {
+  kind: 'scalar';
   values: Record<string, number>; // boundary code → value
   labels: Record<string, string>; // boundary code → display name
   label: string;                  // e.g. "Folkmängd"
@@ -29,6 +31,21 @@ export interface DatasetResult {
   /** Parent-level labels (municipality code → name) included at RegSO/DeSO levels. */
   parentLabels?: Record<string, string>;
 }
+
+export interface ElectionDatasetResult {
+  kind: 'election';
+  /** geoCode → { partyCode → vote share 0–100 } */
+  partyVotes:  Record<string, Record<string, number>>;
+  /** geoCode → winning party code */
+  winnerByGeo: Record<string, string>;
+  /** geoCode → display name */
+  labels:      Record<string, string>;
+  label:       string;
+  unit:        string;
+  electionType: 'riksdag' | 'region' | 'municipality';
+}
+
+export type DatasetResult = ScalarDatasetResult | ElectionDatasetResult;
 
 export interface GeoHierarchyNode {
   code: string;

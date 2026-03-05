@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminLevel, DatasetResult } from '@/datasets/types';
+import { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
@@ -33,7 +33,7 @@ interface StatData {
   total: number | null;
 }
 
-function toStat(result: DatasetResult, code: string): StatData {
+function toStat(result: ScalarDatasetResult, code: string): StatData {
   const value = result.values[code] ?? null;
   const all   = Object.values(result.values).filter(Number.isFinite) as number[];
   const rank  = value !== null ? all.filter(v => v > value).length + 1 : null;
@@ -148,14 +148,14 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
     const statFetches: Promise<void>[] = [
       fetchCached(popDescriptor, adminLevel, STAT_YEAR)
-        .then(r => { popStat = toStat(r, code); })
+        .then(r => { popStat = toStat(r as ScalarDatasetResult, code); })
         .catch(() => {}),
     ];
 
     if (wantsIncome) {
       statFetches.push(
         fetchCached(incomeDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { incomeStat = toStat(r, code); })
+          .then(r => { incomeStat = toStat(r as ScalarDatasetResult, code); })
           .catch(() => {}),
       );
     }
@@ -163,7 +163,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     if (wantsAge) {
       statFetches.push(
         fetchCached(ageDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { ageStat = toStat(r, code); })
+          .then(r => { ageStat = toStat(r as ScalarDatasetResult, code); })
           .catch(() => {}),
       );
     }
@@ -185,7 +185,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       SPARKLINE_YEARS.map(year =>
         fetchCached(popDescriptor, adminLevel, year)
           .then(r => {
-            const v = r.values[code];
+            const v = (r as ScalarDatasetResult).values[code];
             return Number.isFinite(v) ? { year, value: v } : null;
           })
           .catch(() => null),
