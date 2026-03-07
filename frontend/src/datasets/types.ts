@@ -57,6 +57,12 @@ export interface GeoHierarchyNode {
 export interface DatasetDescriptor {
   id: string;
   label: string;
+  /** Short label for use in segmented controls (e.g. inside a group). Falls back to label. */
+  shortLabel?: string;
+  /** Group key — datasets sharing a group are rendered as one item with a sub-selector. */
+  group?: string;
+  /** Display name for the group header. Only needed on one descriptor in the group. */
+  groupLabel?: string;
   source: string;
   availableYears: number[];
   supportedLevels: AdminLevel[];

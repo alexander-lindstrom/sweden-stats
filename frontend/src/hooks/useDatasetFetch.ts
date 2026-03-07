@@ -9,7 +9,7 @@ import { PARTY_COLORS } from '@/datasets/parties';
 interface DatasetFetchResult {
   datasetResult: DatasetResult | null;
   colorScale:    d3.ScaleSequential<string> | null;
-  /** Non-null for election datasets: maps geo code → party color of the winning party. */
+  /** Non-null for election datasets in winner mode: maps geo code → winning party color. */
   mapColorFn:    ((code: string) => string) | null;
   loading:       boolean;
 }
@@ -18,6 +18,8 @@ export function useDatasetFetch(
   selectedDatasetId: string | null,
   selectedLevel:     AdminLevel,
   selectedYear:      number,
+  /** When set, switches election map from winner-color to a per-party gradient choropleth. */
+  activeParty?:      string | null,
 ): DatasetFetchResult {
   const [datasetResult, setDatasetResult] = useState<DatasetResult | null>(null);
   const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
@@ -50,11 +52,25 @@ export function useDatasetFetch(
         setDatasetResult(result);
 
         if (result.kind === 'election') {
-          // Election: color by winning party.
-          const winnerByGeo = result.winnerByGeo;
-          setColorScale(null);
-          // Wrap in arrow so React doesn't treat the function itself as a state updater.
-          setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#ccc');
+          if (activeParty) {
+            // Party choropleth mode: build a gradient from white → party color.
+            const partyColor = PARTY_COLORS[activeParty] ?? '#888';
+            const shares = Object.values(result.partyVotes)
+              .map(v => v[activeParty] ?? 0)
+              .filter(Number.isFinite);
+            const maxShare = shares.length > 0 ? Math.max(...shares) : 50;
+            const scale = d3
+              .scaleSequential((t: number) => d3.interpolate('#f1f5f9', partyColor)(t))
+              .domain([0, maxShare])
+              .clamp(true);
+            setColorScale(() => scale);
+            setMapColorFn(null);
+          } else {
+            // Winner mode: color each area by the winning party.
+            const winnerByGeo = result.winnerByGeo;
+            setColorScale(null);
+            setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#ccc');
+          }
         } else {
           // Scalar: sequential color scale.
           const vals = Object.values((result as ScalarDatasetResult).values).filter(Number.isFinite);
@@ -64,7 +80,7 @@ export function useDatasetFetch(
               .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
               .domain([Math.min(...vals), Math.max(...vals)])
               .clamp(true);
-            setColorScale(() => scale); // wrap: colorScale is a function type
+            setColorScale(() => scale);
           } else {
             setColorScale(null);
           }
@@ -84,7 +100,7 @@ export function useDatasetFetch(
           setLoading(false);
         }
       });
-  }, [selectedDatasetId, selectedLevel, selectedYear]);
+  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty]);
 
   return { datasetResult, colorScale, mapColorFn, loading };
 }

@@ -2,18 +2,24 @@ import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import { ElectionDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
-import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
+import { PARTY_CODES, PARTY_COLORS } from '@/datasets/parties';
 
 interface Props {
   data:            ElectionDatasetResult;
   selectedFeature: { code: string; label: string } | null | undefined;
+  onFeatureSelect: (f: { code: string; label: string } | null) => void;
 }
 
-const MARGIN = { top: 16, right: 64, bottom: 16, left: 152 };
-const BAR_H  = 28;
-const BAR_GAP = 6;
+const MARGIN  = { top: 8, right: 16, bottom: 44, left: 144 };
+const BAR_H   = 22;
+const BAR_GAP = 4;
 
-export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature }) => {
+/**
+ * Stacked 100% horizontal bar chart — one row per geo area.
+ * Rows are grouped by winning party (canonical order), then sorted by winner share desc.
+ * A party legend sits at the bottom. Clicking a row selects that feature.
+ */
+export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dims         = useResizeObserver(containerRef);
@@ -23,90 +29,103 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature }) =
     svg.selectAll('*').remove();
     if (!dims) { return; }
 
-    // Determine which geo code to display.
-    const code = selectedFeature?.code ?? null;
-    const shares = code ? data.partyVotes[code] : null;
+    const codes = Object.keys(data.partyVotes);
+    if (codes.length === 0) { return; }
 
-    if (!shares) {
-      svg.attr('width', dims.width).attr('height', 80);
-      svg.append('text')
-        .attr('x', dims.width / 2).attr('y', 44)
-        .attr('text-anchor', 'middle')
-        .attr('fill', '#94a3b8')
-        .attr('font-size', 14)
-        .text('Välj en region eller kommun på kartan');
-      return;
-    }
+    // Sort by winning party (canonical order) then by winner share desc.
+    const partyOrder = Object.fromEntries(PARTY_CODES.map((p, i) => [p, i]));
+    const sorted = codes.slice().sort((a, b) => {
+      const wa = data.winnerByGeo[a] ?? 'ÖVRIGA';
+      const wb = data.winnerByGeo[b] ?? 'ÖVRIGA';
+      const orderDiff = (partyOrder[wa] ?? 99) - (partyOrder[wb] ?? 99);
+      if (orderDiff !== 0) { return orderDiff; }
+      return (data.partyVotes[b][wb] ?? 0) - (data.partyVotes[a][wa] ?? 0);
+    });
 
-    // Sort parties by share descending; skip parties with 0 votes.
-    const rows = PARTY_CODES
-      .map(p => ({ party: p, share: shares[p] ?? 0 }))
-      .filter(r => r.share > 0)
-      .sort((a, b) => b.share - a.share);
-
-    const innerW  = dims.width - MARGIN.left - MARGIN.right;
-    const innerH  = rows.length * (BAR_H + BAR_GAP);
-    const totalH  = innerH + MARGIN.top + MARGIN.bottom;
+    const innerW = dims.width - MARGIN.left - MARGIN.right;
+    const innerH = sorted.length * (BAR_H + BAR_GAP);
+    const totalH = innerH + MARGIN.top + MARGIN.bottom;
 
     svg.attr('width', dims.width).attr('height', totalH);
 
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
-    const xScale = d3.scaleLinear()
-      .domain([0, Math.max(d3.max(rows, r => r.share) ?? 0, 10)])
-      .range([0, innerW])
-      .clamp(true);
+    sorted.forEach((code, i) => {
+      const y          = i * (BAR_H + BAR_GAP);
+      const shares     = data.partyVotes[code];
+      const isSelected = selectedFeature?.code === code;
+      const label      = data.labels[code] ?? code;
 
-    const yScale = d3.scaleBand()
-      .domain(rows.map(r => r.party))
-      .range([0, innerH])
-      .paddingInner(BAR_GAP / (BAR_H + BAR_GAP));
+      // Stacked segments (only parties with a share > 0).
+      let xOffset = 0;
+      PARTY_CODES.filter(p => (shares[p] ?? 0) > 0).forEach(party => {
+        const w = (shares[party] / 100) * innerW;
+        g.append('rect')
+          .attr('x', xOffset).attr('y', y)
+          .attr('width', w).attr('height', BAR_H)
+          .attr('fill', PARTY_COLORS[party] ?? '#ccc')
+          .attr('opacity', isSelected ? 1 : 0.85);
+        xOffset += w;
+      });
 
-    // Bars
-    g.selectAll<SVGRectElement, typeof rows[0]>('rect.bar')
-      .data(rows)
-      .join('rect').attr('class', 'bar')
-      .attr('x', 0)
-      .attr('y', r => yScale(r.party) ?? 0)
-      .attr('width',  r => Math.max(2, xScale(r.share)))
-      .attr('height', yScale.bandwidth())
-      .attr('rx', 3)
-      .attr('fill', r => PARTY_COLORS[r.party] ?? '#ccc');
+      // Selection highlight outline.
+      if (isSelected) {
+        g.append('rect')
+          .attr('x', -2).attr('y', y - 1)
+          .attr('width', innerW + 4).attr('height', BAR_H + 2)
+          .attr('fill', 'none')
+          .attr('stroke', '#1e40af').attr('stroke-width', 1.5).attr('rx', 2);
+      }
 
-    // Party labels (left)
-    g.selectAll<SVGTextElement, typeof rows[0]>('text.label')
-      .data(rows)
-      .join('text').attr('class', 'label')
-      .attr('x', -8)
-      .attr('y', r => (yScale(r.party) ?? 0) + yScale.bandwidth() / 2)
-      .attr('dy', '0.35em')
-      .attr('text-anchor', 'end')
-      .attr('font-size', 12)
-      .attr('fill', '#475569')
-      .text(r => PARTY_LABELS[r.party] ?? r.party);
+      // Transparent click target.
+      g.append('rect')
+        .attr('x', 0).attr('y', y)
+        .attr('width', innerW).attr('height', BAR_H)
+        .attr('fill', 'transparent').attr('cursor', 'pointer')
+        .on('click', () => onFeatureSelect({ code, label }));
 
-    // Value labels (right of bar)
-    g.selectAll<SVGTextElement, typeof rows[0]>('text.value')
-      .data(rows)
-      .join('text').attr('class', 'value')
-      .attr('x', r => xScale(r.share) + 5)
-      .attr('y', r => (yScale(r.party) ?? 0) + yScale.bandwidth() / 2)
-      .attr('dy', '0.35em')
-      .attr('font-size', 12)
-      .attr('fill', '#64748b')
-      .text(r => `${r.share.toFixed(1)}%`);
+      // Area label (left).
+      g.append('text')
+        .attr('x', -8).attr('y', y + BAR_H / 2)
+        .attr('dy', '0.35em').attr('text-anchor', 'end')
+        .attr('font-size', 11)
+        .attr('fill', isSelected ? '#1e40af' : '#475569')
+        .attr('font-weight', isSelected ? 600 : 400)
+        .text(label);
 
-    // Feature label as title
-    const areaName = (code ? data.labels[code] : null) ?? selectedFeature?.label ?? '';
-    svg.append('text')
-      .attr('x', MARGIN.left)
-      .attr('y', 13)
-      .attr('font-size', 12)
-      .attr('fill', '#94a3b8')
-      .attr('font-weight', 600)
-      .text(areaName);
+      // Winner share % label inside the leading segment (if wide enough).
+      const winner      = data.winnerByGeo[code];
+      const winnerShare = shares[winner] ?? 0;
+      const winnerW     = (winnerShare / 100) * innerW;
+      if (winnerW > 32) {
+        g.append('text')
+          .attr('x', winnerW / 2).attr('y', y + BAR_H / 2)
+          .attr('dy', '0.35em').attr('text-anchor', 'middle')
+          .attr('font-size', 10).attr('fill', 'rgba(255,255,255,0.88)')
+          .attr('pointer-events', 'none')
+          .text(`${winnerShare.toFixed(0)}%`);
+      }
+    });
 
-  }, [data, selectedFeature, dims]);
+    // Party legend at the bottom.
+    const presentParties = PARTY_CODES.filter(p =>
+      codes.some(c => (data.partyVotes[c][p] ?? 0) > 0),
+    );
+    const ITEM_W     = 52;
+    const legendW    = presentParties.length * ITEM_W;
+    const legendX    = Math.max(0, (innerW - legendW) / 2);
+    const legend     = g.append('g').attr('transform', `translate(${legendX},${innerH + 14})`);
+
+    presentParties.forEach((p, i) => {
+      const x = i * ITEM_W;
+      legend.append('rect').attr('x', x).attr('y', 0).attr('width', 10).attr('height', 10)
+        .attr('fill', PARTY_COLORS[p]).attr('rx', 2);
+      legend.append('text').attr('x', x + 13).attr('y', 5).attr('dy', '0.35em')
+        .attr('font-size', 10).attr('fill', '#64748b')
+        .text(p === 'ÖVRIGA' ? 'Övr.' : p);
+    });
+
+  }, [data, selectedFeature, dims, onFeatureSelect]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">

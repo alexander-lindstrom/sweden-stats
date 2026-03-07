@@ -375,11 +375,12 @@ async function fetchElectionTimeSeries(
 function makeElectionDescriptor(opts: {
   id:           string;
   label:        string;
+  shortLabel:   string;
   path:         string;
   contentCode:  string;
   electionType: ElectionDatasetResult['electionType'];
 }): DatasetDescriptor {
-  const { id, label, path, contentCode, electionType } = opts;
+  const { id, label, shortLabel, path, contentCode, electionType } = opts;
 
   async function fetchElection(level: AdminLevel, year: number): Promise<ElectionDatasetResult> {
     switch (level) {
@@ -393,6 +394,9 @@ function makeElectionDescriptor(opts: {
   return {
     id,
     label,
+    shortLabel,
+    group: 'val',
+    groupLabel: 'Val',
     source: 'SCB',
     availableYears: [...ELECTION_YEARS],
     supportedLevels: ['Country', 'Region', 'Municipality'],
@@ -417,6 +421,7 @@ function makeElectionDescriptor(opts: {
 export const riksdagsval = makeElectionDescriptor({
   id:           'riksdagsval',
   label:        'Riksdagsval',
+  shortLabel:   'Riksdag',
   path:         RIKSDAG_PATH,
   contentCode:  CONTENT_CODE_RIKSDAG,
   electionType: 'riksdag',
@@ -425,6 +430,7 @@ export const riksdagsval = makeElectionDescriptor({
 export const regionval = makeElectionDescriptor({
   id:           'regionval',
   label:        'Regionval',
+  shortLabel:   'Region',
   path:         REGION_PATH,
   contentCode:  CONTENT_CODE_REGION,
   electionType: 'region',
@@ -433,6 +439,7 @@ export const regionval = makeElectionDescriptor({
 export const kommunval = makeElectionDescriptor({
   id:           'kommunval',
   label:        'Kommunval',
+  shortLabel:   'Kommun',
   path:         KOMMUN_PATH,
   contentCode:  CONTENT_CODE_KOMMUN,
   electionType: 'municipality',
