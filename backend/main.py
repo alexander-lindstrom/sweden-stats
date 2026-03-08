@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from state_expenses_api import router as state_expenses_router
+from election_geodata_api import router as election_geodata_router
 import httpx
 
 app = FastAPI()
@@ -12,6 +13,7 @@ app.add_middleware(
 )
 
 app.include_router(state_expenses_router)
+app.include_router(election_geodata_router)
 
 BASE_SCB_URL = "https://api.scb.se/OV0104/v1/doris/sv/ssd"
 
