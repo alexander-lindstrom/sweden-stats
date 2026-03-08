@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ElectionDatasetResult } from '@/datasets/types';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { stripLanSuffix } from '@/utils/labelFormatting';
-import { useTableSort, useScrollSelectedIntoView, SortIndicator, tableRowClass, TH } from '@/hooks/useTableSort';
+import { useTableSort, SortIndicator, tableRowClass, TH } from '@/hooks/useTableSort';
 
 interface Props {
   data: ElectionDatasetResult;
@@ -10,42 +11,73 @@ interface Props {
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
-// SortKey is 'name' | 'winner' (by winner share) | a party code
 type SortKey = string;
 
+const ROW_HEIGHT = 36;
+
 export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
-  // Default: strongest winner share first — mirrors scalar table's "value desc" default.
   const { sortKey, sortDir, handleSort } = useTableSort<SortKey>('winner', 'desc');
-  const selectedRowRef = useScrollSelectedIntoView(selectedFeature?.code);
+  const parentRef = useRef<HTMLDivElement>(null);
 
   // Build ordered party columns: main parties that have any votes, then local parties
   // that WIN at least one area (to keep column count manageable), then ÖVRIGA.
-  const winners = new Set(Object.values(data.winnerByGeo));
-  const allPresent = new Set(
-    Object.values(data.partyVotes).flatMap(votes => Object.keys(votes).filter(p => votes[p] > 0)),
+  const presentParties = useMemo(() => {
+    const winners = new Set(Object.values(data.winnerByGeo));
+    const allPresent = new Set(
+      Object.values(data.partyVotes).flatMap(votes => Object.keys(votes).filter(p => votes[p] > 0)),
+    );
+    const mainPresent  = PARTY_CODES.filter(p => p !== 'ÖVRIGA' && allPresent.has(p));
+    const localPresent = [...winners]
+      .filter(p => !(PARTY_CODES as readonly string[]).includes(p) && p !== 'ÖVRIGA')
+      .sort((a, b) => a.localeCompare(b, 'sv'));
+    const hasOvriga = allPresent.has('ÖVRIGA');
+    return [...mainPresent, ...localPresent, ...(hasOvriga ? ['ÖVRIGA'] : [])];
+  }, [data]);
+
+  const rows = useMemo(() =>
+    Object.entries(data.partyVotes).map(([code, votes]) => {
+      const winner      = data.winnerByGeo[code] ?? '';
+      const winnerShare = votes[winner] ?? 0;
+      return { code, name: stripLanSuffix(data.labels[code] ?? code), winner, winnerShare, votes };
+    }),
+    [data],
   );
-  const mainPresent  = PARTY_CODES.filter(p => p !== 'ÖVRIGA' && allPresent.has(p));
-  const localPresent = [...winners]
-    .filter(p => !(PARTY_CODES as readonly string[]).includes(p) && p !== 'ÖVRIGA')
-    .sort((a, b) => a.localeCompare(b, 'sv'));
-  const hasOvriga    = allPresent.has('ÖVRIGA');
-  const presentParties = [...mainPresent, ...localPresent, ...(hasOvriga ? ['ÖVRIGA'] : [])];
 
-  const rows = Object.entries(data.partyVotes).map(([code, votes]) => {
-    const winner      = data.winnerByGeo[code] ?? '';
-    const winnerShare = votes[winner] ?? 0;
-    return { code, name: stripLanSuffix(data.labels[code] ?? code), winner, winnerShare, votes };
-  });
-
-  const sorted = [...rows].sort((a, b) => {
+  const sorted = useMemo(() => [...rows].sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1;
     if (sortKey === 'name')   { return dir * a.name.localeCompare(b.name, 'sv'); }
     if (sortKey === 'winner') { return dir * (a.winnerShare - b.winnerShare); }
     return dir * ((a.votes[sortKey] ?? 0) - (b.votes[sortKey] ?? 0));
+  }), [rows, sortKey, sortDir]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 10,
   });
 
+  const selectedIdx    = useMemo(
+    () => sorted.findIndex(r => r.code === selectedFeature?.code),
+    [sorted, selectedFeature?.code],
+  );
+  const selectedIdxRef = useRef(selectedIdx);
+  selectedIdxRef.current = selectedIdx;
+
+  // Scroll only when the selected code changes, not when a sort reorders the table.
+  const selectedCode = selectedFeature?.code ?? null;
+  useEffect(() => {
+    if (selectedCode !== null && selectedIdxRef.current >= 0) {
+      rowVirtualizer.scrollToIndex(selectedIdxRef.current, { align: 'auto' });
+    }
+  }, [selectedCode, rowVirtualizer]);
+
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const paddingTop    = virtualItems.length > 0 ? virtualItems[0].start                              : 0;
+  const paddingBottom = virtualItems.length > 0 ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end : 0;
+
   return (
-    <div className="w-full h-full overflow-auto">
+    <div ref={parentRef} className="w-full h-full overflow-auto">
       <table className="w-full text-sm border-collapse">
         <thead className="sticky top-0 bg-white z-10">
           <tr className="border-b border-gray-200">
@@ -73,16 +105,17 @@ export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatur
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row, i) => {
+          {paddingTop > 0 && <tr><td style={{ height: paddingTop }} /></tr>}
+          {virtualItems.map(virtualRow => {
+            const row = sorted[virtualRow.index];
             const isSelected = row.code === selectedFeature?.code;
             return (
               <tr
                 key={row.code}
-                ref={isSelected ? selectedRowRef : null}
                 onClick={() => onFeatureSelect?.(isSelected ? null : { code: row.code, label: row.name })}
                 className={tableRowClass(isSelected, !!onFeatureSelect)}
               >
-                <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">{i + 1}</td>
+                <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">{virtualRow.index + 1}</td>
                 <td className="py-2 text-gray-800 whitespace-nowrap">{row.name}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <span className="inline-flex items-center gap-1.5">
@@ -105,6 +138,7 @@ export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatur
               </tr>
             );
           })}
+          {paddingBottom > 0 && <tr><td style={{ height: paddingBottom }} /></tr>}
         </tbody>
       </table>
     </div>

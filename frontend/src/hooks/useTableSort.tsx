@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 
 type SortDir = 'asc' | 'desc';
 
@@ -20,15 +20,6 @@ export function useTableSort<K extends string>(defaultKey: K, defaultDir: SortDi
   };
 
   return { sortKey, sortDir, handleSort };
-}
-
-/** Scrolls the selected table row into view whenever the selected code changes. */
-export function useScrollSelectedIntoView(selectedCode: string | null | undefined) {
-  const ref = useRef<HTMLTableRowElement | null>(null);
-  useEffect(() => {
-    ref.current?.scrollIntoView({ block: 'nearest' });
-  }, [selectedCode]);
-  return ref;
 }
 
 /** Sort direction indicator shown in column headers. */
