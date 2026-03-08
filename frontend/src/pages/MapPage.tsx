@@ -9,6 +9,7 @@ import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart
 import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
+import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult,
@@ -696,6 +697,11 @@ export default function MapPage() {
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
                   <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                </div>
+              )}
+              {activeView === 'table' && electionResult && (
+                <div className="w-full h-full p-6">
+                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
                 </div>
               )}
               {activeView === 'table' && !datasetResult && (

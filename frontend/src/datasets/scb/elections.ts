@@ -403,11 +403,11 @@ function makeElectionDescriptor(opts: {
     source: 'SCB',
     availableYears: [...ELECTION_YEARS],
     supportedLevels: ['Country', 'Region', 'Municipality'],
-    supportedViews: ['map', 'chart'],
+    supportedViews: ['map', 'chart', 'table'],
     supportedViewsByLevel: {
       Country:      ['chart'],
-      Region:       ['map', 'chart'],
-      Municipality: ['map', 'chart'],
+      Region:       ['map', 'chart', 'table'],
+      Municipality: ['map', 'chart', 'table'],
     },
     chartTypes: {
       Country:      ['multiline'],
