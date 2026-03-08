@@ -3,6 +3,7 @@ import {
   AdminLevel, DatasetDescriptor, ElectionDatasetResult, TimeSeriesNode,
 } from '../types';
 import { ELECTION_YEARS, PARTY_CODES, PARTY_COLORS, PARTY_LABELS, normalizePartyCode } from '../parties';
+import { COUNTY_NAMES } from '../adminLevels';
 
 // ── SCB v1 PxWeb paths (proxied through FastAPI backend) ─────────────────────
 // ME0104T3 = riksdag results by municipality/valkrets, 1973–2022
@@ -222,7 +223,7 @@ async function fetchRegionLevel(
   electionType: ElectionDatasetResult['electionType'],
   contentCode: string,
 ): Promise<ElectionDatasetResult> {
-  const { counts: muniCounts, labels: muniLabels } = await fetchMunicipalityData(path, year, contentCode);
+  const { counts: muniCounts } = await fetchMunicipalityData(path, year, contentCode);
 
   // Aggregate municipality counts up to county (first 2 digits of municipality code).
   const countyCounts: Record<string, Record<string, number>> = {};
@@ -238,17 +239,10 @@ async function fetchRegionLevel(
     }
   }
 
-  // Build county labels from municipality labels (county name ≈ first municipality label's prefix).
-  // We'll use the muniLabels' county codes if they exist; otherwise just the code.
+  // Build county labels using the authoritative COUNTY_NAMES mapping.
   const countyLabels: Record<string, string> = {};
-  for (const [code, lbl] of Object.entries(muniLabels)) {
-    if (code.length === 2) {
-      countyLabels[code] = lbl;
-    }
-  }
-  // Fallback: include county codes themselves.
   for (const code of COUNTY_CODES) {
-    if (!countyLabels[code]) { countyLabels[code] = code; }
+    countyLabels[code] = COUNTY_NAMES[code] ?? code;
   }
 
   return buildElectionResult(countyCounts, countyLabels, label, electionType);

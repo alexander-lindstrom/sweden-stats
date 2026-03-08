@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ElectionDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
-import { PARTY_CODES, PARTY_COLORS } from '@/datasets/parties';
+import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 
 interface Props {
   data:            ElectionDatasetResult;
@@ -14,15 +14,24 @@ const MARGIN  = { top: 8, right: 16, bottom: 44, left: 144 };
 const BAR_H   = 22;
 const BAR_GAP = 4;
 
+interface TooltipState {
+  x: number;
+  y: number;
+  code: string;
+}
+
 /**
  * Stacked 100% horizontal bar chart — one row per geo area.
  * Rows are grouped by winning party (canonical order), then sorted by winner share desc.
  * A party legend sits at the bottom. Clicking a row selects that feature.
+ * Hovering shows a floating breakdown tooltip.
  */
 export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dims         = useResizeObserver(containerRef);
+
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
@@ -77,12 +86,21 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
           .attr('stroke', '#1e40af').attr('stroke-width', 1.5).attr('rx', 2);
       }
 
-      // Transparent click target.
+      // Transparent hit target — handles click and hover.
       g.append('rect')
         .attr('x', 0).attr('y', y)
         .attr('width', innerW).attr('height', BAR_H)
         .attr('fill', 'transparent').attr('cursor', 'pointer')
-        .on('click', () => onFeatureSelect({ code, label }));
+        .on('click', () => onFeatureSelect({ code, label }))
+        .on('mousemove', (event: MouseEvent) => {
+          const container = containerRef.current!.getBoundingClientRect();
+          setTooltip({
+            x: event.clientX - container.left + 12,
+            y: event.clientY - container.top - 8,
+            code,
+          });
+        })
+        .on('mouseleave', () => setTooltip(null));
 
       // Area label (left).
       g.append('text')
@@ -91,6 +109,7 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
         .attr('font-size', 11)
         .attr('fill', isSelected ? '#1e40af' : '#475569')
         .attr('font-weight', isSelected ? 600 : 400)
+        .attr('pointer-events', 'none')
         .text(label);
 
       // Winner share % label inside the leading segment (if wide enough).
@@ -111,10 +130,10 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
     const presentParties = PARTY_CODES.filter(p =>
       codes.some(c => (data.partyVotes[c][p] ?? 0) > 0),
     );
-    const ITEM_W     = 52;
-    const legendW    = presentParties.length * ITEM_W;
-    const legendX    = Math.max(0, (innerW - legendW) / 2);
-    const legend     = g.append('g').attr('transform', `translate(${legendX},${innerH + 14})`);
+    const ITEM_W  = 52;
+    const legendW = presentParties.length * ITEM_W;
+    const legendX = Math.max(0, (innerW - legendW) / 2);
+    const legend  = g.append('g').attr('transform', `translate(${legendX},${innerH + 14})`);
 
     presentParties.forEach((p, i) => {
       const x = i * ITEM_W;
@@ -127,9 +146,40 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
 
   }, [data, selectedFeature, dims, onFeatureSelect]);
 
+  // Build tooltip content for the hovered area.
+  const tooltipRows = tooltip
+    ? PARTY_CODES
+        .map(p => ({ p, share: data.partyVotes[tooltip.code]?.[p] ?? 0 }))
+        .filter(r => r.share > 0)
+        .sort((a, b) => b.share - a.share)
+    : [];
+
   return (
-    <div ref={containerRef} className="w-full h-full overflow-y-auto">
+    <div ref={containerRef} className="relative w-full h-full overflow-y-auto">
       <svg ref={svgRef} className="w-full" />
+
+      {tooltip && tooltipRows.length > 0 && (
+        <div
+          className="pointer-events-none absolute z-20 bg-slate-800 text-white rounded-md shadow-lg px-3 py-2 text-xs"
+          style={{ left: tooltip.x, top: tooltip.y, maxWidth: 200 }}
+        >
+          <div className="font-semibold mb-1.5 text-slate-100">
+            {data.labels[tooltip.code] ?? tooltip.code}
+          </div>
+          <div className="space-y-0.5">
+            {tooltipRows.map(({ p, share }) => (
+              <div key={p} className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-sm flex-shrink-0"
+                  style={{ backgroundColor: PARTY_COLORS[p] }}
+                />
+                <span className="text-slate-300">{PARTY_LABELS[p] ?? p}</span>
+                <span className="ml-auto tabular-nums text-slate-100 pl-3">{share.toFixed(1)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -96,7 +96,8 @@ export default function MapPage() {
     subLevel ?? selectedLevel,
     selectedYear,
   );
-  const subScalarResult = subDatasetResult?.kind === 'scalar' ? subDatasetResult as ScalarDatasetResult : null;
+  const subScalarResult    = subDatasetResult?.kind === 'scalar'   ? subDatasetResult as ScalarDatasetResult : null;
+  const subElectionResult  = subDatasetResult?.kind === 'election' ? subDatasetResult : null;
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
@@ -299,6 +300,25 @@ export default function MapPage() {
     return datasetResult;
   }, [activeParty, electionResult, partyChoroplethValues, datasetResult]);
 
+  // Sub-boundary tooltip strings for election datasets (winner or active-party mode).
+  const subElectionTooltip = useMemo(() => {
+    if (!subElectionResult) { return null; }
+    if (activeParty) {
+      return Object.fromEntries(
+        Object.entries(subElectionResult.partyVotes).map(([code, votes]) => {
+          const share = votes[activeParty] ?? 0;
+          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${share.toFixed(1)}%`];
+        }),
+      );
+    }
+    return Object.fromEntries(
+      Object.entries(subElectionResult.winnerByGeo).map(([code, winner]) => {
+        const share = subElectionResult.partyVotes[code]?.[winner] ?? 0;
+        return [code, `${PARTY_LABELS[winner] ?? winner} — ${share.toFixed(1)}%`];
+      }),
+    );
+  }, [subElectionResult, activeParty]);
+
   // Color overrides for MultiLineChart when showing election time series.
   const partyColorOverrides = useMemo(
     () => electionResult || activeDescriptor?.group === 'val'
@@ -348,10 +368,16 @@ export default function MapPage() {
             );
           })}
 
+          {activeDescriptor && (
+            <span className="ml-auto text-xs text-slate-400">
+              {activeDescriptor.label} · {activeDescriptor.source} · {selectedYear}
+            </span>
+          )}
+
           {/* Party selector — shown in map view when an election dataset is active */}
           {activeView === 'map' && electionResult && (
-            <div className="ml-4 flex items-center gap-2">
-              <span className="text-xs text-slate-400 whitespace-nowrap">Visa</span>
+            <div className="flex items-center gap-2 ml-3 pl-3 border-l border-slate-200">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
               <div className="relative">
                 <select
                   value={activeParty ?? ''}
@@ -370,12 +396,6 @@ export default function MapPage() {
                 </div>
               </div>
             </div>
-          )}
-
-          {activeDescriptor && (
-            <span className="ml-auto text-xs text-slate-400">
-              {activeDescriptor.label} · {activeDescriptor.source} · {selectedYear}
-            </span>
           )}
           <button
             onClick={() => setIsPanelOpen(p => !p)}
@@ -458,6 +478,7 @@ export default function MapPage() {
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                   unit={activeParty ? '%' : (datasetResult?.unit ?? '')}
                   subChoroplethData={subScalarResult?.values ?? null}
+                  subTooltipData={subElectionTooltip}
                   resetToken={mapResetToken}
                   selectedFeature={selectedFeature}
                   onFeatureSelect={setSelectedFeature}

@@ -65,6 +65,9 @@ export interface MapViewProps {
   /** Values keyed by sub-level codes (e.g. municipality codes when adminLevel=Region).
    *  Used to show data values when hovering sub-boundary features. */
   subChoroplethData?: Record<string, number> | null;
+  /** Pre-formatted tooltip strings for sub-level features (used for categorical data like elections).
+   *  Takes precedence over subChoroplethData when present. */
+  subTooltipData?: Record<string, string> | null;
   selectedFeature: { code: string; label: string; parentCode?: string } | null;
   onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
   onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
@@ -127,6 +130,7 @@ const MapView: React.FC<MapViewProps> = ({
   featureParentProperty,
   unit,
   subChoroplethData,
+  subTooltipData,
   selectedFeature,
   onFeatureSelect,
   onDrillDown,
@@ -153,10 +157,12 @@ const MapView: React.FC<MapViewProps> = ({
   const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef    = useRef<string | null>(null);
 
-  // Keep latest subChoroplethData in a ref so the pointer-move handler always
-  // sees the current value without needing it in the useCallback dep array.
+  // Keep latest sub-data refs so the pointer-move handler always sees current values
+  // without needing them in the useCallback dep array.
   const subChoroplethDataRef = useRef(subChoroplethData);
   subChoroplethDataRef.current = subChoroplethData;
+  const subTooltipDataRef = useRef(subTooltipData);
+  subTooltipDataRef.current = subTooltipData;
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -301,7 +307,12 @@ const MapView: React.FC<MapViewProps> = ({
             if (subCode !== hoveredSubCodeRef.current) {
               hoveredSubCodeRef.current = subCode;
               subHighlightLayerRef.current?.changed();
-              setHoveredFeature({ label: subLabel!, value: subChoroplethDataRef.current?.[subCode] ?? null, tooltip: null });
+              const subTip = subTooltipDataRef.current?.[subCode] ?? null;
+              setHoveredFeature({
+                label:   subLabel!,
+                value:   subTip !== null ? null : (subChoroplethDataRef.current?.[subCode] ?? null),
+                tooltip: subTip,
+              });
             }
             // Clear main highlight while hovering a sub-feature.
             if (hoveredCodeRef.current !== null) {
