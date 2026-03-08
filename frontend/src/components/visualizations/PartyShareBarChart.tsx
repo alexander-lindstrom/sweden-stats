@@ -66,26 +66,26 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
       const label      = data.labels[code] ?? code;
 
       // Stacked segments (only parties with a share > 0).
+      // Each segment is 1px narrower than its allocated slot, leaving a visible gap between blocks.
       let xOffset = 0;
       PARTY_CODES.filter(p => (shares[p] ?? 0) > 0).forEach(party => {
         const w = (shares[party] / 100) * innerW;
         g.append('rect')
           .attr('x', xOffset).attr('y', y)
-          .attr('width', w).attr('height', BAR_H)
+          .attr('width', Math.max(0, w - 1)).attr('height', BAR_H)
           .attr('fill', PARTY_COLORS[party] ?? '#ccc')
-          .attr('stroke', 'white').attr('stroke-width', 0.5)
           .attr('opacity', isSelected ? 1 : 0.85);
         xOffset += w;
       });
 
-      // Selection highlight outline.
-      if (isSelected) {
-        g.append('rect')
-          .attr('x', -2).attr('y', y - 1)
-          .attr('width', innerW + 4).attr('height', BAR_H + 2)
-          .attr('fill', 'none')
-          .attr('stroke', '#1e40af').attr('stroke-width', 1.5).attr('rx', 2);
-      }
+      // Bar outline (thin black border matching other chart styles; thicker blue when selected).
+      g.append('rect')
+        .attr('x', 0).attr('y', y)
+        .attr('width', innerW).attr('height', BAR_H)
+        .attr('fill', 'none')
+        .attr('stroke', isSelected ? '#1e40af' : '#000')
+        .attr('stroke-width', isSelected ? 1.5 : 0.5)
+        .attr('pointer-events', 'none');
 
       // Transparent hit target — handles click and hover.
       g.append('rect')

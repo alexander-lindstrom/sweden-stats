@@ -45,10 +45,31 @@ function toStat(result: ScalarDatasetResult, code: string): StatData {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
+/** Section heading with a hairline rule extending to the right. */
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
+        {children}
+      </span>
+      <div className="flex-1 h-px bg-slate-100" />
+    </div>
+  );
+}
+
+/** Light card wrapper used around chart visuals. */
+function ChartCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+      {children}
+    </div>
+  );
+}
+
 function StatRow({ label, stat }: { label: string; stat: StatData }) {
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-wider text-slate-400 mb-0.5">
+      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
         {label}
       </div>
       {stat.value === null ? (
@@ -74,11 +95,11 @@ function StatRow({ label, stat }: { label: string; stat: StatData }) {
 function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
   if (data.length < 2) { return null; }
 
-  const W = 224, H = 52, pad = 3;
-  const vals  = data.map(d => d.value);
-  const minV  = Math.min(...vals);
-  const maxV  = Math.max(...vals);
-  const range = maxV - minV || 1;
+  const W = 220, H = 52, pad = 3;
+  const vals   = data.map(d => d.value);
+  const minV   = Math.min(...vals);
+  const maxV   = Math.max(...vals);
+  const range  = maxV - minV || 1;
   const innerH = H - pad * 2;
 
   const points = data.map((d, i) => {
@@ -87,11 +108,11 @@ function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(' ');
 
-  const trend = vals[vals.length - 1] > vals[0] ? 'up' : vals[vals.length - 1] < vals[0] ? 'down' : 'flat';
+  const trend  = vals[vals.length - 1] > vals[0] ? 'up' : vals[vals.length - 1] < vals[0] ? 'down' : 'flat';
   const stroke = trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#9ca3af';
 
   return (
-    <svg width={W} height={H} className="block overflow-visible">
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
       <polyline
         points={points}
         fill="none"
@@ -104,11 +125,11 @@ function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
   );
 }
 
-const DONUT_R    = 52;
-const DONUT_HOLE = 30;
+const DONUT_R    = 48;
+const DONUT_HOLE = 27;
 const DONUT_SIZE = DONUT_R * 2 + 4;
 
-/** Mini donut chart showing party distribution for the selected area. */
+/** Mini donut chart — centered above a party legend list. */
 function ElectionDonut({ votes }: { votes: Record<string, number> }) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -149,22 +170,22 @@ function ElectionDonut({ votes }: { votes: Record<string, number> }) {
       .text(`${winner.share.toFixed(0)}%`);
   }, [votes]);
 
-  // Legend: top 4 parties by share
+  // Top parties by share for the legend.
   const topParties = PARTY_CODES
     .map(p => ({ p, share: votes[p] ?? 0 }))
     .filter(d => d.share > 0)
     .sort((a, b) => b.share - a.share)
-    .slice(0, 4);
+    .slice(0, 5);
 
   return (
-    <div className="flex items-center gap-4">
-      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} />
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col items-center gap-3">
+      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} className="flex-shrink-0" />
+      <div className="w-full space-y-1">
         {topParties.map(({ p, share }) => (
-          <div key={p} className="flex items-center gap-1.5 text-xs">
+          <div key={p} className="flex items-center gap-1.5 text-xs min-w-0">
             <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: PARTY_COLORS[p] }} />
-            <span className="text-slate-500">{PARTY_LABELS[p] ?? p}</span>
-            <span className="ml-auto tabular-nums text-slate-700 pl-2">{share.toFixed(1)}%</span>
+            <span className="text-slate-500 truncate flex-1 min-w-0">{PARTY_LABELS[p] ?? p}</span>
+            <span className="tabular-nums text-slate-700 flex-shrink-0">{share.toFixed(1)}%</span>
           </div>
         ))}
       </div>
@@ -188,11 +209,11 @@ interface PanelStats {
 }
 
 export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }: SelectionPanelProps) {
-  const [stats,          setStats]          = useState<PanelStats | null>(null);
-  const [statsLoading,   setStatsLoading]   = useState(false);
-  const [sparkline,      setSparkline]      = useState<Array<{ year: number; value: number }>>([]);
-  const [sparkLoading,   setSparkLoading]   = useState(false);
-  const [electionVotes,  setElectionVotes]  = useState<Record<string, number> | null>(null);
+  const [stats,           setStats]           = useState<PanelStats | null>(null);
+  const [statsLoading,    setStatsLoading]    = useState(false);
+  const [sparkline,       setSparkline]       = useState<Array<{ year: number; value: number }>>([]);
+  const [sparkLoading,    setSparkLoading]    = useState(false);
+  const [electionVotes,   setElectionVotes]   = useState<Record<string, number> | null>(null);
   const [electionLoading, setElectionLoading] = useState(false);
   const fetchIdRef = useRef(0);
 
@@ -296,7 +317,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     <div className="w-72 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
 
       {/* Header */}
-      <div className="flex items-start gap-3 p-4 border-b border-slate-100 flex-shrink-0">
+      <div className="flex items-start gap-3 px-4 py-3 border-b border-slate-200 flex-shrink-0">
         <div className="flex-1 min-w-0">
           <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1.5 ${LEVEL_BADGE[adminLevel]}`}>
             {LEVEL_LABELS[adminLevel]}
@@ -327,9 +348,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
           <>
             {/* Key stats */}
             <section>
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Nyckeltal {STAT_YEAR}
-              </h3>
+              <SectionTitle>Nyckeltal {STAT_YEAR}</SectionTitle>
               {statsLoading && <Spinner />}
               {!statsLoading && !stats && (
                 <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
@@ -346,18 +365,16 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
             {/* Population sparkline */}
             {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
               <section>
-                <h3 className="text-sm font-semibold text-slate-700 mb-2">
-                  Befolkningstrend
-                </h3>
+                <SectionTitle>Befolkningstrend</SectionTitle>
                 {sparkLoading && <Spinner />}
                 {!sparkLoading && sparkline.length >= 2 && (
-                  <>
+                  <ChartCard>
                     <Sparkline data={sparkline} />
                     <div className="flex justify-between text-xs text-slate-400 mt-1">
                       <span>{sparkline[0].year}</span>
                       <span>{sparkline[sparkline.length - 1].year}</span>
                     </div>
-                  </>
+                  </ChartCard>
                 )}
                 {!sparkLoading && sparkline.length < 2 && (
                   <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
@@ -368,15 +385,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
             {/* Election distribution */}
             {ELECTION_LEVELS.includes(adminLevel) && (
               <section>
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                  Riksdagsval {ELECTION_YEAR}
-                </h3>
+                <SectionTitle>Riksdagsval {ELECTION_YEAR}</SectionTitle>
                 {electionLoading && <Spinner />}
                 {!electionLoading && !electionVotes && (
                   <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
                 )}
                 {!electionLoading && electionVotes && (
-                  <ElectionDonut votes={electionVotes} />
+                  <ChartCard>
+                    <ElectionDonut votes={electionVotes} />
+                  </ChartCard>
                 )}
               </section>
             )}

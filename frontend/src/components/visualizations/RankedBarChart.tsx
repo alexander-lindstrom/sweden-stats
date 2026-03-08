@@ -81,8 +81,8 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('fill', d =>
         colorFn ? colorFn(d.code) : colorScale ? colorScale(d.value) : '#3b82f6'
       )
-      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e40af' : 'none')
-      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0)
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e40af' : '#000')
+      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
       .on('click', (_event: MouseEvent, d) => {
         onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });

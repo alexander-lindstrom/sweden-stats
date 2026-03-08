@@ -101,8 +101,52 @@ export default function MapPage() {
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
-  // For election multiline: use selected feature's code to get area-specific series.
-  const timeSeriesFeatureCode = activeDescriptor?.group === 'val' && selectedFeature ? selectedFeature.code : null;
+
+  // For election multiline at Region/Municipality level: allow picking a specific area via dropdowns.
+  const needsMultilineAreaFilter = activeChartType === 'multiline' && activeDescriptor?.group === 'val'
+    && (selectedLevel === 'Region' || selectedLevel === 'Municipality');
+
+  // Lan list: code-sorted, derived from COUNTY_NAMES (Region) or from election data (Municipality).
+  const availableMultilineLans = useMemo(() => {
+    if (!needsMultilineAreaFilter) { return []; }
+    if (selectedLevel === 'Region') {
+      return Object.entries(COUNTY_NAMES).sort(([a], [b]) => a.localeCompare(b)).map(([code, name]) => ({ code, name }));
+    }
+    const codes = new Set(electionResult ? Object.keys(electionResult.partyVotes).map(c => c.slice(0, 2)) : []);
+    return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
+  }, [needsMultilineAreaFilter, selectedLevel, electionResult]);
+
+  // At Region level: effectiveLan is the selected feature code (a 2-char county code).
+  // At Municipality level: effectiveLan comes from selectedLan state.
+  const effectiveMultilineLan = useMemo(() => {
+    if (availableMultilineLans.length === 0) { return null; }
+    if (selectedLevel === 'Region') {
+      const sf = selectedFeature?.code;
+      return availableMultilineLans.some(l => l.code === sf) ? sf! : availableMultilineLans[0].code;
+    }
+    return availableMultilineLans.some(l => l.code === selectedLan) ? selectedLan! : availableMultilineLans[0].code;
+  }, [availableMultilineLans, selectedLevel, selectedFeature, selectedLan]);
+
+  // Municipality list for Municipality-level multiline: areas under the selected Lan, code-sorted.
+  const availableMultilineMunis = useMemo(() => {
+    if (!needsMultilineAreaFilter || selectedLevel !== 'Municipality' || !electionResult || !effectiveMultilineLan) { return []; }
+    return Object.entries(electionResult.labels)
+      .filter(([code]) => code.startsWith(effectiveMultilineLan))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code, name]) => ({ code, name }));
+  }, [needsMultilineAreaFilter, selectedLevel, electionResult, effectiveMultilineLan]);
+
+  const effectiveMultilineMuni = useMemo(() => {
+    if (availableMultilineMunis.length === 0) { return null; }
+    const sf = selectedFeature?.code;
+    return availableMultilineMunis.some(m => m.code === sf) ? sf! : availableMultilineMunis[0].code;
+  }, [availableMultilineMunis, selectedFeature]);
+
+  const timeSeriesFeatureCode = activeDescriptor?.group === 'val'
+    ? (needsMultilineAreaFilter
+        ? (selectedLevel === 'Municipality' ? effectiveMultilineMuni : effectiveMultilineLan)
+        : (selectedFeature?.code ?? null))
+    : null;
   const { data: timeSeriesData, loading: timeSeriesLoading } = useTimeSeriesFetch(
     activeDescriptor, activeChartType, selectedLevel, timeSeriesFeatureCode,
   );
@@ -479,6 +523,47 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Area selector for multiline election time series at Region/Municipality level */}
+          {activeView === 'chart' && needsMultilineAreaFilter && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
+              <select
+                value={effectiveMultilineLan ?? ''}
+                onChange={e => {
+                  const code = e.target.value;
+                  if (selectedLevel === 'Region') {
+                    setSelectedFeature({ code, label: COUNTY_NAMES[code] ?? code });
+                  } else {
+                    setSelectedLan(code);
+                  }
+                }}
+                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {availableMultilineLans.map(({ code, name }) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+              {selectedLevel === 'Municipality' && (
+                <>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
+                  <select
+                    value={effectiveMultilineMuni ?? ''}
+                    onChange={e => {
+                      const code = e.target.value;
+                      const name = electionResult?.labels[code] ?? code;
+                      setSelectedFeature({ code, label: name });
+                    }}
+                    className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {availableMultilineMunis.map(({ code, name }) => (
+                      <option key={code} value={code}>{name}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Lan / Municipality filter */}
           {activeView === 'chart' && needsLanFilter && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
@@ -581,7 +666,7 @@ export default function MapPage() {
                   <MultiLineChart
                     data={timeSeriesData}
                     label={timeSeriesFeatureCode
-                      ? (electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
+                      ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
                       : activeDescriptor?.label}
                     colorOverrides={partyColorOverrides}
                   />

@@ -411,8 +411,8 @@ function makeElectionDescriptor(opts: {
     },
     chartTypes: {
       Country:      ['multiline'],
-      Region:       ['election-bar', 'multiline', 'party-ranking'],
-      Municipality: ['election-bar', 'multiline', 'party-ranking'],
+      Region:       ['party-ranking', 'election-bar', 'multiline'],
+      Municipality: ['party-ranking', 'election-bar', 'multiline'],
     },
     fetch: fetchElection,
     fetchTimeSeries: (_level, featureCode) => fetchElectionTimeSeries(path, contentCode, featureCode),
