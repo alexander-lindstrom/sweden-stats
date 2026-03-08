@@ -69,7 +69,9 @@ export function useDatasetFetch(
             // Winner mode: color each area by the winning party.
             const winnerByGeo = result.winnerByGeo;
             setColorScale(null);
-            setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#ccc');
+            // '#c8bfb2' is a warm beige — visually distinct from the Övriga gray (#AAAAAA)
+            // and all party colors, so areas with no election data are clearly "no data".
+            setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#c8bfb2');
           }
         } else {
           // Scalar: sequential color scale.

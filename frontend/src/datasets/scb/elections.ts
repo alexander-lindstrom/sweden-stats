@@ -1,30 +1,22 @@
-import { fetchScbData } from '@/api/backend/ScbApi';
 import {
   AdminLevel, DatasetDescriptor, ElectionDatasetResult, TimeSeriesNode,
 } from '../types';
 import { ELECTION_YEARS, PARTY_CODES, PARTY_COLORS, PARTY_LABELS, normalizePartyCode } from '../parties';
 import { COUNTY_NAMES } from '../adminLevels';
 
-// ── SCB v1 PxWeb paths (proxied through FastAPI backend) ─────────────────────
-// ME0104T3 = riksdag results by municipality/valkrets, 1973–2022
-// ME0104T2 = regionfullmäktige results, 1973–2022
-// ME0104T1 = kommunfullmäktige results, 1973–2022
-const RIKSDAG_PATH  = 'ME/ME0104/ME0104C/ME0104T3';
-const REGION_PATH   = 'ME/ME0104/ME0104B/ME0104T2';
-const KOMMUN_PATH   = 'ME/ME0104/ME0104A/ME0104T1';
+// ── SCB v2beta table IDs ──────────────────────────────────────────────────────
+// All fetched directly from the browser — v2beta has CORS enabled, no proxy needed.
+// TAB2706 = riksdag, TAB2697 = regionval, TAB2685 = kommunval
+const RIKSDAG_TABLE = 'TAB2706';
+const REGION_TABLE  = 'TAB2697';
+const KOMMUN_TABLE  = 'TAB2685';
 
-// SCB variable names in the ME0104 election tables.
-// "Partimm" = party; content codes differ per table (all mean "Antal röster").
-const PARTY_VAR  = 'Partimm';
-const YEAR_VAR   = 'Tid';
-const REGION_VAR = 'Region';
+// Content codes: antal röster (vote counts), used for aggregating to county/national level.
+const COUNT_CODE_RIKSDAG = 'ME0104B6';
+const COUNT_CODE_REGION  = 'ME0104B4';
+const COUNT_CODE_KOMMUN  = 'ME0104B1';
 
-// Each ME0104 sub-table uses its own ContentsCode for "Antal röster".
-const CONTENT_CODE_RIKSDAG = 'ME0104B6'; // ME0104T3
-const CONTENT_CODE_REGION  = 'ME0104B4'; // ME0104T2
-const CONTENT_CODE_KOMMUN  = 'ME0104B1'; // ME0104T1
-
-// Party codes as used by SCB (FP is handled via normalizePartyCode → L).
+// Party codes as known to SCB. FP is normalised → L via normalizePartyCode.
 const SCB_PARTY_CODES = ['S', 'M', 'SD', 'C', 'V', 'KD', 'MP', 'FP', 'ÖVRIGA'];
 
 // County (2-digit) codes for the 21 Swedish läns.
@@ -35,11 +27,20 @@ const COUNTY_CODES = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Snap an arbitrary year to the nearest available election year. */
 function nearestElectionYear(year: number): number {
   return ELECTION_YEARS.reduce((prev, curr) =>
     Math.abs(curr - year) < Math.abs(prev - year) ? curr : prev,
   );
+}
+
+// ── v2beta fetch helpers ──────────────────────────────────────────────────────
+
+function dataUrl(tableId: string): string {
+  return `https://api.scb.se/OV0104/v2beta/api/v2/tables/${tableId}/data?outputFormat=json-stat2`;
+}
+
+function metaUrl(tableId: string): string {
+  return `https://api.scb.se/OV0104/v2beta/api/v2/tables/${tableId}/metadata`;
 }
 
 interface JsonStat2 {
@@ -47,161 +48,177 @@ interface JsonStat2 {
   size:      number[];
   value:     (number | null)[];
   dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
+    category: { index: Record<string, number>; label: Record<string, string> };
   }>;
 }
 
-/**
- * Parse a JSON-stat2 response that has Region × Party dimensions.
- * Returns raw vote counts per region per party.
- */
+interface MetadataResponse {
+  dimension: Record<string, {
+    category: { index: Record<string, number>; label: Record<string, string> };
+  }>;
+}
+
+async function postQuery(
+  tableId: string,
+  selection: Array<{ variableCode: string; valueCodes: string[] }>,
+): Promise<JsonStat2> {
+  const res = await fetch(dataUrl(tableId), {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ selection }),
+  });
+  if (!res.ok) { throw new Error(`SCB v2beta ${tableId}: ${res.status} ${res.statusText}`); }
+  return res.json();
+}
+
+// ── Municipality code cache (per table) ──────────────────────────────────────
+
+const muniCodeCache: Record<string, { codes: string[]; labels: Record<string, string> }> = {};
+
+async function getMuniCodes(
+  tableId: string,
+): Promise<{ codes: string[]; labels: Record<string, string> }> {
+  if (muniCodeCache[tableId]) { return muniCodeCache[tableId]; }
+
+  const res = await fetch(metaUrl(tableId));
+  if (!res.ok) { throw new Error(`SCB metadata ${tableId}: ${res.status}`); }
+  const metadata: MetadataResponse = await res.json();
+
+  const regionCat = metadata.dimension['Region']?.category;
+  if (!regionCat) { throw new Error(`SCB metadata ${tableId}: Region dimension not found`); }
+
+  const codes: string[]                = [];
+  const labels: Record<string, string> = {};
+  for (const [code, label] of Object.entries(regionCat.label)) {
+    // Municipality codes are exactly 4 digits; TAB2706 also contains VR-prefix valkrets entries.
+    if (code.length === 4 && !/^VR/i.test(code)) {
+      codes.push(code);
+      labels[code] = label;
+    }
+  }
+
+  muniCodeCache[tableId] = { codes, labels };
+  return muniCodeCache[tableId];
+}
+
+// ── JSON-stat2 parser ─────────────────────────────────────────────────────────
+
 function parseElectionResponse(
   data: JsonStat2,
 ): { counts: Record<string, Record<string, number>>; labels: Record<string, string> } {
-  const dimIds = data.id;
-  const sizes  = data.size;
+  const { id: dimIds, size: sizes, value, dimension } = data;
 
   const strides = new Array(dimIds.length).fill(1);
   for (let i = dimIds.length - 2; i >= 0; i--) {
     strides[i] = strides[i + 1] * sizes[i + 1];
   }
 
-  const regionDimIdx = dimIds.indexOf(REGION_VAR);
-  const partyDimIdx  = dimIds.indexOf(PARTY_VAR);
+  const regionDimIdx = dimIds.indexOf('Region');
+  const partyDimIdx  = dimIds.indexOf('Partimm');
   if (regionDimIdx === -1 || partyDimIdx === -1) {
     throw new Error(`SCB election response missing expected dimensions. Got: ${dimIds.join(', ')}`);
   }
 
-  const regionDim = data.dimension[REGION_VAR];
-  const partyDim  = data.dimension[PARTY_VAR];
+  const regionDim = dimension['Region'];
+  const partyDim  = dimension['Partimm'];
 
   const indexToRegion: Record<number, string> = {};
   for (const [code, idx] of Object.entries(regionDim.category.index)) {
     indexToRegion[idx as number] = code;
   }
-
   const indexToParty: Record<number, string> = {};
   for (const [code, idx] of Object.entries(partyDim.category.index)) {
     indexToParty[idx as number] = normalizePartyCode(code);
   }
 
   const counts: Record<string, Record<string, number>> = {};
-  for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
+  for (let i = 0; i < value.length; i++) {
+    const raw = value[i];
     if (raw === null || raw === undefined) { continue; }
     const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
     if (isNaN(num)) { continue; }
 
-    const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
-    const partyIdx  = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];
+    const regionIdx  = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
+    const partyIdx   = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];
     const regionCode = indexToRegion[regionIdx];
     const partyCode  = indexToParty[partyIdx];
 
     if (!regionCode || !partyCode) { continue; }
-
     if (!counts[regionCode]) { counts[regionCode] = {}; }
     counts[regionCode][partyCode] = (counts[regionCode][partyCode] ?? 0) + num;
   }
 
-  const labels = { ...regionDim.category.label } as Record<string, string>;
-  return { counts, labels };
+  return { counts, labels: { ...regionDim.category.label } };
 }
 
-/**
- * Convert raw vote counts into an ElectionDatasetResult.
- * For each geo code, compute vote shares and determine the winner.
- */
+// ── Build ElectionDatasetResult from raw counts ───────────────────────────────
+
 function buildElectionResult(
-  counts: Record<string, Record<string, number>>,
-  labels: Record<string, string>,
-  label: string,
+  counts:       Record<string, Record<string, number>>,
+  labels:       Record<string, string>,
+  label:        string,
   electionType: ElectionDatasetResult['electionType'],
 ): ElectionDatasetResult {
   const partyVotes:  Record<string, Record<string, number>> = {};
-  const winnerByGeo: Record<string, string> = {};
+  const winnerByGeo: Record<string, string>                 = {};
 
   for (const [geoCode, partyCounts] of Object.entries(counts)) {
     const total = Object.values(partyCounts).reduce((s, v) => s + v, 0);
     if (total === 0) { continue; }
 
     const shares: Record<string, number> = {};
-    let winnerCode = '';
+    let winnerCode  = '';
     let winnerShare = -1;
 
     for (const [party, count] of Object.entries(partyCounts)) {
       const share = (count / total) * 100;
       shares[party] = Math.round(share * 10) / 10;
-      if (share > winnerShare) {
-        winnerShare = share;
-        winnerCode = party;
-      }
+      if (share > winnerShare) { winnerShare = share; winnerCode = party; }
     }
 
     partyVotes[geoCode]  = shares;
     winnerByGeo[geoCode] = winnerCode;
   }
 
-  return {
-    kind: 'election',
-    partyVotes,
-    winnerByGeo,
-    labels,
-    label,
-    unit: '%',
-    electionType,
-  };
+  return { kind: 'election', partyVotes, winnerByGeo, labels, label, unit: '%', electionType };
 }
 
-// ── Fetch: municipality-level data (used for both Municipality and Region) ────
+// ── Core municipality data fetch ──────────────────────────────────────────────
 
-async function fetchMunicipalityData(
-  path: string,
-  year: number,
+/**
+ * Fetch vote counts for all municipalities in a table for a single year.
+ * Metadata labels are used (already clean, no valkrets suffixes).
+ */
+async function fetchMuniData(
+  tableId:     string,
   contentCode: string,
+  year:        number,
 ): Promise<{ counts: Record<string, Record<string, number>>; labels: Record<string, string> }> {
-  const electionYear = nearestElectionYear(year);
+  const electionYear         = nearestElectionYear(year);
+  const { codes, labels }    = await getMuniCodes(tableId);
 
-  const raw: JsonStat2 = await fetchScbData(path, {
-    query: [
-      // "all" filter returns every region value; we then filter to 4-digit codes.
-      { code: REGION_VAR, selection: { filter: 'all', values: ['*'] } },
-      { code: PARTY_VAR,  selection: { filter: 'item', values: SCB_PARTY_CODES } },
-      { code: 'ContentsCode', selection: { filter: 'item', values: [contentCode] } },
-      { code: YEAR_VAR,   selection: { filter: 'item', values: [String(electionYear)] } },
-    ],
-    response: { format: 'json-stat2' },
-  });
+  const raw = await postQuery(tableId, [
+    { variableCode: 'Region',       valueCodes: codes },
+    { variableCode: 'Partimm',      valueCodes: SCB_PARTY_CODES },
+    { variableCode: 'ContentsCode', valueCodes: [contentCode] },
+    { variableCode: 'Tid',          valueCodes: [String(electionYear)] },
+  ]);
 
-  const { counts: allCounts, labels: allLabels } = parseElectionResponse(raw);
-
-  // Keep only 4-digit municipality codes.
-  const counts: Record<string, Record<string, number>> = {};
-  const labels: Record<string, string> = {};
-  for (const [code, partyCounts] of Object.entries(allCounts)) {
-    if (code.length === 4) {
-      counts[code] = partyCounts;
-      labels[code] = allLabels[code] ?? code;
-    }
-  }
-
+  const { counts } = parseElectionResponse(raw);
   return { counts, labels };
 }
 
-// ── Fetch: country-level (aggregate all municipalities) ───────────────────────
+// ── Fetch by level ────────────────────────────────────────────────────────────
 
 async function fetchCountryLevel(
-  path: string,
-  year: number,
-  label: string,
+  tableId:      string,
+  contentCode:  string,
+  year:         number,
+  label:        string,
   electionType: ElectionDatasetResult['electionType'],
-  contentCode: string,
 ): Promise<ElectionDatasetResult> {
-  const { counts: muniCounts, labels: muniLabels } = await fetchMunicipalityData(path, year, contentCode);
+  const { counts: muniCounts, labels: muniLabels } = await fetchMuniData(tableId, contentCode, year);
 
-  // Aggregate all municipality counts into one national total.
   const national: Record<string, number> = {};
   for (const partyCounts of Object.values(muniCounts)) {
     for (const [party, count] of Object.entries(partyCounts)) {
@@ -209,27 +226,20 @@ async function fetchCountryLevel(
     }
   }
 
-  // The national entry needs a label — use "Sverige".
-  const result = buildElectionResult({ SE: national }, { SE: 'Sverige', ...muniLabels }, label, electionType);
-  return result;
+  return buildElectionResult({ SE: national }, { SE: 'Sverige', ...muniLabels }, label, electionType);
 }
 
-// ── Fetch: region (county/Lan) level ─────────────────────────────────────────
-
 async function fetchRegionLevel(
-  path: string,
-  year: number,
-  label: string,
+  tableId:      string,
+  contentCode:  string,
+  year:         number,
+  label:        string,
   electionType: ElectionDatasetResult['electionType'],
-  contentCode: string,
 ): Promise<ElectionDatasetResult> {
-  const { counts: muniCounts } = await fetchMunicipalityData(path, year, contentCode);
+  const { counts: muniCounts } = await fetchMuniData(tableId, contentCode, year);
 
-  // Aggregate municipality counts up to county (first 2 digits of municipality code).
   const countyCounts: Record<string, Record<string, number>> = {};
-  for (const countyCode of COUNTY_CODES) {
-    countyCounts[countyCode] = {};
-  }
+  for (const code of COUNTY_CODES) { countyCounts[code] = {}; }
 
   for (const [muniCode, partyCounts] of Object.entries(muniCounts)) {
     const countyCode = muniCode.slice(0, 2);
@@ -239,106 +249,89 @@ async function fetchRegionLevel(
     }
   }
 
-  // Build county labels using the authoritative COUNTY_NAMES mapping.
   const countyLabels: Record<string, string> = {};
-  for (const code of COUNTY_CODES) {
-    countyLabels[code] = COUNTY_NAMES[code] ?? code;
-  }
+  for (const code of COUNTY_CODES) { countyLabels[code] = COUNTY_NAMES[code] ?? code; }
 
   return buildElectionResult(countyCounts, countyLabels, label, electionType);
 }
 
-// ── Fetch: municipality-level result ─────────────────────────────────────────
-
 async function fetchMunicipalityLevel(
-  path: string,
-  year: number,
-  label: string,
+  tableId:      string,
+  contentCode:  string,
+  year:         number,
+  label:        string,
   electionType: ElectionDatasetResult['electionType'],
-  contentCode: string,
 ): Promise<ElectionDatasetResult> {
-  const { counts, labels } = await fetchMunicipalityData(path, year, contentCode);
+  const { counts, labels } = await fetchMuniData(tableId, contentCode, year);
   return buildElectionResult(counts, labels, label, electionType);
 }
 
-// ── Time series fetch (national or per-area, one line per party) ─────────────
+// ── Time series ───────────────────────────────────────────────────────────────
 
 /**
  * Fetch party vote-share time series across all election years.
  * If areaCode is provided (2-digit county or 4-digit municipality), the series
- * is limited to that area; otherwise a national aggregate is returned.
+ * is scoped to that area; otherwise a national aggregate is returned.
  */
 async function fetchElectionTimeSeries(
-  path: string,
+  tableId:     string,
   contentCode: string,
-  areaCode?: string,
+  areaCode?:   string,
 ): Promise<TimeSeriesNode[]> {
-  // Fetch all election years at once for the national total.
-  const raw: JsonStat2 = await fetchScbData(path, {
-    query: [
-      { code: REGION_VAR, selection: { filter: 'all', values: ['*'] } },
-      { code: PARTY_VAR,  selection: { filter: 'item', values: SCB_PARTY_CODES } },
-      { code: 'ContentsCode', selection: { filter: 'item', values: [contentCode] } },
-      { code: YEAR_VAR,   selection: { filter: 'all', values: ['*'] } },
-    ],
-    response: { format: 'json-stat2' },
-  });
+  const { codes } = await getMuniCodes(tableId);
 
-  // Parse all data, then aggregate to national per year.
-  const dimIds = raw.id;
-  const sizes  = raw.size;
+  const raw = await postQuery(tableId, [
+    { variableCode: 'Region',       valueCodes: codes },
+    { variableCode: 'Partimm',      valueCodes: SCB_PARTY_CODES },
+    { variableCode: 'ContentsCode', valueCodes: [contentCode] },
+    { variableCode: 'Tid',          valueCodes: ELECTION_YEARS.map(String) },
+  ]);
+
+  const { id: dimIds, size: sizes, value, dimension } = raw;
+
   const strides = new Array(dimIds.length).fill(1);
   for (let i = dimIds.length - 2; i >= 0; i--) {
     strides[i] = strides[i + 1] * sizes[i + 1];
   }
 
-  const regionDimIdx = dimIds.indexOf(REGION_VAR);
-  const partyDimIdx  = dimIds.indexOf(PARTY_VAR);
-  const yearDimIdx   = dimIds.indexOf(YEAR_VAR);
+  const regionDimIdx = dimIds.indexOf('Region');
+  const partyDimIdx  = dimIds.indexOf('Partimm');
+  const yearDimIdx   = dimIds.indexOf('Tid');
   if (regionDimIdx === -1 || partyDimIdx === -1 || yearDimIdx === -1) {
     throw new Error(`Time series: missing dimensions. Got: ${dimIds.join(', ')}`);
   }
 
-  const regionDim = raw.dimension[REGION_VAR];
-  const partyDim  = raw.dimension[PARTY_VAR];
-  const yearDim   = raw.dimension[YEAR_VAR];
-
   const regionIndexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
+  for (const [code, idx] of Object.entries(dimension['Region'].category.index)) {
     regionIndexToCode[idx as number] = code;
   }
   const partyIndexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(partyDim.category.index)) {
+  for (const [code, idx] of Object.entries(dimension['Partimm'].category.index)) {
     partyIndexToCode[idx as number] = normalizePartyCode(code);
   }
-  const yearCodes = Object.keys(yearDim.category.index).sort(
-    (a, b) => (yearDim.category.index[a] as number) - (yearDim.category.index[b] as number),
+  const yearCodes = Object.keys(dimension['Tid'].category.index).sort(
+    (a, b) => dimension['Tid'].category.index[a] - dimension['Tid'].category.index[b],
   );
 
-  // Accumulate counts: yearCode → partyCode → total count (national)
+  // Accumulate counts: yearCode → partyCode → total
   const yearPartyCount: Record<string, Record<string, number>> = {};
-  for (const yr of yearCodes) {
-    yearPartyCount[yr] = {};
-  }
+  for (const yr of yearCodes) { yearPartyCount[yr] = {}; }
 
-  for (let i = 0; i < raw.value.length; i++) {
-    const val = raw.value[i];
+  for (let i = 0; i < value.length; i++) {
+    const val = value[i];
     if (val === null || val === undefined) { continue; }
     const num = typeof val === 'number' ? val : parseFloat(val as string);
     if (isNaN(num) || num === 0) { continue; }
 
-    const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
-    const partyIdx  = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];
-    const yearIdx   = Math.floor(i / strides[yearDimIdx])   % sizes[yearDimIdx];
-
+    const regionIdx  = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
+    const partyIdx   = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];
+    const yearIdx    = Math.floor(i / strides[yearDimIdx])   % sizes[yearDimIdx];
     const regionCode = regionIndexToCode[regionIdx];
     const partyCode  = partyIndexToCode[partyIdx];
     const yearCode   = yearCodes[yearIdx];
 
-    // Only municipality codes (4-digit) to avoid double-counting aggregates.
-    if (!regionCode || regionCode.length !== 4 || !partyCode || !yearCode) { continue; }
-
-    // Area filter: county (2-digit prefix match) or specific municipality (exact).
+    if (!regionCode || !partyCode || !yearCode) { continue; }
+    // Area filter: 2-digit county (prefix) or exact 4-digit municipality
     if (areaCode && !regionCode.startsWith(areaCode)) { continue; }
 
     yearPartyCount[yearCode][partyCode] = (yearPartyCount[yearCode][partyCode] ?? 0) + num;
@@ -349,7 +342,7 @@ async function fetchElectionTimeSeries(
 
   for (const [yearStr, partyCounts] of Object.entries(yearPartyCount)) {
     const yearNum = parseInt(yearStr, 10);
-    if (!ELECTION_YEARS.includes(yearNum as typeof ELECTION_YEARS[number])) { continue; }
+    if (!ELECTION_YEARS.includes(yearNum as (typeof ELECTION_YEARS)[number])) { continue; }
 
     const total = Object.values(partyCounts).reduce((s, v) => s + v, 0);
     if (total === 0) { continue; }
@@ -357,13 +350,12 @@ async function fetchElectionTimeSeries(
     for (const [party, count] of Object.entries(partyCounts)) {
       if (!partyPoints[party]) { partyPoints[party] = []; }
       partyPoints[party].push({
-        date:  `${yearNum}-09-15`, // approximate election date (Sweden elects in September)
-        value: Math.round((count / total) * 1000) / 10, // one decimal %
+        date:  `${yearNum}-09-15`, // approximate (Swedish elections are held in September)
+        value: Math.round((count / total) * 1000) / 10,
       });
     }
   }
 
-  // Return in canonical party order; include only parties with any data.
   return PARTY_CODES
     .filter(p => (partyPoints[p]?.length ?? 0) > 0)
     .map(p => ({
@@ -373,23 +365,23 @@ async function fetchElectionTimeSeries(
     }));
 }
 
-// ── Dataset descriptor factories ─────────────────────────────────────────────
+// ── Dataset descriptor factory ────────────────────────────────────────────────
 
 function makeElectionDescriptor(opts: {
   id:           string;
   label:        string;
   shortLabel:   string;
-  path:         string;
+  tableId:      string;
   contentCode:  string;
   electionType: ElectionDatasetResult['electionType'];
 }): DatasetDescriptor {
-  const { id, label, shortLabel, path, contentCode, electionType } = opts;
+  const { id, label, shortLabel, tableId, contentCode, electionType } = opts;
 
   async function fetchElection(level: AdminLevel, year: number): Promise<ElectionDatasetResult> {
     switch (level) {
-      case 'Country':      return fetchCountryLevel(path, year, label, electionType, contentCode);
-      case 'Region':       return fetchRegionLevel(path, year, label, electionType, contentCode);
-      case 'Municipality': return fetchMunicipalityLevel(path, year, label, electionType, contentCode);
+      case 'Country':      return fetchCountryLevel(tableId, contentCode, year, label, electionType);
+      case 'Region':       return fetchRegionLevel(tableId, contentCode, year, label, electionType);
+      case 'Municipality': return fetchMunicipalityLevel(tableId, contentCode, year, label, electionType);
       default: throw new Error(`Election dataset "${id}": unsupported level "${level}"`);
     }
   }
@@ -398,12 +390,12 @@ function makeElectionDescriptor(opts: {
     id,
     label,
     shortLabel,
-    group: 'val',
+    group:      'val',
     groupLabel: 'Val',
-    source: 'SCB',
+    source:     'SCB',
     availableYears: [...ELECTION_YEARS],
     supportedLevels: ['Country', 'Region', 'Municipality'],
-    supportedViews: ['map', 'chart', 'table'],
+    supportedViews:  ['map', 'chart', 'table'],
     supportedViewsByLevel: {
       Country:      ['chart'],
       Region:       ['map', 'chart', 'table'],
@@ -414,8 +406,9 @@ function makeElectionDescriptor(opts: {
       Region:       ['party-ranking', 'election-bar', 'multiline'],
       Municipality: ['party-ranking', 'election-bar', 'multiline'],
     },
-    fetch: fetchElection,
-    fetchTimeSeries: (_level, featureCode) => fetchElectionTimeSeries(path, contentCode, featureCode),
+    fetch:           fetchElection,
+    fetchTimeSeries: (_level, featureCode) =>
+      fetchElectionTimeSeries(tableId, contentCode, featureCode),
   };
 }
 
@@ -425,8 +418,8 @@ export const riksdagsval = makeElectionDescriptor({
   id:           'riksdagsval',
   label:        'Riksdagsval',
   shortLabel:   'Riksdag',
-  path:         RIKSDAG_PATH,
-  contentCode:  CONTENT_CODE_RIKSDAG,
+  tableId:      RIKSDAG_TABLE,
+  contentCode:  COUNT_CODE_RIKSDAG,
   electionType: 'riksdag',
 });
 
@@ -434,8 +427,8 @@ export const regionval = makeElectionDescriptor({
   id:           'regionval',
   label:        'Regionval',
   shortLabel:   'Region',
-  path:         REGION_PATH,
-  contentCode:  CONTENT_CODE_REGION,
+  tableId:      REGION_TABLE,
+  contentCode:  COUNT_CODE_REGION,
   electionType: 'region',
 });
 
@@ -443,10 +436,9 @@ export const kommunval = makeElectionDescriptor({
   id:           'kommunval',
   label:        'Kommunval',
   shortLabel:   'Kommun',
-  path:         KOMMUN_PATH,
-  contentCode:  CONTENT_CODE_KOMMUN,
+  tableId:      KOMMUN_TABLE,
+  contentCode:  COUNT_CODE_KOMMUN,
   electionType: 'municipality',
 });
 
-// Re-export party metadata for convenience.
 export { PARTY_COLORS, PARTY_LABELS, PARTY_CODES };

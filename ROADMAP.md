@@ -77,6 +77,21 @@ This is high-effort, low-generalisation work. Worth doing only if the time-serie
 
 ---
 
+## Election data — known gaps and future work
+
+### Övriga breakdown
+At the municipality level, local parties sometimes form the largest single block inside "Övriga". Currently Övriga is pre-aggregated (we request only the 9 main party codes from SCB and they fold the rest). To surface the largest sub-party:
+
+1. Fetch all party codes from table metadata instead of the fixed 9.
+2. Client-side: bucket the 8 known parties normally; sum the rest into Övriga while tracking the per-geo leader.
+3. Extend `ElectionDatasetResult` with `ovrigaLeader?: Record<string, { label: string; share: number }>`.
+4. Show it in the winner column of `ElectionTable` and the `ElectionDonut` when Övriga wins.
+
+### Election results at finer granularity (valdistrikt)
+SCB and Valmyndigheten publish results at the valdistrikt (polling district) level for recent elections. Mapping these would require a GeoServer layer for valdistrikt boundaries and a matching dataset fetch. Higher spatial resolution than DeSO in many urban areas — potentially very striking.
+
+---
+
 ## Ideas parking lot
 
 - **"Find areas like this"** — given a selected area, surface the N most similar areas nationally (by statistical profile). Useful and unusual.

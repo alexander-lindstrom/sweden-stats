@@ -341,8 +341,10 @@ const MapView: React.FC<MapViewProps> = ({
           const rawLabel = String(feature.get(featureLabelProperty) ?? code);
           const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
           // tooltipData overrides numeric choropleth for election/categorical data.
+          // When tooltipData is provided but has no entry for this code, the area has
+          // no data (e.g. Gotland in regionval) — show "Ingen data" explicitly.
           const value    = choroplethData?.[code] ?? null;
-          const tooltip  = tooltipData?.[code] ?? null;
+          const tooltip  = tooltipData != null ? (tooltipData[code] ?? 'Ingen data') : null;
           result = { code, label, value: tooltip !== null ? null : value, tooltip };
           return true;
         },
