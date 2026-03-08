@@ -261,11 +261,17 @@ async function fetchMunicipalityLevel(
   return buildElectionResult(counts, labels, label, electionType);
 }
 
-// ── Time series fetch (Country level, one line per party) ────────────────────
+// ── Time series fetch (national or per-area, one line per party) ─────────────
 
+/**
+ * Fetch party vote-share time series across all election years.
+ * If areaCode is provided (2-digit county or 4-digit municipality), the series
+ * is limited to that area; otherwise a national aggregate is returned.
+ */
 async function fetchElectionTimeSeries(
   path: string,
   contentCode: string,
+  areaCode?: string,
 ): Promise<TimeSeriesNode[]> {
   // Fetch all election years at once for the national total.
   const raw: JsonStat2 = await fetchScbData(path, {
@@ -331,6 +337,9 @@ async function fetchElectionTimeSeries(
 
     // Only municipality codes (4-digit) to avoid double-counting aggregates.
     if (!regionCode || regionCode.length !== 4 || !partyCode || !yearCode) { continue; }
+
+    // Area filter: county (2-digit prefix match) or specific municipality (exact).
+    if (areaCode && !regionCode.startsWith(areaCode)) { continue; }
 
     yearPartyCount[yearCode][partyCode] = (yearPartyCount[yearCode][partyCode] ?? 0) + num;
   }
@@ -402,11 +411,11 @@ function makeElectionDescriptor(opts: {
     },
     chartTypes: {
       Country:      ['multiline'],
-      Region:       ['election-bar'],
-      Municipality: ['election-bar'],
+      Region:       ['election-bar', 'multiline', 'party-ranking'],
+      Municipality: ['election-bar', 'multiline', 'party-ranking'],
     },
     fetch: fetchElection,
-    fetchTimeSeries: () => fetchElectionTimeSeries(path, contentCode),
+    fetchTimeSeries: (_level, featureCode) => fetchElectionTimeSeries(path, contentCode, featureCode),
   };
 }
 

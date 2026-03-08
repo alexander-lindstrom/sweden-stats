@@ -101,7 +101,11 @@ export default function MapPage() {
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
-  const { data: timeSeriesData, loading: timeSeriesLoading } = useTimeSeriesFetch(activeDescriptor, activeChartType, selectedLevel);
+  // For election multiline: use selected feature's code to get area-specific series.
+  const timeSeriesFeatureCode = activeDescriptor?.group === 'val' && selectedFeature ? selectedFeature.code : null;
+  const { data: timeSeriesData, loading: timeSeriesLoading } = useTimeSeriesFetch(
+    activeDescriptor, activeChartType, selectedLevel, timeSeriesFeatureCode,
+  );
 
   useMapKeyboardNavigation(
     selectedFeature, selectedLevel, scalarResult,
@@ -199,6 +203,7 @@ export default function MapPage() {
   const needsLanFilter = (
     (activeChartType === 'diverging' && (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO'))
     || (activeChartType === 'election-bar' && selectedLevel === 'Municipality')
+    || (activeChartType === 'party-ranking' && selectedLevel === 'Municipality')
   );
   const needsMuniFilter = activeChartType === 'diverging' &&
     (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
@@ -300,6 +305,46 @@ export default function MapPage() {
     return datasetResult;
   }, [activeParty, electionResult, partyChoroplethValues, datasetResult]);
 
+  // Derived scalar result for party-ranking chart: areas ranked by selected party's share.
+  // Falls back to winner share when no party is selected. Filtered by Lan at Municipality level.
+  const partyRankingResult = useMemo(() => {
+    if (!electionResult) { return null; }
+    const filterByLan = activeChartType === 'party-ranking' && selectedLevel === 'Municipality' && effectiveLan;
+    const values: Record<string, number> = {};
+    for (const [code, votes] of Object.entries(electionResult.partyVotes)) {
+      if (filterByLan && !code.startsWith(effectiveLan)) { continue; }
+      values[code] = activeParty
+        ? (votes[activeParty] ?? 0)
+        : (votes[electionResult.winnerByGeo[code]] ?? 0);
+    }
+    const labels = filterByLan
+      ? Object.fromEntries(Object.entries(electionResult.labels).filter(([c]) => c.startsWith(effectiveLan)))
+      : electionResult.labels;
+    return {
+      kind:   'scalar' as const,
+      values,
+      labels,
+      label:  activeParty ? (PARTY_LABELS[activeParty] ?? activeParty) : 'Vinnande parti',
+      unit:   '%',
+    };
+  }, [electionResult, activeParty, activeChartType, selectedLevel, effectiveLan]);
+
+  // In winner mode, color each ranking bar by the winning party and show its name in the tooltip.
+  const rankingColorFn = useMemo(() => {
+    if (activeParty || !electionResult) { return null; }
+    return (code: string) => PARTY_COLORS[electionResult.winnerByGeo[code]] ?? '#ccc';
+  }, [activeParty, electionResult]);
+
+  const rankingRowMeta = useMemo(() => {
+    if (activeParty || !electionResult) { return null; }
+    return Object.fromEntries(
+      Object.entries(electionResult.winnerByGeo).map(([code, winner]) => [
+        code,
+        PARTY_LABELS[winner] ?? winner,
+      ]),
+    );
+  }, [activeParty, electionResult]);
+
   // Sub-boundary tooltip strings for election datasets (winner or active-party mode).
   const subElectionTooltip = useMemo(() => {
     if (!subElectionResult) { return null; }
@@ -374,8 +419,9 @@ export default function MapPage() {
             </span>
           )}
 
-          {/* Party selector — shown in map view when an election dataset is active */}
-          {activeView === 'map' && electionResult && (
+          {/* Party selector — shown when an election dataset is active in map view
+              or in chart view for the party-ranking chart type */}
+          {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
             <div className="flex items-center gap-2 ml-3 pl-3 border-l border-slate-200">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
               <div className="relative">
@@ -532,13 +578,31 @@ export default function MapPage() {
               )}
               {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
                 <div className="w-full h-full p-4">
-                  <MultiLineChart data={timeSeriesData} label={activeDescriptor?.label} colorOverrides={partyColorOverrides} />
+                  <MultiLineChart
+                    data={timeSeriesData}
+                    label={timeSeriesFeatureCode
+                      ? (electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
+                      : activeDescriptor?.label}
+                    colorOverrides={partyColorOverrides}
+                  />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'party-ranking' && partyRankingResult && (
+                <div className="w-full h-full p-6">
+                  <RankedBarChart
+                    data={partyRankingResult}
+                    colorScale={activeParty ? colorScale : null}
+                    colorFn={rankingColorFn}
+                    rowMeta={rankingRowMeta}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={setSelectedFeature}
+                  />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>

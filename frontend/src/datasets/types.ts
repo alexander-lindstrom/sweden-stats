@@ -1,14 +1,15 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
-  bar:           'Rankningslista',
-  histogram:     'Fördelning',
-  sunburst:      'Soldiagram',
-  diverging:     'Avvikelse',
-  multiline:     'Tidsserie',
-  'election-bar': 'Partier',
+  bar:             'Rankningslista',
+  histogram:       'Fördelning',
+  sunburst:        'Soldiagram',
+  diverging:       'Avvikelse',
+  multiline:       'Tidsserie',
+  'election-bar':  'Partier',
+  'party-ranking': 'Rankningslista',
 };
 
 export interface TimeSeriesPoint {
@@ -74,7 +75,9 @@ export interface DatasetDescriptor {
   sunburstDepthToLevel?: AdminLevel[];
   fetch: (level: AdminLevel, year: number) => Promise<DatasetResult>;
   fetchHierarchy?: (year: number) => Promise<GeoHierarchyNode>;
-  fetchTimeSeries?: (level: AdminLevel) => Promise<TimeSeriesNode[]>;
+  /** Pass featureCode to get area-specific time series (e.g. a county or municipality).
+   *  Omit for national/global aggregate. */
+  fetchTimeSeries?: (level: AdminLevel, featureCode?: string) => Promise<TimeSeriesNode[]>;
 }
 
 /** Returns which views are available for a descriptor at a given level. */

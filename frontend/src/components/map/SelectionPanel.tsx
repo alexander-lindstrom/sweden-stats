@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
+import * as d3 from 'd3';
+import { AdminLevel, ElectionDatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
+import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { Spinner } from '@/components/ui/Spinner';
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
@@ -13,18 +15,19 @@ const LEVEL_BADGE: Record<AdminLevel, string> = {
   DeSO:         'bg-rose-100 text-rose-700',
 };
 
-const popDescriptor    = DATASETS.find(d => d.id === 'population')!;
-const incomeDescriptor = DATASETS.find(d => d.id === 'medianinkomst')!;
-const ageDescriptor    = DATASETS.find(d => d.id === 'medelalder')!;
+const popDescriptor        = DATASETS.find(d => d.id === 'population')!;
+const incomeDescriptor     = DATASETS.find(d => d.id === 'medianinkomst')!;
+const ageDescriptor        = DATASETS.find(d => d.id === 'medelalder')!;
+const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
 
-const STAT_YEAR = 2024;
+const STAT_YEAR     = 2024;
+const ELECTION_YEAR = 2022;
 
-// Spread out across the population series (2000–2024) for a compact sparkline.
 const SPARKLINE_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
 
-// Levels that have income and age data.
-const INCOME_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const AGE_LEVELS:    AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const INCOME_LEVELS:   AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const AGE_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const ELECTION_LEVELS: AdminLevel[] = ['Region', 'Municipality'];
 
 interface StatData {
   value: number | null;
@@ -38,12 +41,6 @@ function toStat(result: ScalarDatasetResult, code: string): StatData {
   const all   = Object.values(result.values).filter(Number.isFinite) as number[];
   const rank  = value !== null ? all.filter(v => v > value).length + 1 : null;
   return { value, unit: result.unit, rank, total: all.length };
-}
-
-interface PanelStats {
-  population: StatData;
-  income:     StatData | null; // null → not supported at this level
-  age:        StatData | null;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -107,6 +104,74 @@ function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
   );
 }
 
+const DONUT_R    = 52;
+const DONUT_HOLE = 30;
+const DONUT_SIZE = DONUT_R * 2 + 4;
+
+/** Mini donut chart showing party distribution for the selected area. */
+function ElectionDonut({ votes }: { votes: Record<string, number> }) {
+  const svgRef = useRef<SVGSVGElement>(null);
+
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll('*').remove();
+
+    const rows = PARTY_CODES
+      .map(p => ({ party: p, share: votes[p] ?? 0 }))
+      .filter(d => d.share > 0);
+
+    if (rows.length === 0) { return; }
+
+    const pie = d3.pie<typeof rows[0]>().sort(null).value(d => d.share);
+    const arc = d3.arc<d3.PieArcDatum<typeof rows[0]>>().innerRadius(DONUT_HOLE).outerRadius(DONUT_R);
+
+    const g = svg
+      .attr('width', DONUT_SIZE).attr('height', DONUT_SIZE)
+      .append('g').attr('transform', `translate(${DONUT_SIZE / 2},${DONUT_SIZE / 2})`);
+
+    g.selectAll('path')
+      .data(pie(rows))
+      .join('path')
+      .attr('d', arc)
+      .attr('fill', d => PARTY_COLORS[d.data.party] ?? '#ccc')
+      .attr('stroke', 'white')
+      .attr('stroke-width', 1);
+
+    // Winner label in the centre.
+    const winner = rows.reduce((a, b) => a.share > b.share ? a : b);
+    g.append('text')
+      .attr('text-anchor', 'middle').attr('dy', '-0.2em')
+      .attr('font-size', 13).attr('font-weight', 700).attr('fill', '#1e293b')
+      .text(winner.party === 'ÖVRIGA' ? 'Övr.' : winner.party);
+    g.append('text')
+      .attr('text-anchor', 'middle').attr('dy', '1em')
+      .attr('font-size', 10).attr('fill', '#64748b')
+      .text(`${winner.share.toFixed(0)}%`);
+  }, [votes]);
+
+  // Legend: top 4 parties by share
+  const topParties = PARTY_CODES
+    .map(p => ({ p, share: votes[p] ?? 0 }))
+    .filter(d => d.share > 0)
+    .sort((a, b) => b.share - a.share)
+    .slice(0, 4);
+
+  return (
+    <div className="flex items-center gap-4">
+      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} />
+      <div className="flex flex-col gap-1">
+        {topParties.map(({ p, share }) => (
+          <div key={p} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: PARTY_COLORS[p] }} />
+            <span className="text-slate-500">{PARTY_LABELS[p] ?? p}</span>
+            <span className="ml-auto tabular-nums text-slate-700 pl-2">{share.toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export interface SelectionPanelProps {
@@ -116,17 +181,26 @@ export interface SelectionPanelProps {
   onClose: () => void;
 }
 
+interface PanelStats {
+  population: StatData;
+  income:     StatData | null;
+  age:        StatData | null;
+}
+
 export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }: SelectionPanelProps) {
-  const [stats,        setStats]        = useState<PanelStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [sparkline,    setSparkline]    = useState<Array<{ year: number; value: number }>>([]);
-  const [sparkLoading, setSparkLoading] = useState(false);
-  const fetchIdRef                      = useRef(0);
+  const [stats,          setStats]          = useState<PanelStats | null>(null);
+  const [statsLoading,   setStatsLoading]   = useState(false);
+  const [sparkline,      setSparkline]      = useState<Array<{ year: number; value: number }>>([]);
+  const [sparkLoading,   setSparkLoading]   = useState(false);
+  const [electionVotes,  setElectionVotes]  = useState<Record<string, number> | null>(null);
+  const [electionLoading, setElectionLoading] = useState(false);
+  const fetchIdRef = useRef(0);
 
   useEffect(() => {
     if (!selectedFeature) {
       setStats(null);
       setSparkline([]);
+      setElectionVotes(null);
       return;
     }
 
@@ -137,11 +211,13 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     setStatsLoading(true);
     setSparkline([]);
     setSparkLoading(true);
+    setElectionVotes(null);
 
-    const wantsIncome = INCOME_LEVELS.includes(adminLevel);
-    const wantsAge    = AGE_LEVELS.includes(adminLevel);
+    const wantsIncome   = INCOME_LEVELS.includes(adminLevel);
+    const wantsAge      = AGE_LEVELS.includes(adminLevel);
+    const wantsElection = ELECTION_LEVELS.includes(adminLevel);
 
-    // -- Stats (all three in parallel, resolved together) ---------------------
+    // -- Stats ----------------------------------------------------------------
     let popStat:    StatData | null = null;
     let incomeStat: StatData | null = null;
     let ageStat:    StatData | null = null;
@@ -180,7 +256,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       setStatsLoading(false);
     });
 
-    // -- Sparkline (population across years, parallel) ------------------------
+    // -- Sparkline ------------------------------------------------------------
     Promise.all(
       SPARKLINE_YEARS.map(year =>
         fetchCached(popDescriptor, adminLevel, year)
@@ -195,6 +271,23 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       setSparkline(results.filter((r): r is { year: number; value: number } => r !== null));
       setSparkLoading(false);
     });
+
+    // -- Election -------------------------------------------------------------
+    if (wantsElection) {
+      setElectionLoading(true);
+      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
+        .then(r => {
+          if (id !== fetchIdRef.current) { return; }
+          if (r.kind === 'election') {
+            const votes = (r as ElectionDatasetResult).partyVotes[code];
+            setElectionVotes(votes ?? null);
+          }
+          setElectionLoading(false);
+        })
+        .catch(() => {
+          if (id === fetchIdRef.current) { setElectionLoading(false); }
+        });
+    }
   }, [selectedFeature, adminLevel]);
 
   if (!isOpen) { return null; }
@@ -202,7 +295,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
   return (
     <div className="w-72 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
 
-      {/* Header ─────────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex items-start gap-3 p-4 border-b border-slate-100 flex-shrink-0">
         <div className="flex-1 min-w-0">
           <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1.5 ${LEVEL_BADGE[adminLevel]}`}>
@@ -221,7 +314,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
         </button>
       </div>
 
-      {/* Body ───────────────────────────────────────────────────────────── */}
+      {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
         {!selectedFeature && (
@@ -232,18 +325,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
         {selectedFeature && (
           <>
-            {/* Key stats ─────────────────────────────────────────────── */}
+            {/* Key stats */}
             <section>
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
                 Nyckeltal {STAT_YEAR}
               </h3>
-
               {statsLoading && <Spinner />}
-
               {!statsLoading && !stats && (
                 <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
-
               {!statsLoading && stats && (
                 <div className="space-y-3">
                   <StatRow label="Befolkning"    stat={stats.population} />
@@ -253,28 +343,43 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               )}
             </section>
 
-            {/* Population sparkline — hidden for RegSO/DeSO (SCB only provides 2024 data at those levels) */}
-            {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && <section>
-              <h3 className="text-sm font-semibold text-slate-700 mb-2">
-                Befolkningstrend
-              </h3>
+            {/* Population sparkline */}
+            {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
+              <section>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">
+                  Befolkningstrend
+                </h3>
+                {sparkLoading && <Spinner />}
+                {!sparkLoading && sparkline.length >= 2 && (
+                  <>
+                    <Sparkline data={sparkline} />
+                    <div className="flex justify-between text-xs text-slate-400 mt-1">
+                      <span>{sparkline[0].year}</span>
+                      <span>{sparkline[sparkline.length - 1].year}</span>
+                    </div>
+                  </>
+                )}
+                {!sparkLoading && sparkline.length < 2 && (
+                  <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                )}
+              </section>
+            )}
 
-              {sparkLoading && <Spinner />}
-
-              {!sparkLoading && sparkline.length >= 2 && (
-                <>
-                  <Sparkline data={sparkline} />
-                  <div className="flex justify-between text-xs text-slate-400 mt-1">
-                    <span>{sparkline[0].year}</span>
-                    <span>{sparkline[sparkline.length - 1].year}</span>
-                  </div>
-                </>
-              )}
-
-              {!sparkLoading && sparkline.length < 2 && (
-                <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
-              )}
-            </section>}
+            {/* Election distribution */}
+            {ELECTION_LEVELS.includes(adminLevel) && (
+              <section>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                  Riksdagsval {ELECTION_YEAR}
+                </h3>
+                {electionLoading && <Spinner />}
+                {!electionLoading && !electionVotes && (
+                  <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                )}
+                {!electionLoading && electionVotes && (
+                  <ElectionDonut votes={electionVotes} />
+                )}
+              </section>
+            )}
           </>
         )}
       </div>

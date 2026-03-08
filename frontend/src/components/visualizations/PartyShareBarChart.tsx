@@ -73,6 +73,7 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
           .attr('x', xOffset).attr('y', y)
           .attr('width', w).attr('height', BAR_H)
           .attr('fill', PARTY_COLORS[party] ?? '#ccc')
+          .attr('stroke', 'white').attr('stroke-width', 0.5)
           .attr('opacity', isSelected ? 1 : 0.85);
         xOffset += w;
       });
