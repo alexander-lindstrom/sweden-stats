@@ -168,6 +168,13 @@ def load_votes(filename: str, sheet: str) -> pd.DataFrame:
 
     df['Parti'] = df['Parti'].str.strip()
 
+    # Exclude summary/statistic rows that are not parties.
+    NON_PARTY_LABELS = {
+        'Valdeltagande', 'Summa giltiga röster', 'Blanka röster',
+        'Ogiltiga röster', 'Röstberättigade',
+    }
+    df = df[~df['Parti'].isin(NON_PARTY_LABELS)].copy()
+
     # Map the 8 main parties to canonical codes; keep the full name for all
     # others so we can apply a data-driven threshold later rather than losing
     # local party identity here.
@@ -286,7 +293,7 @@ def main() -> None:
             print(f'  -> {suffix.upper()}')
             result   = project_votes(votes, weights, ref_code_col, labels, label, election_type)
             out_path = OUT_DIR / f'{election_id}_2022_{suffix}.json'
-            out_path.write_text(json.dumps(result, ensure_ascii=False, separators=(',', ':')))
+            out_path.write_text(json.dumps(result, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
             print(f'     Written {out_path.name} ({out_path.stat().st_size // 1024} KB)')
 
     print('\nDone.')

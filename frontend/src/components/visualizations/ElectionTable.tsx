@@ -18,10 +18,18 @@ export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatur
   const { sortKey, sortDir, handleSort } = useTableSort<SortKey>('winner', 'desc');
   const selectedRowRef = useScrollSelectedIntoView(selectedFeature?.code);
 
-  // Only show party columns that have votes in at least one area.
-  const presentParties = PARTY_CODES.filter(p =>
-    Object.values(data.partyVotes).some(votes => (votes[p] ?? 0) > 0),
+  // Build ordered party columns: main parties that have any votes, then local parties
+  // that WIN at least one area (to keep column count manageable), then ÖVRIGA.
+  const winners = new Set(Object.values(data.winnerByGeo));
+  const allPresent = new Set(
+    Object.values(data.partyVotes).flatMap(votes => Object.keys(votes).filter(p => votes[p] > 0)),
   );
+  const mainPresent  = PARTY_CODES.filter(p => p !== 'ÖVRIGA' && allPresent.has(p));
+  const localPresent = [...winners]
+    .filter(p => !(PARTY_CODES as readonly string[]).includes(p) && p !== 'ÖVRIGA')
+    .sort((a, b) => a.localeCompare(b, 'sv'));
+  const hasOvriga    = allPresent.has('ÖVRIGA');
+  const presentParties = [...mainPresent, ...localPresent, ...(hasOvriga ? ['ÖVRIGA'] : [])];
 
   const rows = Object.entries(data.partyVotes).map(([code, votes]) => {
     const winner      = data.winnerByGeo[code] ?? '';

@@ -183,6 +183,26 @@ function buildElectionResult(
   return { kind: 'election', partyVotes, winnerByGeo, labels, label, unit: '%', electionType };
 }
 
+// ── DeSO / RegSO fetch (backend static JSON) ──────────────────────────────────
+
+const BACKEND = 'http://localhost:3001';
+
+async function fetchDesoRegsoLevel(
+  electionId:   string,
+  level:        'DeSO' | 'RegSO',
+  year:         number,
+): Promise<ElectionDatasetResult> {
+  // Only 2022 data exists; snap to nearest supported year (2022) when more are added.
+  const supportedYear = 2022;
+  void year; // year parameter reserved for future multi-year support
+  const levelParam = level === 'DeSO' ? 'deso' : 'regso';
+  const url = `${BACKEND}/api/election-geodata/${electionId}/${supportedYear}/${levelParam}`;
+  const res = await fetch(url);
+  if (!res.ok) { throw new Error(`Election geodata ${url}: ${res.status} ${res.statusText}`); }
+  const raw = await res.json() as Omit<ElectionDatasetResult, 'kind'>;
+  return { kind: 'election', ...raw };
+}
+
 // ── Core municipality data fetch ──────────────────────────────────────────────
 
 /**
@@ -374,14 +394,17 @@ function makeElectionDescriptor(opts: {
   tableId:      string;
   contentCode:  string;
   electionType: ElectionDatasetResult['electionType'];
+  geodataId:    string;  // backend election slug (riksdag / regionval / kommunval)
 }): DatasetDescriptor {
-  const { id, label, shortLabel, tableId, contentCode, electionType } = opts;
+  const { id, label, shortLabel, tableId, contentCode, electionType, geodataId } = opts;
 
   async function fetchElection(level: AdminLevel, year: number): Promise<ElectionDatasetResult> {
     switch (level) {
       case 'Country':      return fetchCountryLevel(tableId, contentCode, year, label, electionType);
       case 'Region':       return fetchRegionLevel(tableId, contentCode, year, label, electionType);
       case 'Municipality': return fetchMunicipalityLevel(tableId, contentCode, year, label, electionType);
+      case 'DeSO':         return fetchDesoRegsoLevel(geodataId, 'DeSO',  year);
+      case 'RegSO':        return fetchDesoRegsoLevel(geodataId, 'RegSO', year);
       default: throw new Error(`Election dataset "${id}": unsupported level "${level}"`);
     }
   }
@@ -394,17 +417,21 @@ function makeElectionDescriptor(opts: {
     groupLabel: 'Val',
     source:     'SCB',
     availableYears: [...ELECTION_YEARS],
-    supportedLevels: ['Country', 'Region', 'Municipality'],
+    supportedLevels: ['Country', 'Region', 'Municipality', 'DeSO', 'RegSO'],
     supportedViews:  ['map', 'chart', 'table'],
     supportedViewsByLevel: {
       Country:      ['chart'],
       Region:       ['map', 'chart', 'table'],
       Municipality: ['map', 'chart', 'table'],
+      DeSO:         ['map', 'table'],
+      RegSO:        ['map', 'table'],
     },
     chartTypes: {
       Country:      ['multiline'],
       Region:       ['party-ranking', 'election-bar', 'multiline'],
       Municipality: ['party-ranking', 'election-bar', 'multiline'],
+      DeSO:         ['party-ranking', 'election-bar'],
+      RegSO:        ['party-ranking', 'election-bar'],
     },
     fetch:           fetchElection,
     fetchTimeSeries: (_level, featureCode) =>
@@ -421,6 +448,7 @@ export const riksdagsval = makeElectionDescriptor({
   tableId:      RIKSDAG_TABLE,
   contentCode:  COUNT_CODE_RIKSDAG,
   electionType: 'riksdag',
+  geodataId:    'riksdag',
 });
 
 export const regionval = makeElectionDescriptor({
@@ -430,6 +458,7 @@ export const regionval = makeElectionDescriptor({
   tableId:      REGION_TABLE,
   contentCode:  COUNT_CODE_REGION,
   electionType: 'region',
+  geodataId:    'regionval',
 });
 
 export const kommunval = makeElectionDescriptor({
@@ -439,6 +468,7 @@ export const kommunval = makeElectionDescriptor({
   tableId:      KOMMUN_TABLE,
   contentCode:  COUNT_CODE_KOMMUN,
   electionType: 'municipality',
+  geodataId:    'kommunval',
 });
 
 export { PARTY_COLORS, PARTY_LABELS, PARTY_CODES };
