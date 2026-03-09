@@ -98,7 +98,7 @@ function zoomToWfsFeature(
     srsName:      'EPSG:3857',
     count:        '1',
   });
-  fetch(`http://localhost:8080/geoserver/wfs?${params}`, { signal })
+  fetch(`/geoserver/wfs?${params}`, { signal })
     .then(r => r.json())
     .then(geojson => {
       if (geojson.features?.length > 0) {

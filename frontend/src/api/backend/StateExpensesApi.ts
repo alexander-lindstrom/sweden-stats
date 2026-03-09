@@ -1,5 +1,5 @@
-const EXPENSES_API_URL = "http://localhost:3001/api/expenses/";
-const REVENUE_API_URL = "http://localhost:3001/api/revenue/";
+const EXPENSES_API_URL = "/api/expenses/";
+const REVENUE_API_URL = "/api/revenue/";
 
 export const fetchAllExpenses = async () => {
   try {

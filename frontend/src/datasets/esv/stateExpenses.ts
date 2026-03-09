@@ -1,6 +1,6 @@
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
 
-const EXPENSES_URL = 'http://localhost:3001/api/expenses';
+const EXPENSES_URL = '/api/expenses';
 
 interface RawNode {
   name:      string;

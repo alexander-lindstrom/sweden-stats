@@ -1,0 +1,29 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - geoserver
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    volumes:
+      - ./data:/app/data:ro
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:5173
+    restart: unless-stopped
+
+  geoserver:
+    image: kartoza/geoserver:2.26.0
+    volumes:
+      - geoserver_data:/opt/geoserver/data_dir
+    restart: unless-stopped
+
+volumes:
+  geoserver_data:

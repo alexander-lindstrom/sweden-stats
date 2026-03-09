@@ -1,0 +1,13 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+
+# Large gitignored data files — provision separately on the server
+data/geopackage/
+data/SCB boundaries/
+data/valmyndigheten/
+processing/data/
+
+**/__pycache__/
+**/*.pyc
+.git/

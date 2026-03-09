@@ -4,7 +4,7 @@
  * RegSO name, with a numeric suffix when a RegSO contains multiple DeSOs.
  */
 
-const BACKEND = 'http://localhost:3001';
+const BACKEND = '';
 
 const cache: Partial<Record<'deso' | 'regso', Promise<Record<string, string>>>> = {};
 

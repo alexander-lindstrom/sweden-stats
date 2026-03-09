@@ -1,4 +1,4 @@
-const SCB_API_URL = "http://localhost:3001/api/scb";
+const SCB_API_URL = "/api/scb";
 
 export const fetchScbData = async (endpoint: string, body: object) => {
   try {

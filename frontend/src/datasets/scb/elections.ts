@@ -185,7 +185,7 @@ function buildElectionResult(
 
 // ── DeSO / RegSO fetch (backend static JSON) ──────────────────────────────────
 
-const BACKEND = 'http://localhost:3001';
+const BACKEND = '';
 
 async function fetchDesoRegsoLevel(
   electionId:   string,
