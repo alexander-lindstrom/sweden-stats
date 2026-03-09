@@ -11,6 +11,8 @@ export function useTimeSeriesFetch(
   activeDescriptor: DatasetDescriptor | null,
   activeChartType:  ChartType,
   selectedLevel:    AdminLevel,
+  /** When set, fetches area-specific time series instead of national aggregate. */
+  featureCode?:     string | null,
 ): TimeSeriesFetchResult {
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesNode[] | null>(null);
   const [loading,        setLoading]        = useState(false);
@@ -25,7 +27,7 @@ export function useTimeSeriesFetch(
 
     const gen = ++fetchGenRef.current;
     setLoading(true);
-    fetchTimeSeriesCached(activeDescriptor, selectedLevel)
+    fetchTimeSeriesCached(activeDescriptor, selectedLevel, featureCode ?? undefined)
       .then(result => {
         if (gen !== fetchGenRef.current) { return; }
         setTimeSeriesData(result);
@@ -36,7 +38,7 @@ export function useTimeSeriesFetch(
         console.error('Time series fetch failed:', err);
         setLoading(false);
       });
-  }, [activeChartType, activeDescriptor, selectedLevel]);
+  }, [activeChartType, activeDescriptor, selectedLevel, featureCode]);
 
   return { data: timeSeriesData, loading };
 }

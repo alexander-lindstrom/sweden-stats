@@ -1,14 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { DatasetResult } from '@/datasets/types';
+import { ScalarDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 
-interface Hovered { name: string; value: number; x: number; y: number; }
+interface Hovered { code: string; name: string; value: number; x: number; y: number; }
 
 interface RankedBarChartProps {
-  data: DatasetResult;
+  data: ScalarDatasetResult;
   colorScale?: ((value: number) => string) | null;
+  /** Code-based color function — overrides colorScale when provided (e.g. winning-party colors). */
+  colorFn?: ((code: string) => string) | null;
+  /** Extra per-row label shown in the hover tooltip below the value (e.g. winning party name). */
+  rowMeta?: Record<string, string> | null;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
@@ -17,7 +21,7 @@ const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
-export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, selectedFeature, onFeatureSelect }) => {
+export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, colorFn, rowMeta, selectedFeature, onFeatureSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -75,9 +79,9 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill', d =>
-        colorScale ? colorScale(d.value) : '#3b82f6'
+        colorFn ? colorFn(d.code) : colorScale ? colorScale(d.value) : '#3b82f6'
       )
-      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
+      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e40af' : '#000')
       .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
       .style('cursor', 'pointer')
       .on('click', (_event: MouseEvent, d) => {
@@ -92,7 +96,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
           hoveredElRef.current = el;
           d3.select(el).attr('fill-opacity', 0.6);
         }
-        setHovered({ name: d.name, value: d.value, x: event.clientX, y: event.clientY });
+        setHovered({ code: d.code, name: d.name, value: d.value, x: event.clientX, y: event.clientY });
       });
 
     const clearHighlight = () => {
@@ -176,7 +180,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
       }
     }
-  }, [sorted, svgWidth, svgHeight, colorScale, selectedFeature, onFeatureSelect]);
+  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, selectedFeature, onFeatureSelect]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">
@@ -188,6 +192,9 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         >
           <div className="font-semibold">{hovered.name}</div>
           <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
+          {rowMeta?.[hovered.code] && (
+            <div className="text-gray-400 mt-0.5">{rowMeta[hovered.code]}</div>
+          )}
         </div>
       )}
     </div>

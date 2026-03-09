@@ -44,6 +44,87 @@ function NavItem({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
+/** Render datasets, collapsing any that share a `group` into one nav item + segmented sub-selector. */
+function DatasetList({
+  datasets,
+  selectedDatasetId,
+  onDatasetChange,
+}: {
+  datasets: DatasetDescriptor[];
+  selectedDatasetId: string | null;
+  onDatasetChange: (id: string) => void;
+}) {
+  // Partition into ungrouped items and groups (preserving order of first appearance).
+  const order: Array<{ kind: 'single'; ds: DatasetDescriptor } | { kind: 'group'; key: string; items: DatasetDescriptor[] }> = [];
+  const seenGroups = new Map<string, DatasetDescriptor[]>();
+
+  for (const ds of datasets) {
+    if (!ds.group) {
+      order.push({ kind: 'single', ds });
+    } else if (!seenGroups.has(ds.group)) {
+      const items: DatasetDescriptor[] = [ds];
+      seenGroups.set(ds.group, items);
+      order.push({ kind: 'group', key: ds.group, items });
+    } else {
+      seenGroups.get(ds.group)!.push(ds);
+    }
+  }
+
+  return (
+    <ul>
+      {order.map((entry) => {
+        if (entry.kind === 'single') {
+          return (
+            <li key={entry.ds.id}>
+              <NavItem active={selectedDatasetId === entry.ds.id} onClick={() => onDatasetChange(entry.ds.id)}>
+                {entry.ds.label}
+              </NavItem>
+            </li>
+          );
+        }
+
+        // Group entry
+        const { key, items } = entry;
+        const isGroupActive = items.some(d => d.id === selectedDatasetId);
+        const groupLabel = items.find(d => d.groupLabel)?.groupLabel ?? key;
+
+        return (
+          <li key={key}>
+            <NavItem
+              active={isGroupActive}
+              onClick={() => {
+                // Keep currently selected item in group; otherwise pick first.
+                const current = items.find(d => d.id === selectedDatasetId);
+                onDatasetChange((current ?? items[0]).id);
+              }}
+            >
+              {groupLabel}
+            </NavItem>
+            {isGroupActive && (
+              <div className="flex gap-1 px-3.5 pb-2 pt-0.5">
+                {items.map(ds => (
+                  <button
+                    key={ds.id}
+                    onClick={() => onDatasetChange(ds.id)}
+                    className={[
+                      'flex-1 text-xs py-0.5 rounded text-center transition-colors',
+                      selectedDatasetId === ds.id
+                        ? 'bg-blue-100 text-blue-700 font-medium'
+                        : 'text-slate-500 hover:bg-slate-200',
+                    ].join(' ')}
+                  >
+                    {ds.shortLabel ?? ds.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export function MapSidebar({
   selectedLevel,
   onLevelChange,
@@ -92,15 +173,11 @@ export function MapSidebar({
               Inga dataset för denna nivå.
             </p>
           ) : (
-            <ul>
-              {availableDatasets.map((ds) => (
-                <li key={ds.id}>
-                  <NavItem active={selectedDatasetId === ds.id} onClick={() => onDatasetChange(ds.id)}>
-                    {ds.label}
-                  </NavItem>
-                </li>
-              ))}
-            </ul>
+            <DatasetList
+              datasets={availableDatasets}
+              selectedDatasetId={selectedDatasetId}
+              onDatasetChange={onDatasetChange}
+            />
           )}
         </SidebarSection>
 

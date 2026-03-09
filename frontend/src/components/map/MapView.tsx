@@ -15,6 +15,7 @@ import {
   adminVectorTileLayers,
   adminWfsLayers,
   baseVectorStyle,
+  buildCategoricalStyle,
   buildChoroplethStyle,
   createHighlightLayer,
   createSelectionLayer,
@@ -43,8 +44,9 @@ const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
 
 interface HoveredFeature {
-  label: string;
-  value: number | null;
+  label:   string;
+  value:   number | null;
+  tooltip: string | null; // pre-formatted string (used for categorical data like elections)
 }
 
 export interface MapViewProps {
@@ -52,6 +54,12 @@ export interface MapViewProps {
   selectedBase: BaseMapKey;
   choroplethData: Record<string, number> | null;
   colorScale: ((value: number) => string) | null;
+  /** When set, overrides colorScale — colors features by category (e.g. election winner). */
+  mapColorFn?: ((code: string) => string) | null;
+  /** Pre-formatted tooltip strings keyed by geo code. Overrides the numeric choropleth display. */
+  tooltipData?: Record<string, string> | null;
+  /** Display name overrides keyed by geo code. Supplements missing or raw GeoServer labels. */
+  featureLabels?: Record<string, string> | null;
   featureCodeProperty: string;
   featureLabelProperty: string;
   featureParentProperty?: string;
@@ -59,6 +67,9 @@ export interface MapViewProps {
   /** Values keyed by sub-level codes (e.g. municipality codes when adminLevel=Region).
    *  Used to show data values when hovering sub-boundary features. */
   subChoroplethData?: Record<string, number> | null;
+  /** Pre-formatted tooltip strings for sub-level features (used for categorical data like elections).
+   *  Takes precedence over subChoroplethData when present. */
+  subTooltipData?: Record<string, string> | null;
   selectedFeature: { code: string; label: string; parentCode?: string } | null;
   onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
   onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
@@ -114,11 +125,15 @@ const MapView: React.FC<MapViewProps> = ({
   selectedBase,
   choroplethData,
   colorScale,
+  mapColorFn,
+  tooltipData,
+  featureLabels,
   featureCodeProperty,
   featureLabelProperty,
   featureParentProperty,
   unit,
   subChoroplethData,
+  subTooltipData,
   selectedFeature,
   onFeatureSelect,
   onDrillDown,
@@ -145,10 +160,12 @@ const MapView: React.FC<MapViewProps> = ({
   const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef    = useRef<string | null>(null);
 
-  // Keep latest subChoroplethData in a ref so the pointer-move handler always
-  // sees the current value without needing it in the useCallback dep array.
+  // Keep latest sub-data refs so the pointer-move handler always sees current values
+  // without needing them in the useCallback dep array.
   const subChoroplethDataRef = useRef(subChoroplethData);
   subChoroplethDataRef.current = subChoroplethData;
+  const subTooltipDataRef = useRef(subTooltipData);
+  subTooltipDataRef.current = subTooltipData;
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -208,7 +225,7 @@ const MapView: React.FC<MapViewProps> = ({
       evt.pixel,
       (feature) => {
         clickedCode  = String(feature.get(featureCodeProperty) ?? '');
-        const rawClickLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        const rawClickLabel = featureLabels?.[clickedCode] ?? String(feature.get(featureLabelProperty) ?? clickedCode);
         clickedLabel = adminLevel === 'Region' ? cleanCountyLabel(rawClickLabel) : rawClickLabel;
         if (featureParentProperty) {
           const p = feature.get(featureParentProperty);
@@ -293,7 +310,12 @@ const MapView: React.FC<MapViewProps> = ({
             if (subCode !== hoveredSubCodeRef.current) {
               hoveredSubCodeRef.current = subCode;
               subHighlightLayerRef.current?.changed();
-              setHoveredFeature({ label: subLabel!, value: subChoroplethDataRef.current?.[subCode] ?? null });
+              const subTip = subTooltipDataRef.current?.[subCode] ?? null;
+              setHoveredFeature({
+                label:   subLabel!,
+                value:   subTip !== null ? null : (subChoroplethDataRef.current?.[subCode] ?? null),
+                tooltip: subTip,
+              });
             }
             // Clear main highlight while hovering a sub-feature.
             if (hoveredCodeRef.current !== null) {
@@ -313,28 +335,32 @@ const MapView: React.FC<MapViewProps> = ({
       }
 
       // -- Priority 2: main overlay layer --
-      let result: { code: string; label: string; value: number | null } | null = null;
+      let result: { code: string; label: string; value: number | null; tooltip: string | null } | null = null;
 
       map.forEachFeatureAtPixel(
         pixel,
         (feature) => {
           const code     = String(feature.get(featureCodeProperty) ?? '');
-          const rawLabel = String(feature.get(featureLabelProperty) ?? code);
+          const rawLabel = featureLabels?.[code] ?? String(feature.get(featureLabelProperty) ?? code);
           const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
+          // tooltipData overrides numeric choropleth for election/categorical data.
+          // When tooltipData is provided but has no entry for this code, the area has
+          // no data (e.g. Gotland in regionval) — show "Ingen data" explicitly.
           const value    = choroplethData?.[code] ?? null;
-          result = { code, label, value };
+          const tooltip  = tooltipData != null ? (tooltipData[code] ?? 'Ingen data') : null;
+          result = { code, label, value: tooltip !== null ? null : value, tooltip };
           return true;
         },
         { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 },
       );
 
       if (result !== null) {
-        const { code, label, value } = result;
+        const { code, label, value, tooltip } = result;
         if (code !== hoveredCodeRef.current) {
           hoveredCodeRef.current = code;
           // Only re-render the thin highlight layer, not the full choropleth layer
           highlightLayerRef.current?.changed();
-          setHoveredFeature({ label, value });
+          setHoveredFeature({ label, value, tooltip });
         }
         mapRef.current!.style.cursor = 'pointer';
       } else {
@@ -346,7 +372,7 @@ const MapView: React.FC<MapViewProps> = ({
         mapRef.current!.style.cursor = '';
       }
     }, 50);
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData, tooltipData]);
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {
@@ -512,14 +538,16 @@ const MapView: React.FC<MapViewProps> = ({
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
     const layer = overlayLayerRef.current;
-    if (!layer) {return;}
+    if (!layer) { return; }
 
-    if (choroplethData && colorScale) {
+    if (mapColorFn) {
+      layer.setStyle(buildCategoricalStyle(mapColorFn, featureCodeProperty));
+    } else if (choroplethData && colorScale) {
       layer.setStyle(buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty));
     } else {
       layer.setStyle(baseVectorStyle);
     }
-  }, [choroplethData, colorScale, featureCodeProperty]);
+  }, [choroplethData, colorScale, mapColorFn, featureCodeProperty]);
 
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
@@ -543,7 +571,10 @@ const MapView: React.FC<MapViewProps> = ({
         {hoveredFeature && (
           <>
             <div className="font-semibold">{hoveredFeature.label}</div>
-            {hoveredFeature.value !== null && (
+            {hoveredFeature.tooltip !== null && (
+              <div className="text-gray-300">{hoveredFeature.tooltip}</div>
+            )}
+            {hoveredFeature.tooltip === null && hoveredFeature.value !== null && (
               <div className="text-gray-300">
                 {hoveredFeature.value.toLocaleString('sv-SE')} {unit}
               </div>

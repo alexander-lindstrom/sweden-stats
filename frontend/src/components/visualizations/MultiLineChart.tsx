@@ -10,8 +10,9 @@ const fmtTip    = d3.timeFormat('%b %Y');
 const fmtVal    = d3.format(',.1f');
 
 interface Props {
-  data:   TimeSeriesNode[];
-  label?: string;
+  data:            TimeSeriesNode[];
+  label?:          string;
+  colorOverrides?: Map<string, string>;
 }
 
 interface ParsedSeries {
@@ -21,7 +22,7 @@ interface ParsedSeries {
   pts:   Array<{ parsed: Date; value: number }>;
 }
 
-export function MultiLineChart({ data, label }: Props) {
+export function MultiLineChart({ data, label, colorOverrides }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const tooltipRef   = useRef<HTMLDivElement>(null);
@@ -42,10 +43,12 @@ export function MultiLineChart({ data, label }: Props) {
     setVisible(prev => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  // Stable per-series color from Tableau10 — more distinct than schemeCategory10.
+  // Stable per-series color: use overrides when provided (e.g. party colors), else Tableau10.
   const colorMap = useMemo(
-    () => new Map(data.map((s, i) => [s.id, d3.schemeTableau10[i % 10] as string])),
-    [data],
+    () => colorOverrides
+      ? new Map(data.map(s => [s.id, colorOverrides.get(s.id) ?? (d3.schemeTableau10[0] as string)]))
+      : new Map(data.map((s, i) => [s.id, d3.schemeTableau10[i % 10] as string])),
+    [data, colorOverrides],
   );
 
   const parsedSeries = useMemo<ParsedSeries[]>(() => {

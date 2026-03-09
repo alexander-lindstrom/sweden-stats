@@ -45,7 +45,7 @@ Lean harder into the year slider — show which areas are growing or shrinking o
 | SCB — income/demographics | Disposable income, foreign background %, age | DeSO |
 | SCB — housing | Tenure type, housing stock | DeSO/Kommun |
 | Skolverket | School merit points, pass rates | Kommun |
-| Valmyndigheten | Election results by party | Kommun |
+| Valmyndigheten | Election results by party | Kommun/DeSO/RegSO ✓ |
 | Folkhälsomyndigheten | Public health indicators | Region/Kommun |
 | Kolada | 1000+ municipal KPIs, easy API | Kommun |
 
@@ -74,6 +74,34 @@ The path forward:
 3. **Serve the static files** from the backend (or bundle as assets) and load them in place of live SCB API calls for historical years at RegSO/DeSO level.
 
 This is high-effort, low-generalisation work. Worth doing only if the time-series story at DeSO level becomes a core feature of the explorer.
+
+---
+
+## Election data — what's in place
+
+Election results for riksdagsval, regionval, and kommunval (2022) are available at Country, Region, Municipality, RegSO, and DeSO levels.
+
+- **Country/Region/Municipality**: fetched live from SCB v2beta (TAB2706/2697/2685), covering all elections years back to 1998.
+- **RegSO/DeSO**: area-weighted spatial interpolation from Valmyndigheten valdistrikt boundaries and vote counts onto DeSO/RegSO polygons. Processed offline (`processing/process_election_geodata.py`), served as static JSON from the backend. Currently 2022 only.
+- Local parties that reach ≥0.5% share in any area keep their own identity; below that they fold into Övriga.
+
+## Election data — known gaps and future work
+
+### Övriga breakdown
+At the municipality level, local parties sometimes form the largest single block inside "Övriga". Currently Övriga is pre-aggregated (we request only the 9 main party codes from SCB and they fold the rest). To surface the largest sub-party:
+
+1. Fetch all party codes from table metadata instead of the fixed 9.
+2. Client-side: bucket the 8 known parties normally; sum the rest into Övriga while tracking the per-geo leader.
+3. Extend `ElectionDatasetResult` with `ovrigaLeader?: Record<string, { label: string; share: number }>`.
+4. Show it in the winner column of `ElectionTable` and the `ElectionDonut` when Övriga wins.
+
+### Multi-year DeSO/RegSO election data
+The interpolation pipeline is designed to support multiple years. Adding 2018 (and earlier) requires the same Valmyndigheten source files. Once added, re-running `process_election_geodata.py` produces the additional JSONs; the frontend year slider unlocks automatically (the lock is boundary-driven, not hard-coded to 2022).
+
+The multiline chart is intentionally absent at DeSO/RegSO for now — it becomes meaningful once more than one year of interpolated data exists.
+
+### Election results at valdistrikt granularity
+Valmyndigheten publishes boundaries and results at the valdistrikt (polling district) level — higher spatial resolution than DeSO in dense urban areas. Integrating this would require a GeoServer layer for valdistrikt boundaries. Worth revisiting if the DeSO-level patterns prove compelling.
 
 ---
 

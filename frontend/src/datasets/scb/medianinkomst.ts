@@ -1,5 +1,6 @@
 import { JsonStat2Response } from '@/util/scb';
-import { AdminLevel, DatasetDescriptor, DatasetResult } from '../types';
+import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
+import { getGeoLabels } from '../geoLabels';
 
 // ── TAB6679 constants ─────────────────────────────────────────────────────────
 // "Andel av befolkningen per inkomstklass efter region, inkomstslag och kön"
@@ -139,39 +140,45 @@ async function postQuery(codes: string[], year: number): Promise<JsonStat2Respon
 
 // ── Fetch functions ───────────────────────────────────────────────────────────
 
-async function fetchByRegion(year: number): Promise<DatasetResult> {
+async function fetchByRegion(year: number): Promise<ScalarDatasetResult> {
   const { countyCodes } = await getCodesByLevel();
   const data = await postQuery(countyCodes, year);
   const { values, labels } = aggregateByRegion(data);
-  return { values, labels, label: 'Medianinkomst', unit: 'tkr' };
+  return { kind: 'scalar', values, labels, label: 'Medianinkomst', unit: 'tkr' };
 }
 
-async function fetchByMunicipality(year: number): Promise<DatasetResult> {
+async function fetchByMunicipality(year: number): Promise<ScalarDatasetResult> {
   const { municipalityCodes } = await getCodesByLevel();
   const data = await postQuery(municipalityCodes, year);
   const { values, labels } = aggregateByRegion(data);
-  return { values, labels, label: 'Medianinkomst', unit: 'tkr' };
+  return { kind: 'scalar', values, labels, label: 'Medianinkomst', unit: 'tkr' };
 }
 
-async function fetchByRegso(): Promise<DatasetResult> {
+async function fetchByRegso(): Promise<ScalarDatasetResult> {
   // Boundary-locked: RegSO boundaries stable only at 2024.
-  const { regsoCodes, municipalityLabels } = await getCodesByLevel();
+  const [{ regsoCodes, municipalityLabels }, geoLabels] = await Promise.all([
+    getCodesByLevel(),
+    getGeoLabels('regso'),
+  ]);
   const data = await postQuery(regsoCodes, 2024);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
+  return { kind: 'scalar', values, labels: { ...labels, ...geoLabels }, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
 }
 
-async function fetchByDeso(): Promise<DatasetResult> {
+async function fetchByDeso(): Promise<ScalarDatasetResult> {
   // Boundary-locked: DeSO boundaries stable only at 2024.
-  const { desoCodes, municipalityLabels } = await getCodesByLevel();
+  const [{ desoCodes, municipalityLabels }, geoLabels] = await Promise.all([
+    getCodesByLevel(),
+    getGeoLabels('deso'),
+  ]);
   const data = await postQuery(desoCodes, 2024);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { values, labels, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
+  return { kind: 'scalar', values, labels: { ...labels, ...geoLabels }, label: 'Medianinkomst', unit: 'tkr', parentLabels: municipalityLabels };
 }
 
 // ── Descriptor ────────────────────────────────────────────────────────────────
 
-async function fetchMedianinkomst(level: AdminLevel, year: number): Promise<DatasetResult> {
+async function fetchMedianinkomst(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
   switch (level) {
     case 'Region':       return fetchByRegion(year);
     case 'Municipality': return fetchByMunicipality(year);

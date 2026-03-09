@@ -28,8 +28,8 @@ function hierarchyKey(datasetId: string, year: number): string {
   return `${datasetId}:${year}`;
 }
 
-function timeSeriesKey(datasetId: string, level: AdminLevel): string {
-  return `${datasetId}:${level}`;
+function timeSeriesKey(datasetId: string, level: AdminLevel, featureCode?: string): string {
+  return featureCode ? `${datasetId}:${level}:${featureCode}` : `${datasetId}:${level}`;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -99,10 +99,11 @@ export async function fetchHierarchyCached(
 export async function fetchTimeSeriesCached(
   descriptor: DatasetDescriptor,
   level: AdminLevel,
+  featureCode?: string,
 ): Promise<TimeSeriesNode[] | null> {
   if (!descriptor.fetchTimeSeries) { return null; }
 
-  const key = timeSeriesKey(descriptor.id, level);
+  const key = timeSeriesKey(descriptor.id, level, featureCode);
 
   const cached = timeSeriesCache.get(key);
   if (cached) { return cached; }
@@ -111,7 +112,7 @@ export async function fetchTimeSeriesCached(
   if (inflight) { return inflight; }
 
   const promise = descriptor
-    .fetchTimeSeries(level)
+    .fetchTimeSeries(level, featureCode)
     .then(result => {
       timeSeriesCache.set(key, result);
       timeSeriesInFlight.delete(key);

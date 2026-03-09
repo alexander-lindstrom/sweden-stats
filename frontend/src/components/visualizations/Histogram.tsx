@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import { DatasetResult } from '@/datasets/types';
+import { ScalarDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 
 interface HistogramProps {
-  data: DatasetResult;
+  data: ScalarDatasetResult;
   colorScale?: ((v: number) => string) | null;
 }
 
