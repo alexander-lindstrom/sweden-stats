@@ -265,15 +265,70 @@ def project_votes(
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def build_deso_labels(deso: gpd.GeoDataFrame, regso: gpd.GeoDataFrame) -> dict[str, str]:
+    """
+    Label each DeSO by its containing RegSO name, with a numeric suffix when
+    a RegSO contains multiple DeSOs (sorted by desokod for determinism).
+    Single-DeSO RegSOs just use the RegSO name directly.
+    """
+    centroids = deso[['desokod', 'geometry']].copy()
+    centroids = centroids.set_geometry(deso.geometry.centroid)
+
+    joined = gpd.sjoin(
+        centroids,
+        regso[['regsokod', 'regsonamn', 'geometry']],
+        how='left',
+        predicate='within',
+    )[['desokod', 'regsokod', 'regsonamn']]
+
+    # Fall back to nearest RegSO for centroids that landed outside all polygons
+    # (can happen near coasts where the clipped boundary doesn't cover the centroid).
+    unmatched_codes = joined[joined['regsokod'].isna()]['desokod']
+    if len(unmatched_codes) > 0:
+        fallback = gpd.sjoin_nearest(
+            centroids[centroids['desokod'].isin(unmatched_codes)],
+            regso[['regsokod', 'regsonamn', 'geometry']],
+            how='left',
+        )[['desokod', 'regsokod', 'regsonamn']]
+        joined = pd.concat([joined[~joined['regsokod'].isna()], fallback], ignore_index=True)
+
+    labels: dict[str, str] = {}
+    for _, group in joined.groupby('regsokod'):
+        regsonamn   = group['regsonamn'].iloc[0]
+        sorted_codes = sorted(group['desokod'].tolist())
+        if len(sorted_codes) == 1:
+            labels[sorted_codes[0]] = regsonamn
+        else:
+            for i, code in enumerate(sorted_codes, 1):
+                labels[code] = f'{regsonamn} {i}'
+
+    # Final fallback: use raw code for any DeSO that still has no label.
+    for _, row in deso.iterrows():
+        if row['desokod'] not in labels:
+            labels[row['desokod']] = row['desokod']
+
+    n_fallback = len(unmatched_codes)
+    print(f'  Built labels for {len(labels)} DeSO areas ({n_fallback} used nearest fallback)')
+    return labels
+
+
 def main() -> None:
     print('Loading boundaries...')
     valdistrikt = load_valdistrikt()
     deso        = load_deso()
     regso       = load_regso()
 
-    # Label dicts — DeSO has no name column so use kommunnamn + code.
-    deso_labels  = {row.desokod:  f'{row.kommunnamn} ({row.desokod})' for row in deso.itertuples()}
-    regso_labels = {row.regsokod: row.regsonamn                        for row in regso.itertuples()}
+    # Build label dicts.
+    print('\nBuilding DeSO labels from RegSO names...')
+    deso_labels  = build_deso_labels(deso, regso)
+    regso_labels = {row.regsokod: row.regsonamn for row in regso.itertuples()}
+
+    # Write standalone label files for use by other datasets (e.g. SCB scalar data).
+    (OUT_DIR / 'deso_labels.json').write_text(
+        json.dumps(deso_labels, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    (OUT_DIR / 'regso_labels.json').write_text(
+        json.dumps(regso_labels, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+    print(f'  Written deso_labels.json and regso_labels.json')
 
     # Compute spatial weights — expensive, done once and reused across election types.
     print('\nComputing spatial weights (this may take a few minutes)...')

@@ -605,6 +605,7 @@ export default function MapPage() {
                   colorScale={colorScale}
                   mapColorFn={mapColorFn}
                   tooltipData={tooltipData}
+                  featureLabels={datasetResult?.labels}
                   featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                   featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}

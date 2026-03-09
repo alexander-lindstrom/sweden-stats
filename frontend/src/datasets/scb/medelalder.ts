@@ -1,5 +1,6 @@
 import { JsonStat2Response } from '@/util/scb';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
+import { getGeoLabels } from '../geoLabels';
 
 // ── TAB637 constants (Country → Region → Municipality) ────────────────────────
 
@@ -276,21 +277,23 @@ async function fetchBySmallArea(codes: string[]): Promise<ScalarDatasetResult> {
 }
 
 async function fetchByRegso(): Promise<ScalarDatasetResult> {
-  const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
+  const [{ regsoCodes }, { labels: parentLabels }, geoLabels] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes637(),
+    getGeoLabels('regso'),
   ]);
   const result = await fetchBySmallArea(regsoCodes);
-  return { ...result, parentLabels };
+  return { ...result, labels: { ...result.labels, ...geoLabels }, parentLabels };
 }
 
 async function fetchByDeso(): Promise<ScalarDatasetResult> {
-  const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
+  const [{ desoCodes }, { labels: parentLabels }, geoLabels] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes637(),
+    getGeoLabels('deso'),
   ]);
   const result = await fetchBySmallArea(desoCodes);
-  return { ...result, parentLabels };
+  return { ...result, labels: { ...result.labels, ...geoLabels }, parentLabels };
 }
 
 // ── Descriptor ────────────────────────────────────────────────────────────────

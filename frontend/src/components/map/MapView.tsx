@@ -58,6 +58,8 @@ export interface MapViewProps {
   mapColorFn?: ((code: string) => string) | null;
   /** Pre-formatted tooltip strings keyed by geo code. Overrides the numeric choropleth display. */
   tooltipData?: Record<string, string> | null;
+  /** Display name overrides keyed by geo code. Supplements missing or raw GeoServer labels. */
+  featureLabels?: Record<string, string> | null;
   featureCodeProperty: string;
   featureLabelProperty: string;
   featureParentProperty?: string;
@@ -125,6 +127,7 @@ const MapView: React.FC<MapViewProps> = ({
   colorScale,
   mapColorFn,
   tooltipData,
+  featureLabels,
   featureCodeProperty,
   featureLabelProperty,
   featureParentProperty,
@@ -222,7 +225,7 @@ const MapView: React.FC<MapViewProps> = ({
       evt.pixel,
       (feature) => {
         clickedCode  = String(feature.get(featureCodeProperty) ?? '');
-        const rawClickLabel = String(feature.get(featureLabelProperty) ?? clickedCode);
+        const rawClickLabel = featureLabels?.[clickedCode] ?? String(feature.get(featureLabelProperty) ?? clickedCode);
         clickedLabel = adminLevel === 'Region' ? cleanCountyLabel(rawClickLabel) : rawClickLabel;
         if (featureParentProperty) {
           const p = feature.get(featureParentProperty);
@@ -338,7 +341,7 @@ const MapView: React.FC<MapViewProps> = ({
         pixel,
         (feature) => {
           const code     = String(feature.get(featureCodeProperty) ?? '');
-          const rawLabel = String(feature.get(featureLabelProperty) ?? code);
+          const rawLabel = featureLabels?.[code] ?? String(feature.get(featureLabelProperty) ?? code);
           const label    = adminLevel === 'Region' ? cleanCountyLabel(rawLabel) : rawLabel;
           // tooltipData overrides numeric choropleth for election/categorical data.
           // When tooltipData is provided but has no entry for this code, the area has

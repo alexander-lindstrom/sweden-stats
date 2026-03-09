@@ -1,6 +1,7 @@
 import { JsonStat2Response } from '@/util/scb';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
 import { stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
+import { getGeoLabels } from '../geoLabels';
 
 // ── TAB5444 constants (Country → Region, Region → Municipality) ──────────────
 
@@ -240,23 +241,25 @@ async function fetchByMunicipality(year: number): Promise<ScalarDatasetResult> {
 }
 
 async function fetchByRegso(): Promise<ScalarDatasetResult> {
-  const [{ regsoCodes }, { labels: parentLabels }] = await Promise.all([
+  const [{ regsoCodes }, { labels: parentLabels }, geoLabels] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes(),
+    getGeoLabels('regso'),
   ]);
   const data = await postDataQuery6574(regsoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
+  return { kind: 'scalar', values, labels: { ...labels, ...geoLabels }, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
 async function fetchByDeso(): Promise<ScalarDatasetResult> {
-  const [{ desoCodes }, { labels: parentLabels }] = await Promise.all([
+  const [{ desoCodes }, { labels: parentLabels }, geoLabels] = await Promise.all([
     getRegsoDeso(),
     getMunicipalityCodes(),
+    getGeoLabels('deso'),
   ]);
   const data = await postDataQuery6574(desoCodes);
   const { values, labels } = stripSuffixes(aggregateByRegion(data));
-  return { kind: 'scalar', values, labels, label: 'Folkmängd', unit: 'personer', parentLabels };
+  return { kind: 'scalar', values, labels: { ...labels, ...geoLabels }, label: 'Folkmängd', unit: 'personer', parentLabels };
 }
 
 // ── Hierarchy builder ────────────────────────────────────────────────────────

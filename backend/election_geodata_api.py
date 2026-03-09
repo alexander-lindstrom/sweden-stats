@@ -8,6 +8,7 @@ DATA_DIR = Path("../data/elections")
 
 VALID_ELECTION_TYPES = {"riksdag", "regionval", "kommunval"}
 VALID_LEVELS         = {"deso", "regso"}
+VALID_LABEL_LEVELS   = {"deso", "regso"}
 
 
 @router.get("/api/election-geodata/{election_type}/{year}/{level}")
@@ -20,5 +21,17 @@ async def get_election_geodata(election_type: str, year: int, level: str):
     path = DATA_DIR / f"{election_type}_{year}_{level}.json"
     if not path.exists():
         raise HTTPException(status_code=404, detail=f"No data for {election_type} {year} {level}")
+
+    return FileResponse(path, media_type="application/json")
+
+
+@router.get("/api/geo-labels/{level}")
+async def get_geo_labels(level: str):
+    if level not in VALID_LABEL_LEVELS:
+        raise HTTPException(status_code=400, detail=f"Unknown level '{level}'")
+
+    path = DATA_DIR / f"{level}_labels.json"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"No labels for {level}")
 
     return FileResponse(path, media_type="application/json")
