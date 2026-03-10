@@ -10,5 +10,4 @@ data/SCB boundaries/*.gpkg
 # Raw election source data — large files, obtain from Valmyndigheten
 data/valmyndigheten/
 
-# Generated election geodata — produced by processing/process_election_geodata.py
-data/elections/
+# Raw election source data — large files, obtain from Valmyndigheten (already listed above)
