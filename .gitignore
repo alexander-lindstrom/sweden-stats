@@ -1,6 +1,7 @@
 .claude/
 node_modules/
 .env.local
+.env.production
 
 # GeoPackage files — large binaries, regenerate with processing/clip_regso_deso.py
 data/geopackage/
