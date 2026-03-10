@@ -1,0 +1,15 @@
+datamedmera.se {
+    # Block GeoServer admin UI
+    respond /geoserver/web/* 403
+
+    # Backend API
+    reverse_proxy /api/* backend:3001
+
+    # GeoServer tiles / WFS
+    reverse_proxy /geoserver/* geoserver:8080
+
+    # SPA — serve static files, fall back to index.html
+    root * /var/www/html
+    try_files {path} /index.html
+    file_server
+}
