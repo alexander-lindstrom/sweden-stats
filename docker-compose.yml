@@ -20,6 +20,7 @@ services:
       - ./data:/app/data:ro
     environment:
       - ALLOWED_ORIGINS=https://datamedmera.se
+      - DATA_DIR=/app/data
     restart: unless-stopped
 
   geoserver:

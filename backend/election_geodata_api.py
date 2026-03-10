@@ -1,10 +1,11 @@
+import os
+from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from pathlib import Path
 
 router = APIRouter()
 
-DATA_DIR = Path("../data/elections")
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(__file__).parent.parent / "data"))) / "elections"
 
 VALID_ELECTION_TYPES = {"riksdag", "regionval", "kommunval"}
 VALID_LEVELS         = {"deso", "regso"}
