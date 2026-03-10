@@ -24,6 +24,9 @@ services:
     volumes:
       - geoserver_data:/opt/geoserver/data_dir
       - ./data/geopackage:/opt/geopackage:ro
+    environment:
+      - GEOSERVER_ADMIN_USER=admin
+      - GEOSERVER_ADMIN_PASSWORD=geoserver
     restart: unless-stopped
     # Remove after initial GeoServer setup
     ports:
