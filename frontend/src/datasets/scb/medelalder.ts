@@ -320,10 +320,10 @@ export const medelalder: DatasetDescriptor = {
     DeSO:  ['map', 'chart', 'table'],
   },
   chartTypes: {
-    Region:       ['bar', 'diverging', 'histogram'],
-    Municipality: ['diverging', 'histogram'],
-    RegSO:        ['diverging', 'histogram'],
-    DeSO:         ['diverging', 'histogram'],
+    Region:       ['bar', 'diverging', 'histogram', 'scatter'],
+    Municipality: ['diverging', 'histogram', 'scatter', 'boxplot'],
+    RegSO:        ['diverging', 'histogram', 'scatter', 'boxplot'],
+    DeSO:         ['diverging', 'histogram', 'scatter', 'boxplot'],
   },
   fetch: fetchMedelalder,
 };

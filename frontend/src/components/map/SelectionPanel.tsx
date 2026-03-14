@@ -15,18 +15,22 @@ const LEVEL_BADGE: Record<AdminLevel, string> = {
   DeSO:         'bg-rose-100 text-rose-700',
 };
 
-const popDescriptor         = DATASETS.find(d => d.id === 'population')!;
-const incomeDescriptor      = DATASETS.find(d => d.id === 'medianinkomst')!;
-const ageDescriptor         = DATASETS.find(d => d.id === 'medelalder')!;
-const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
+const popDescriptor           = DATASETS.find(d => d.id === 'population')!;
+const incomeDescriptor        = DATASETS.find(d => d.id === 'medianinkomst')!;
+const ageDescriptor           = DATASETS.find(d => d.id === 'medelalder')!;
+const foreignBgDescriptor     = DATASETS.find(d => d.id === 'utlandsk_bakgrund')!;
+const employmentDescriptor    = DATASETS.find(d => d.id === 'sysselsattning')!;
+const riksdagsvalDescriptor   = DATASETS.find(d => d.id === 'riksdagsval')!;
 
 const STAT_YEAR     = 2024;
 const ELECTION_YEAR = 2022;
 
-const SPARKLINE_YEARS   = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
-const INCOME_LEVELS:    AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const AGE_LEVELS:       AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const ELECTION_LEVELS:  AdminLevel[] = ['Region', 'Municipality'];
+const SPARKLINE_YEARS     = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
+const INCOME_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const AGE_LEVELS:         AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const FOREIGN_BG_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const EMPLOYMENT_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const ELECTION_LEVELS:    AdminLevel[] = ['Region', 'Municipality'];
 
 interface StatData {
   value:      number | null;
@@ -176,7 +180,7 @@ function RadarChart({ axes }: { axes: RadarAxis[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const N  = axes.length;
-  const CX = 88, CY = 80, R = 52;
+  const CX = 108, CY = 80, R = 52;
   const H  = 142;
 
   const angle = (i: number) => (2 * Math.PI * i / N) - Math.PI / 2;
@@ -353,9 +357,11 @@ export interface SelectionPanelProps {
 }
 
 interface PanelStats {
-  population: StatData;
-  income:     StatData | null;
-  age:        StatData | null;
+  population:  StatData;
+  income:      StatData | null;
+  age:         StatData | null;
+  foreignBg:   StatData | null;
+  employment:  StatData | null;
 }
 
 export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }: SelectionPanelProps) {
@@ -384,13 +390,17 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     setSparkLoading(true);
     setElectionVotes(null);
 
-    const wantsIncome   = INCOME_LEVELS.includes(adminLevel);
-    const wantsAge      = AGE_LEVELS.includes(adminLevel);
-    const wantsElection = ELECTION_LEVELS.includes(adminLevel);
+    const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
+    const wantsAge        = AGE_LEVELS.includes(adminLevel);
+    const wantsForeignBg  = FOREIGN_BG_LEVELS.includes(adminLevel);
+    const wantsEmployment = EMPLOYMENT_LEVELS.includes(adminLevel);
+    const wantsElection   = ELECTION_LEVELS.includes(adminLevel);
 
-    let popStat:    StatData | null = null;
-    let incomeStat: StatData | null = null;
-    let ageStat:    StatData | null = null;
+    let popStat:        StatData | null = null;
+    let incomeStat:     StatData | null = null;
+    let ageStat:        StatData | null = null;
+    let foreignBgStat:  StatData | null = null;
+    let employmentStat: StatData | null = null;
 
     const statFetches: Promise<void>[] = [
       fetchCached(popDescriptor, adminLevel, STAT_YEAR)
@@ -414,13 +424,31 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       );
     }
 
+    if (wantsForeignBg) {
+      statFetches.push(
+        fetchCached(foreignBgDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { foreignBgStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+
+    if (wantsEmployment) {
+      statFetches.push(
+        fetchCached(employmentDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { employmentStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+
     Promise.all(statFetches).then(() => {
       if (id !== fetchIdRef.current) { return; }
       if (popStat !== null) {
         setStats({
-          population: popStat,
-          income:     wantsIncome ? incomeStat : null,
-          age:        wantsAge    ? ageStat    : null,
+          population:  popStat,
+          income:      wantsIncome     ? incomeStat     : null,
+          age:         wantsAge        ? ageStat        : null,
+          foreignBg:   wantsForeignBg  ? foreignBgStat  : null,
+          employment:  wantsEmployment ? employmentStat : null,
         });
       }
       setStatsLoading(false);
@@ -477,6 +505,16 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       radarAxes.push({ label: 'Ålder', percentile: stats.age.percentile,
         value: stats.age.value, unit: stats.age.unit,
         rank: stats.age.rank, total: stats.age.total });
+    }
+    if (stats.foreignBg != null && stats.foreignBg.percentile !== null) {
+      radarAxes.push({ label: 'Utländsk', percentile: stats.foreignBg.percentile,
+        value: stats.foreignBg.value, unit: stats.foreignBg.unit,
+        rank: stats.foreignBg.rank, total: stats.foreignBg.total });
+    }
+    if (stats.employment != null && stats.employment.percentile !== null) {
+      radarAxes.push({ label: 'Syssels.', percentile: stats.employment.percentile,
+        value: stats.employment.value, unit: stats.employment.unit,
+        rank: stats.employment.rank, total: stats.employment.total });
     }
   }
 
@@ -551,9 +589,11 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
               )}
               {!statsLoading && stats && (
                 <div className="space-y-3">
-                  <StatRow label="Befolkning"    stat={stats.population} />
-                  {stats.income && <StatRow label="Medianinkomst" stat={stats.income} />}
-                  {stats.age    && <StatRow label="Medelålder"    stat={stats.age}    />}
+                  <StatRow label="Befolkning"       stat={stats.population} />
+                  {stats.income     && <StatRow label="Medianinkomst"    stat={stats.income}     />}
+                  {stats.age        && <StatRow label="Medelålder"       stat={stats.age}        />}
+                  {stats.foreignBg  && <StatRow label="Utländsk bakgrund" stat={stats.foreignBg} />}
+                  {stats.employment && <StatRow label="Sysselsättning"   stat={stats.employment} />}
                 </div>
               )}
             </section>

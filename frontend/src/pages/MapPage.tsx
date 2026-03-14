@@ -11,6 +11,8 @@ import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
+import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
+import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
@@ -80,6 +82,8 @@ export default function MapPage() {
   const [mapResetToken,     setMapResetToken]       = useState(0);
   /** Which party to show on the choropleth map (null = winner coloring). */
   const [activeParty,       setActiveParty]        = useState<string | null>(null);
+  /** Secondary dataset for the scatter chart Y axis. */
+  const [scatterYDatasetId, setScatterYDatasetId]  = useState<string | null>(null);
 
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -100,6 +104,13 @@ export default function MapPage() {
   );
   const subScalarResult    = subDatasetResult?.kind === 'scalar'   ? subDatasetResult as ScalarDatasetResult : null;
   const subElectionResult  = subDatasetResult?.kind === 'election' ? subDatasetResult : null;
+
+  const { datasetResult: scatterYResult } = useDatasetFetch(
+    scatterYDatasetId,
+    selectedLevel,
+    selectedYear,
+  );
+  const scatterYScalar = scatterYResult?.kind === 'scalar' ? scatterYResult as ScalarDatasetResult : null;
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
@@ -244,6 +255,28 @@ export default function MapPage() {
     const types = activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType];
     setActiveChartType(ct => types.includes(ct) ? ct : (types[0] ?? 'bar'));
   }, [selectedLevel, activeDescriptor]);
+
+  // ── Scatter Y-axis dataset ─────────────────────────────────────────────────
+  // Scalar geographic datasets available as the Y axis (excludes active + elections).
+  const scatterableDatasets = useMemo(
+    () => DATASETS.filter(d =>
+      d.id !== selectedDatasetId &&
+      d.group !== 'val' &&
+      d.supportedLevels.includes(selectedLevel) &&
+      chartTypesForLevel(d, selectedLevel).some(ct => ['bar', 'diverging', 'histogram', 'scatter'].includes(ct)),
+    ),
+    [selectedDatasetId, selectedLevel],
+  );
+
+  // Auto-select the first available Y dataset when entering scatter mode or
+  // when the active dataset / level changes while in scatter mode.
+  useEffect(() => {
+    if (activeChartType !== 'scatter') { return; }
+    const valid = scatterableDatasets.some(d => d.id === scatterYDatasetId);
+    if (!valid) {
+      setScatterYDatasetId(scatterableDatasets[0]?.id ?? null);
+    }
+  }, [activeChartType, scatterableDatasets, scatterYDatasetId]);
 
   // ── Lan/Municipality filter ────────────────────────────────────────────────
   // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
@@ -619,6 +652,22 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Y-axis dataset selector for scatter chart */}
+          {activeView === 'chart' && activeChartType === 'scatter' && scatterableDatasets.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Y-axel</label>
+              <select
+                value={scatterYDatasetId ?? ''}
+                onChange={e => setScatterYDatasetId(e.target.value || null)}
+                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {scatterableDatasets.map(d => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="flex-1 flex min-h-0 overflow-hidden">
             <div className="flex-1 relative overflow-hidden min-w-0" style={{ isolation: 'isolate' }}>
               {activeView === 'map' && (
@@ -710,10 +759,30 @@ export default function MapPage() {
                   />
                 </div>
               )}
+              {activeView === 'chart' && activeChartType === 'scatter' && scalarResult && scatterYScalar && (
+                <div className="w-full h-full p-4">
+                  <ScatterPlot
+                    xData={scalarResult}
+                    yData={scatterYScalar}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={setSelectedFeature}
+                  />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'boxplot' && scalarResult && (
+                <div className="w-full h-full p-6 overflow-y-auto">
+                  <BoxPlot
+                    data={scalarResult}
+                    colorScale={colorScale}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={setSelectedFeature}
+                  />
+                </div>
+              )}
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>

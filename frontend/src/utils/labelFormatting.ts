@@ -1,4 +1,16 @@
 /**
+ * Strip a leading numeric code that some SCB tables include in their labels.
+ * Safe to call on any label — no-op when no numeric prefix is present.
+ * Examples:
+ *   "01 Stockholm"   → "Stockholm"
+ *   "2482 Skellefteå" → "Skellefteå"
+ *   "Uppsala"        → "Uppsala"  (no-op)
+ */
+export function stripCodePrefix(label: string): string {
+  return label.replace(/^\d+\s+/, '');
+}
+
+/**
  * Strip the Swedish county suffix ("s län" / " län") from a label.
  * Safe to call on any label — no-op when the suffix is absent.
  * Examples:

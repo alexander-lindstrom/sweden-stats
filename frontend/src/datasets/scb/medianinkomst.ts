@@ -1,6 +1,7 @@
 import { JsonStat2Response } from '@/util/scb';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
 import { getGeoLabels } from '../geoLabels';
+import { stripCodePrefix } from '@/utils/labelFormatting';
 
 // ── TAB6679 constants ─────────────────────────────────────────────────────────
 // "Andel av befolkningen per inkomstklass efter region, inkomstslag och kön"
@@ -58,7 +59,7 @@ async function getCodesByLevel(): Promise<CodeCache> {
     else if (code.includes('_DeSO'))  {desoCodes.push(code);}
     else if (code.length === 4) {
       municipalityCodes.push(code);
-      municipalityLabels[code] = regionCat.label[code] ?? code;
+      municipalityLabels[code] = stripCodePrefix(regionCat.label[code] ?? code);
     }
     else if (code.length === 2) {countyCodes.push(code);}
   }
@@ -101,7 +102,10 @@ function aggregateByRegion(
     if (code) {values[code] = (values[code] ?? 0) + num;}
   }
 
-  const responseLabels = { ...regionDim.category.label } as Record<string, string>;
+  const responseLabels: Record<string, string> = {};
+  for (const [code, label] of Object.entries(regionDim.category.label as Record<string, string>)) {
+    responseLabels[code] = stripCodePrefix(label);
+  }
   const labels = externalLabels ? { ...externalLabels, ...responseLabels } : responseLabels;
   return { values, labels };
 }
@@ -200,10 +204,10 @@ export const medianinkomst: DatasetDescriptor = {
     DeSO:  ['map', 'chart', 'table'],
   },
   chartTypes: {
-    Region:       ['bar', 'diverging', 'histogram'],
-    Municipality: ['diverging', 'histogram'],
-    RegSO:        ['diverging', 'histogram'],
-    DeSO:         ['diverging', 'histogram'],
+    Region:       ['bar', 'diverging', 'histogram', 'scatter'],
+    Municipality: ['diverging', 'histogram', 'scatter', 'boxplot'],
+    RegSO:        ['diverging', 'histogram', 'scatter', 'boxplot'],
+    DeSO:         ['diverging', 'histogram', 'scatter', 'boxplot'],
   },
   fetch: fetchMedianinkomst,
 };
