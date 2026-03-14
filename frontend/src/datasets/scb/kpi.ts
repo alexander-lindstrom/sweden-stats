@@ -1,40 +1,36 @@
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, TimeSeriesNode } from '../types';
-import { fetchScbData } from '@/api/backend/ScbApi';
+
+const DATA_URL = 'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5512/data?outputFormat=json-stat2';
+
+/** TAB5512 runs 1980M01–2025M12 and is frozen (base year moves to 2020 from 2026). */
+function monthCodes(startYear: number, endYear: number): string[] {
+  const codes: string[] = [];
+  for (let y = startYear; y <= endYear; y++) {
+    for (let m = 1; m <= 12; m++) {
+      codes.push(`${y}M${String(m).padStart(2, '0')}`);
+    }
+  }
+  return codes;
+}
 
 const QUERY_BODY = {
-  query: [
-    {
-      code: 'VaruTjanstegrupp',
-      selection: {
-        filter: 'vs:VaruTjänstegrCoicopA',
-        values: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '11', '12'],
-      },
-    },
-    {
-      code: 'ContentsCode',
-      selection: {
-        filter: 'item',
-        values: ['000003TJ'],
-      },
-    },
+  selection: [
+    { variableCode: 'VaruTjanstegrupp', valueCodes: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '11', '12'] },
+    { variableCode: 'ContentsCode', valueCodes: ['000003TJ'] },
+    { variableCode: 'Tid', valueCodes: monthCodes(1980, 2025) },
   ],
-  response: { format: 'json-stat2' },
 };
 
 interface KpiApiResponse {
-  dimension: {
-    VaruTjanstegrupp: {
-      category: { label: Record<string, string> };
-    };
-    Tid: {
-      category: {
-        index: Record<string, number>;
-        label: Record<string, string>;
-      };
-    };
-  };
+  id: string[];
   size: number[];
-  value: number[];
+  value: (number | null)[];
+  dimension: Record<string, {
+    category: {
+      index: Record<string, number>;
+      label: Record<string, string>;
+    };
+  }>;
 }
 
 /** Parses SCB YYYYMXX date format (e.g. "2023M01") to ISO YYYY-MM-DD. */
@@ -44,41 +40,38 @@ function parseScbMonth(dateStr: string): string {
   return `${year}-${month}-01`;
 }
 
-/**
- * SCB omits category 10 (education/utbildning) from the data array but still
- * assigns codes 01–12 (minus 10). This means the index into the value array
- * must skip the gap at code 10.
- */
-const MISSING_CODES = new Set(['10']);
-
-function adjustedCategoryIndex(code: string): number {
-  const n = parseInt(code, 10);
-  let offset = 0;
-  for (const m of MISSING_CODES) {
-    if (parseInt(m, 10) < n) { offset++; }
-  }
-  return n - offset;
-}
-
 async function fetchKpiTimeSeries(): Promise<TimeSeriesNode[]> {
-  const raw: KpiApiResponse = await fetchScbData('START/PR/PR0101/PR0101A/KPICOI80MN', QUERY_BODY);
+  const response = await fetch(DATA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(QUERY_BODY),
+  });
+  if (!response.ok) { throw new Error(`SCB KPI fetch failed: ${response.statusText}`); }
+  const raw: KpiApiResponse = await response.json();
 
-  const categoryLabels = raw.dimension.VaruTjanstegrupp.category.label;
-  const timeIndex      = raw.dimension.Tid.category.index;
-  const timeKeys       = Object.keys(timeIndex);
-  const nTimePoints    = raw.size[2];
+  // Compute strides for indexing into the flat value array.
+  const strides = new Array(raw.id.length).fill(1);
+  for (let i = raw.id.length - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * raw.size[i + 1];
+  }
+  const catPos = raw.id.indexOf('VaruTjanstegrupp');
+  const tidPos = raw.id.indexOf('Tid');
+
+  const catDim  = raw.dimension['VaruTjanstegrupp'].category;
+  const timeDim = raw.dimension['Tid'].category;
+  const timeKeys = Object.keys(timeDim.index).sort((a, b) => timeDim.index[a] - timeDim.index[b]);
 
   const capitalise = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-  return Object.entries(categoryLabels).map(([code, name]) => {
-    const catIdx = adjustedCategoryIndex(code);
+  return Object.entries(catDim.label).map(([code, name]) => {
+    const catIdx = catDim.index[code];
 
     const points = timeKeys
       .map(timeKey => {
-        const tIdx   = timeIndex[timeKey];
-        const vIdx   = tIdx + (catIdx - 1) * nTimePoints;
-        const value  = raw.value[vIdx];
-        return Number.isFinite(value) ? { date: parseScbMonth(timeKey), value } : null;
+        const tIdx  = timeDim.index[timeKey];
+        const vIdx  = catIdx * strides[catPos] + tIdx * strides[tidPos];
+        const value = raw.value[vIdx];
+        return value != null && Number.isFinite(value) ? { date: parseScbMonth(timeKey), value } : null;
       })
       .filter((p): p is { date: string; value: number } => p !== null);
 
