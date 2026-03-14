@@ -12,6 +12,7 @@ import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
+import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
@@ -768,10 +769,20 @@ export default function MapPage() {
                   />
                 </div>
               )}
+              {activeView === 'chart' && activeChartType === 'boxplot' && scalarResult && (
+                <div className="w-full h-full p-6 overflow-y-auto">
+                  <BoxPlot
+                    data={scalarResult}
+                    colorScale={colorScale}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={setSelectedFeature}
+                  />
+                </div>
+              )}
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>
