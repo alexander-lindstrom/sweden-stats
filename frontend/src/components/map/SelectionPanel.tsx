@@ -15,37 +15,41 @@ const LEVEL_BADGE: Record<AdminLevel, string> = {
   DeSO:         'bg-rose-100 text-rose-700',
 };
 
-const popDescriptor        = DATASETS.find(d => d.id === 'population')!;
-const incomeDescriptor     = DATASETS.find(d => d.id === 'medianinkomst')!;
-const ageDescriptor        = DATASETS.find(d => d.id === 'medelalder')!;
+const popDescriptor         = DATASETS.find(d => d.id === 'population')!;
+const incomeDescriptor      = DATASETS.find(d => d.id === 'medianinkomst')!;
+const ageDescriptor         = DATASETS.find(d => d.id === 'medelalder')!;
 const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
 
 const STAT_YEAR     = 2024;
 const ELECTION_YEAR = 2022;
 
-const SPARKLINE_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
-
-const INCOME_LEVELS:   AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const AGE_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const ELECTION_LEVELS: AdminLevel[] = ['Region', 'Municipality'];
+const SPARKLINE_YEARS   = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
+const INCOME_LEVELS:    AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const AGE_LEVELS:       AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const ELECTION_LEVELS:  AdminLevel[] = ['Region', 'Municipality'];
 
 interface StatData {
-  value: number | null;
-  unit:  string;
-  rank:  number | null;
-  total: number | null;
+  value:      number | null;
+  unit:       string;
+  rank:       number | null;
+  total:      number | null;
+  /** Fraction of peer areas with a strictly lower value (0 = lowest, 1 = highest). */
+  percentile: number | null;
 }
 
 function toStat(result: ScalarDatasetResult, code: string): StatData {
   const value = result.values[code] ?? null;
   const all   = Object.values(result.values).filter(Number.isFinite) as number[];
   const rank  = value !== null ? all.filter(v => v > value).length + 1 : null;
-  return { value, unit: result.unit, rank, total: all.length };
+  const percentile =
+    value !== null && all.length > 1
+      ? all.filter(v => v < value).length / (all.length - 1)
+      : null;
+  return { value, unit: result.unit, rank, total: all.length, percentile };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-/** Section heading with a hairline rule extending to the right. */
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-3">
@@ -57,7 +61,6 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Light card wrapper used around chart visuals. */
 function ChartCard({ children }: { children: React.ReactNode }) {
   return (
     <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
@@ -66,27 +69,56 @@ function ChartCard({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Thin horizontal bar showing where a value sits relative to all peers.
+ * The vertical tick marks the median (50th percentile).
+ */
+function PercentileBar({ percentile }: { percentile: number }) {
+  const pct = Math.max(0, Math.min(1, percentile)) * 100;
+  return (
+    // py-2 gives the overflowing dot room above and below the 4px track
+    <div className="py-2 relative">
+      <div className="relative h-1 rounded-full bg-slate-100">
+        {/* Fill */}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-blue-200"
+          style={{ width: `${pct}%` }}
+        />
+        {/* Median tick */}
+        <div className="absolute top-0 bottom-0 w-px bg-slate-400" style={{ left: '50%' }} />
+        {/* Position dot */}
+        <div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-white shadow-sm"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function StatRow({ label, stat }: { label: string; stat: StatData }) {
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-0.5">
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
         {label}
       </div>
       {stat.value === null ? (
         <div className="text-sm text-slate-400">—</div>
       ) : (
-        <div className="flex items-baseline gap-2">
-          <span className="text-xl font-bold text-slate-900 tabular-nums">
-            {stat.value.toLocaleString('sv-SE')}
-          </span>
-          <span className="text-xs text-slate-500">{stat.unit}</span>
-          {stat.rank !== null && stat.total !== null && (
-            <span className="ml-auto text-xs text-slate-500 tabular-nums">
-              #{stat.rank}
-              <span className="text-slate-400">/{stat.total}</span>
+        <>
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-bold text-slate-900 tabular-nums">
+              {stat.value.toLocaleString('sv-SE')}
             </span>
-          )}
-        </div>
+            <span className="text-xs text-slate-500">{stat.unit}</span>
+            {stat.rank !== null && stat.total !== null && (
+              <span className="ml-auto text-[10px] text-slate-400 tabular-nums">
+                #{stat.rank}/{stat.total}
+              </span>
+            )}
+          </div>
+          {stat.percentile !== null && <PercentileBar percentile={stat.percentile} />}
+        </>
       )}
     </div>
   );
@@ -125,11 +157,131 @@ function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
   );
 }
 
+interface RadarAxis {
+  label:      string;
+  percentile: number;
+  value?:     number | null;
+  unit?:      string;
+  rank?:      number | null;
+  total?:     number | null;
+}
+
+const RADAR_WEB = [0.25, 0.5, 0.75, 1] as const;
+
+/**
+ * Spider/radar chart showing percentile scores across multiple axes.
+ * Hover a vertex dot to see the exact value, percentile, and rank.
+ */
+function RadarChart({ axes }: { axes: RadarAxis[] }) {
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  const N  = axes.length;
+  const CX = 88, CY = 80, R = 52;
+  const H  = 142;
+
+  const angle = (i: number) => (2 * Math.PI * i / N) - Math.PI / 2;
+  const pt = (v: number, i: number): [number, number] => [
+    CX + R * v * Math.cos(angle(i)),
+    CY + R * v * Math.sin(angle(i)),
+  ];
+  const ring = (v: number) =>
+    axes.map((_, i) => pt(v, i))
+      .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+      .join(' ') + 'Z';
+
+  const valuePath = axes
+    .map((a, i) => pt(a.percentile, i))
+    .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+    .join(' ') + 'Z';
+
+  // Build tooltip data when a vertex is hovered.
+  const tooltip = hovered !== null ? (() => {
+    const axis = axes[hovered];
+    const [vx, vy] = pt(axis.percentile, hovered);
+    const lines: Array<{ text: string; bold?: boolean }> = [];
+    if (axis.value != null) {
+      lines.push({ text: `${axis.value.toLocaleString('sv-SE')} ${axis.unit ?? ''}`.trim(), bold: true });
+    }
+    lines.push({ text: `Percentil: ${Math.round(axis.percentile * 100)}%` });
+    if (axis.rank != null && axis.total != null) {
+      lines.push({ text: `#${axis.rank} av ${axis.total}` });
+    }
+    const lineH = 11, padX = 6, padY = 4, boxW = 94;
+    const boxH = lines.length * lineH + padY * 2;
+    const above = vy >= CY;
+    const tx = Math.max(2, Math.min(CX * 2 - boxW - 2, vx - boxW / 2));
+    const ty = above ? vy - boxH - 7 : vy + 7;
+    return { lines, lineH, padX, padY, boxW, boxH, tx, ty };
+  })() : null;
+
+  return (
+    <svg width="100%" viewBox={`0 0 ${CX * 2} ${H}`} className="block overflow-visible">
+      {/* Web grid */}
+      {RADAR_WEB.map(v => (
+        <path key={v} d={ring(v)} fill="none"
+          stroke={v === 0.5 ? '#94a3b8' : '#e2e8f0'}
+          strokeWidth={v === 0.5 ? 1 : 0.75}
+          strokeDasharray={v === 0.5 ? '3 3' : undefined}
+        />
+      ))}
+      {/* Axis spokes */}
+      {axes.map((_, i) => {
+        const [x2, y2] = pt(1, i);
+        return <line key={i} x1={CX} y1={CY} x2={x2.toFixed(1)} y2={y2.toFixed(1)} stroke="#e2e8f0" strokeWidth={0.75} />;
+      })}
+      {/* Value polygon */}
+      <path d={valuePath} fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth={1.5} strokeLinejoin="round" />
+      {/* Vertex dots */}
+      {axes.map((a, i) => {
+        const [cx, cy] = pt(a.percentile, i);
+        return <circle key={i} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={2.5} fill="#3b82f6" />;
+      })}
+      {/* Large transparent hit areas for hover */}
+      {axes.map((a, i) => {
+        const [cx, cy] = pt(a.percentile, i);
+        return (
+          <circle key={`hit-${i}`} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={10}
+            fill="transparent" style={{ cursor: 'default' }}
+            onMouseEnter={() => setHovered(i)}
+            onMouseLeave={() => setHovered(null)}
+          />
+        );
+      })}
+      {/* Axis labels — anchor direction follows which side of centre the label is on */}
+      {axes.map(({ label }, i) => {
+        const [x, y] = pt(1.28, i);
+        const anchor = x < CX - 4 ? 'end' : x > CX + 4 ? 'start' : 'middle';
+        return (
+          <text key={i} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor={anchor} dominantBaseline="middle"
+            fontSize={9} fontWeight={600} fill={hovered === i ? '#3b82f6' : '#64748b'}>
+            {label}
+          </text>
+        );
+      })}
+      <circle cx={CX} cy={CY} r={2} fill="#e2e8f0" />
+      {/* Tooltip */}
+      {tooltip && (
+        <g style={{ pointerEvents: 'none' }}>
+          <rect x={tooltip.tx} y={tooltip.ty} width={tooltip.boxW} height={tooltip.boxH}
+            rx={3} fill="white" stroke="#cbd5e1" strokeWidth={0.75} />
+          {tooltip.lines.map(({ text, bold }, li) => (
+            <text key={li}
+              x={tooltip.tx + tooltip.padX}
+              y={tooltip.ty + tooltip.padY + li * tooltip.lineH + tooltip.lineH * 0.75}
+              fontSize={8.5} fontWeight={bold ? 600 : 400} fill="#475569">
+              {text}
+            </text>
+          ))}
+        </g>
+      )}
+    </svg>
+  );
+}
+
 const DONUT_R    = 48;
 const DONUT_HOLE = 27;
 const DONUT_SIZE = DONUT_R * 2 + 4;
 
-/** Mini donut chart — centered above a party legend list. */
 function ElectionDonut({ votes }: { votes: Record<string, number> }) {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -158,7 +310,6 @@ function ElectionDonut({ votes }: { votes: Record<string, number> }) {
       .attr('stroke', 'white')
       .attr('stroke-width', 1);
 
-    // Winner label in the centre.
     const winner = rows.reduce((a, b) => a.share > b.share ? a : b);
     g.append('text')
       .attr('text-anchor', 'middle').attr('dy', '-0.2em')
@@ -170,7 +321,6 @@ function ElectionDonut({ votes }: { votes: Record<string, number> }) {
       .text(`${winner.share.toFixed(0)}%`);
   }, [votes]);
 
-  // Top parties by share for the legend.
   const topParties = PARTY_CODES
     .map(p => ({ p, share: votes[p] ?? 0 }))
     .filter(d => d.share > 0)
@@ -238,7 +388,6 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     const wantsAge      = AGE_LEVELS.includes(adminLevel);
     const wantsElection = ELECTION_LEVELS.includes(adminLevel);
 
-    // -- Stats ----------------------------------------------------------------
     let popStat:    StatData | null = null;
     let incomeStat: StatData | null = null;
     let ageStat:    StatData | null = null;
@@ -277,7 +426,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       setStatsLoading(false);
     });
 
-    // -- Sparkline ------------------------------------------------------------
+    // Sparkline
     Promise.all(
       SPARKLINE_YEARS.map(year =>
         fetchCached(popDescriptor, adminLevel, year)
@@ -293,7 +442,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       setSparkLoading(false);
     });
 
-    // -- Election -------------------------------------------------------------
+    // Election
     if (wantsElection) {
       setElectionLoading(true);
       fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
@@ -311,10 +460,47 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     }
   }, [selectedFeature, adminLevel]);
 
-  if (!isOpen) { return null; }
+  // Build radar axes from whatever stats are available (need ≥3 for a meaningful chart).
+  const radarAxes: RadarAxis[] = [];
+  if (stats) {
+    if (stats.population.percentile !== null) {
+      radarAxes.push({ label: 'Befolkning', percentile: stats.population.percentile,
+        value: stats.population.value, unit: stats.population.unit,
+        rank: stats.population.rank, total: stats.population.total });
+    }
+    if (stats.income != null && stats.income.percentile !== null) {
+      radarAxes.push({ label: 'Inkomst', percentile: stats.income.percentile,
+        value: stats.income.value, unit: stats.income.unit,
+        rank: stats.income.rank, total: stats.income.total });
+    }
+    if (stats.age != null && stats.age.percentile !== null) {
+      radarAxes.push({ label: 'Ålder', percentile: stats.age.percentile,
+        value: stats.age.value, unit: stats.age.unit,
+        rank: stats.age.rank, total: stats.age.total });
+    }
+  }
 
   return (
-    <div className="w-72 flex-shrink-0 bg-white border-l border-slate-200 flex flex-col">
+    <div
+      aria-hidden={!isOpen}
+      className={[
+        'flex flex-col bg-white',
+        // Mobile: fixed bottom sheet that slides up/down
+        'fixed bottom-0 left-0 right-0 z-20',
+        'max-h-[65vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
+        'transition-transform duration-300 ease-out',
+        // Desktop: normal flex panel in the layout
+        'sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:z-auto',
+        'sm:max-h-none sm:rounded-none sm:shadow-none sm:border-t-0 sm:border-l',
+        'sm:w-72 sm:flex-shrink-0',
+        // Open / closed
+        isOpen ? 'translate-y-0' : 'translate-y-full sm:hidden',
+      ].join(' ')}
+    >
+      {/* Drag handle — mobile only */}
+      <div className="sm:hidden flex justify-center pt-2.5 pb-1 flex-shrink-0">
+        <div className="w-8 h-1 rounded-full bg-slate-300" />
+      </div>
 
       {/* Header */}
       <div className="flex items-start gap-3 px-4 py-3 border-b border-slate-200 flex-shrink-0">
@@ -336,7 +522,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
         {!selectedFeature && (
           <p className="text-sm text-slate-400 italic">
@@ -346,6 +532,16 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
         {selectedFeature && (
           <>
+            {/* Radar profile — shown once all three axes are available */}
+            {!statsLoading && radarAxes.length >= 3 && (
+              <section>
+                <SectionTitle>Profil</SectionTitle>
+                <ChartCard>
+                  <RadarChart axes={radarAxes} />
+                </ChartCard>
+              </section>
+            )}
+
             {/* Key stats */}
             <section>
               <SectionTitle>Nyckeltal {STAT_YEAR}</SectionTitle>

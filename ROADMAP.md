@@ -12,15 +12,18 @@ Make the map the most compelling way to explore Swedish public data. The differe
 
 ## Near-term
 
-### Selected area panel *(in progress)*
+### Selected area panel _(in progress)_
+
 A panel slides out when a feature is clicked and shows population stats for the selected area. Basic structure is in place.
 
 Still to do:
+
 - National average comparison — visual indicator of how the area sits relative to Sweden as a whole
 - Trend sparkline — a small time-series line for 2–3 key metrics using existing year data
 - Internal spread — if a region/municipality is selected, show how its sub-areas vary (e.g. this municipality's DeSOs range from X to Y on income), surfacing within-area inequality
 
 ### DeSO-level income and demographics
+
 SCB has DeSO-level data for disposable income, country of birth/foreign background, age distribution, housing tenure, and employment rate. Loading this unlocks the most genuinely interesting story in the dataset: two DeSOs a kilometer apart in a Swedish city can look completely different. Hard to find visualized elsewhere.
 
 ---
@@ -28,26 +31,29 @@ SCB has DeSO-level data for disposable income, country of birth/foreign backgrou
 ## Medium-term
 
 ### Comparison mode
+
 Select two areas, see them side by side across all loaded datasets. UX: click one area, shift-click another, panel splits. Simple interaction, high payoff.
 
 ### Bivariate choropleth
+
 Encode two variables simultaneously in a single 2D color scale (e.g. income × foreign-born %). Visually striking and tells the segregation story in one view. More complex to implement and to explain to users, but a genuinely novel presentation.
 
 ### Population change animation
+
 Lean harder into the year slider — show which areas are growing or shrinking over time. The map becomes a time machine. Most interesting at municipality level where rural depopulation and suburban growth are clearly visible.
 
 ---
 
 ## Data sources to explore
 
-| Source | What's interesting | Level |
-|---|---|---|
-| SCB — income/demographics | Disposable income, foreign background %, age | DeSO |
-| SCB — housing | Tenure type, housing stock | DeSO/Kommun |
-| Skolverket | School merit points, pass rates | Kommun |
-| Valmyndigheten | Election results by party | Kommun/DeSO/RegSO ✓ |
-| Folkhälsomyndigheten | Public health indicators | Region/Kommun |
-| Kolada | 1000+ municipal KPIs, easy API | Kommun |
+| Source                    | What's interesting                           | Level               |
+| ------------------------- | -------------------------------------------- | ------------------- |
+| SCB — income/demographics | Disposable income, foreign background %, age | DeSO                |
+| SCB — housing             | Tenure type, housing stock                   | DeSO/Kommun         |
+| Skolverket                | School merit points, pass rates              | Kommun              |
+| Valmyndigheten            | Election results by party                    | Kommun/DeSO/RegSO ✓ |
+| Folkhälsomyndigheten      | Public health indicators                     | Region/Kommun       |
+| Kolada                    | 1000+ municipal KPIs, easy API               | Kommun              |
 
 Election results are politically sensitive but produce some of the most spatially interesting patterns, especially combined with income/demographics.
 
@@ -59,13 +65,13 @@ Kolada is worth a look — it aggregates many official sources into one clean AP
 
 ### RegSO/DeSO historical data (SCB vintage code problem)
 
-SCB's fine-grained area codes carry a **vintage suffix** reflecting boundary revisions. The 2025 revision introduced `_RegSO2025` and `_DeSO2025` codes across tables like TAB6574, TAB6679, TAB6693, and TAB6680. These new codes exist in the metadata and claim coverage back to 2010–2020, but the actual data cells are `null` for all years except 2024. SCB's documented policy: *"Previous years are not updated to the new division."*
+SCB's fine-grained area codes carry a **vintage suffix** reflecting boundary revisions. The 2025 revision introduced `_RegSO2025` and `_DeSO2025` codes across tables like TAB6574, TAB6679, TAB6693, and TAB6680. These new codes exist in the metadata and claim coverage back to 2010–2020, but the actual data cells are `null` for all years except 2024. SCB's documented policy: _"Previous years are not updated to the new division."_
 
 Consequence: the population sparkline is hidden at RegSO/DeSO level, and the year slider is disabled there, because fetching any year other than 2024 returns an empty dataset and breaks the choropleth.
 
 **Implementing historical RegSO/DeSO data (the messy way)**
 
-The historical data exists under the *old* vintage codes (`_RegSO2020`, `_DeSO2018`) in older SCB tables (e.g. TAB5722 Demografivariabler 2007–2023). The challenge is that the boundary geometries changed between vintages, so codes don't map 1-to-1.
+The historical data exists under the _old_ vintage codes (`_RegSO2020`, `_DeSO2018`) in older SCB tables (e.g. TAB5722 Demografivariabler 2007–2023). The challenge is that the boundary geometries changed between vintages, so codes don't map 1-to-1.
 
 The path forward:
 
@@ -88,6 +94,7 @@ Election results for riksdagsval, regionval, and kommunval (2022) are available 
 ## Election data — known gaps and future work
 
 ### Övriga breakdown
+
 At the municipality level, local parties sometimes form the largest single block inside "Övriga". Currently Övriga is pre-aggregated (we request only the 9 main party codes from SCB and they fold the rest). To surface the largest sub-party:
 
 1. Fetch all party codes from table metadata instead of the fixed 9.
@@ -96,11 +103,13 @@ At the municipality level, local parties sometimes form the largest single block
 4. Show it in the winner column of `ElectionTable` and the `ElectionDonut` when Övriga wins.
 
 ### Multi-year DeSO/RegSO election data
+
 The interpolation pipeline is designed to support multiple years. Adding 2018 (and earlier) requires the same Valmyndigheten source files. Once added, re-running `process_election_geodata.py` produces the additional JSONs; the frontend year slider unlocks automatically (the lock is boundary-driven, not hard-coded to 2022).
 
 The multiline chart is intentionally absent at DeSO/RegSO for now — it becomes meaningful once more than one year of interpolated data exists.
 
 ### Election results at valdistrikt granularity
+
 Valmyndigheten publishes boundaries and results at the valdistrikt (polling district) level — higher spatial resolution than DeSO in dense urban areas. Integrating this would require a GeoServer layer for valdistrikt boundaries. Worth revisiting if the DeSO-level patterns prove compelling.
 
 ---

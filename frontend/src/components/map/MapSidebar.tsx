@@ -15,6 +15,8 @@ interface MapSidebarProps {
   selectedBase:      BaseMapKey;
   onBaseChange:      (base: BaseMapKey) => void;
   onReset:           () => void;
+  mobileOpen:        boolean;
+  onMobileClose:     () => void;
 }
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -136,20 +138,39 @@ export function MapSidebar({
   selectedBase,
   onBaseChange,
   onReset,
+  mobileOpen,
+  onMobileClose,
 }: MapSidebarProps) {
   const availableDatasets = getDatasetsForLevel(selectedLevel);
 
   return (
-    <aside className="w-52 flex-shrink-0 border-r border-slate-200 bg-slate-50 flex flex-col overflow-y-auto">
+    <aside className={[
+      // Desktop: always-visible inline panel
+      'sm:relative sm:inset-auto sm:z-auto sm:translate-x-0 sm:w-52 sm:flex-shrink-0',
+      'sm:border-r sm:border-slate-200 sm:bg-slate-50 sm:flex sm:flex-col sm:overflow-y-auto',
+      // Mobile: fixed full-height overlay sliding in from the left
+      'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-slate-50 flex flex-col overflow-y-auto',
+      'transition-transform duration-300 ease-out shadow-xl',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
+    ].join(' ')}>
 
       {/* Wordmark */}
-      <button
-        onClick={onReset}
-        className="h-11 flex items-center px-4 border-b border-slate-200 flex-shrink-0 w-full hover:bg-slate-100 transition-colors"
-      >
-        <span className="text-sm font-bold tracking-tight text-slate-800">Riks</span>
-        <span className="text-sm font-bold tracking-tight text-blue-600">kartan</span>
-      </button>
+      <div className="h-11 flex items-center px-4 border-b border-slate-200 flex-shrink-0">
+        <button
+          onClick={onReset}
+          className="flex items-center gap-0 flex-1 hover:opacity-80 transition-opacity"
+        >
+          <span className="text-sm font-bold tracking-tight text-slate-800">Riks</span>
+          <span className="text-sm font-bold tracking-tight text-blue-600">kartan</span>
+        </button>
+        <button
+          onClick={onMobileClose}
+          aria-label="Stäng meny"
+          className="sm:hidden text-slate-400 hover:text-slate-700 text-xl leading-none ml-2"
+        >
+          ×
+        </button>
+      </div>
 
       <div className="flex flex-col gap-5 py-4 flex-1">
 

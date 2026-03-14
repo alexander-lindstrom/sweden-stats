@@ -76,6 +76,7 @@ export default function MapPage() {
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen]  = useState(false);
   const [mapResetToken,     setMapResetToken]       = useState(0);
   /** Which party to show on the choropleth map (null = winner coloring). */
   const [activeParty,       setActiveParty]        = useState<string | null>(null);
@@ -162,6 +163,7 @@ export default function MapPage() {
     setSelectedFeature(null);
     setActiveView('map');
     setIsPanelOpen(false);
+    setMobileSidebarOpen(false);
     setActiveParty(null);
     setMapResetToken(t => t + 1);
   };
@@ -420,23 +422,45 @@ export default function MapPage() {
   return (
     <main className="flex h-screen overflow-hidden bg-white">
       <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
+
+      {/* Mobile sidebar backdrop */}
+      {mobileSidebarOpen && (
+        <div
+          className="sm:hidden fixed inset-0 z-20 bg-black/30"
+          onClick={() => setMobileSidebarOpen(false)}
+        />
+      )}
+
       <MapSidebar
         selectedLevel={selectedLevel}
-        onLevelChange={setSelectedLevel}
+        onLevelChange={(l) => { setSelectedLevel(l); setMobileSidebarOpen(false); }}
         selectedDatasetId={selectedDatasetId}
-        onDatasetChange={setSelectedDatasetId}
+        onDatasetChange={(id) => { setSelectedDatasetId(id); setMobileSidebarOpen(false); }}
         activeDescriptor={activeDescriptor}
         displayYear={displayYear}
         onYearChange={handleYearChange}
         selectedBase={selectedBase}
         onBaseChange={setSelectedBase}
         onReset={handleReset}
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* View toggle bar */}
         <div className="flex items-center border-b border-slate-200 px-4 bg-white flex-shrink-0">
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMobileSidebarOpen(o => !o)}
+            aria-label="Öppna meny"
+            className="sm:hidden mr-2 p-1 -ml-1 text-slate-500 hover:text-slate-800 transition-colors"
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+
           {ALL_VIEWS.map(({ key, label }) => {
             const supported = availableViews.includes(key);
             return (
