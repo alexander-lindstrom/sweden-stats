@@ -22,11 +22,11 @@ SCB has DeSO-level data for disposable income, country of birth/foreign backgrou
 
 ### Comparison mode
 
-Select two areas, see them side by side across all loaded datasets. UX: click one area, shift-click another, panel splits. Simple interaction, high payoff.
+Select two areas, see them side by side across all loaded datasets. UX: click one area, shift-click another, SelectionPanel splits into two columns showing the same metrics for both with a delta row. The map highlights both areas in distinct colours (e.g. blue + orange). Charts (diverging, ranked bar) can mark both features. Main risk is panel crowding — the two-column layout needs to stay compact. Builds directly on the existing SelectionPanel infrastructure.
 
 ### Bivariate choropleth
 
-Encode two variables simultaneously in a single 2D color scale (e.g. income × foreign-born %). Visually striking and tells the segregation story in one view. More complex to implement and to explain to users, but a genuinely novel presentation.
+Encode two variables simultaneously in a single 2D color scale (e.g. income × foreign-born %). Visually striking and tells the segregation story in one view — most compelling at DeSO level. Implementation: quantize each variable into 3 bins → 9-cell 3×3 palette (Joshua Stevens-style); each area gets a color from the grid; legend is a small labeled 3×3 square. The scatter plot's Y-axis dataset picker is already ~80% of the secondary dataset selection UX. Main new work: 2D color assignment on the map, 2D legend component, handling the "active dataset" concept when there are two. Worth doing — genuinely hard to find elsewhere for Swedish data.
 
 ### Population change animation
 
@@ -48,6 +48,15 @@ Lean harder into the year slider — show which areas are growing or shrinking o
 Election results are politically sensitive but produce some of the most spatially interesting patterns, especially combined with income/demographics.
 
 Kolada is worth a look — it aggregates many official sources into one clean API and covers things that would otherwise require separate integrations.
+
+### Municipal equalization (utjämningsbidrag)
+
+Show what municipalities actually receive or pay net through the Swedish kommunal utjämning system, then surface why the formula doesn't fully reflect structural fiscal reality. The interesting story: some municipalities in the north receive large transfers but host state-owned enterprises (e.g. LKAB in Gällivare/Kiruna) whose taxes flow to the state rather than the municipality; government agencies are heavily concentrated around Stockholm, artificially inflating the tax base there.
+
+**Suggested approach:**
+1. Start with raw Kolada equalization data — net transfer per capita is a clean, comparable metric across all municipalities. Explore the Kolada API first to confirm what's available (indicators: kommunalekonomisk utjämning, LSS-utjämning, skatteunderlag, net transfer per capita).
+2. Get the raw data on the map as a first dataset.
+3. The contextual weighting (LKAB tax flows, government employment geography) would need to be assembled from multiple sources (SCB enterprise data, ESV employment data) and is genuinely original analysis — better treated as annotations or a secondary overlay rather than baked into the metric.
 
 ---
 
