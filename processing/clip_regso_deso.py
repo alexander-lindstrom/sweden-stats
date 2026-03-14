@@ -63,6 +63,10 @@ def clip(
 
 def save(gdf: gpd.GeoDataFrame, filename: str, layer: str) -> None:
     path = OUT_DIR / filename
+    # Remove existing file first so we get a clean single-layer GeoPackage,
+    # not an accumulation of layers from repeated runs.
+    if path.exists():
+        path.unlink()
     gdf.to_file(path, driver="GPKG", layer=layer)
     print(f"  Saved: {path} (layer='{layer}')")
 
