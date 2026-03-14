@@ -1,6 +1,6 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar:             'Rankningslista',
@@ -10,6 +10,7 @@ export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   multiline:       'Tidsserie',
   'election-bar':  'Partier',
   'party-ranking': 'Rankningslista',
+  scatter:         'Spridningsdiagram',
 };
 
 export interface TimeSeriesPoint {

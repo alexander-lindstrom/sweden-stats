@@ -204,10 +204,10 @@ export const medianinkomst: DatasetDescriptor = {
     DeSO:  ['map', 'chart', 'table'],
   },
   chartTypes: {
-    Region:       ['bar', 'diverging', 'histogram'],
-    Municipality: ['diverging', 'histogram'],
-    RegSO:        ['diverging', 'histogram'],
-    DeSO:         ['diverging', 'histogram'],
+    Region:       ['bar', 'diverging', 'histogram', 'scatter'],
+    Municipality: ['diverging', 'histogram', 'scatter'],
+    RegSO:        ['diverging', 'histogram', 'scatter'],
+    DeSO:         ['diverging', 'histogram', 'scatter'],
   },
   fetch: fetchMedianinkomst,
 };
