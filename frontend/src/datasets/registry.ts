@@ -2,12 +2,15 @@ import { AdminLevel, DatasetDescriptor } from './types';
 import { population } from './scb/population';
 import { medelalder } from './scb/medelalder';
 import { medianinkomst } from './scb/medianinkomst';
+import { utlandskBakgrund } from './scb/utlandsk_bakgrund';
+import { sysselsattning } from './scb/sysselsattning';
 import { stateExpenses } from './esv/stateExpenses';
 import { kpi } from './scb/kpi';
 import { riksdagsval, regionval, kommunval } from './scb/elections';
 
 export const DATASETS: DatasetDescriptor[] = [
-  population, medelalder, medianinkomst, stateExpenses, kpi,
+  population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
+  stateExpenses, kpi,
   riksdagsval, regionval, kommunval,
 ];
 

@@ -1,6 +1,6 @@
 import { JsonStat2Response } from '@/util/scb';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
-import { stripLanSuffix, stripOuterParens } from '@/utils/labelFormatting';
+import { stripLanSuffix, stripOuterParens, stripCodePrefix } from '@/utils/labelFormatting';
 import { getGeoLabels } from '../geoLabels';
 
 // ── TAB5444 constants (Country → Region, Region → Municipality) ──────────────
@@ -61,7 +61,7 @@ async function getMunicipalityCodes(): Promise<{ codes: string[]; labels: Record
   const labels: Record<string, string> = {};
   for (const [code, label] of Object.entries(regionCat.label)) {
     if (code.length === 4) {
-      labels[code] = label;
+      labels[code] = stripCodePrefix(label);
     }
   }
 
@@ -159,10 +159,11 @@ function aggregateByRegion(
     }
   }
 
-  const responseLabels = { ...regionDim.category.label } as Record<string, string>;
-  const labels = externalLabels
-    ? { ...externalLabels, ...responseLabels }
-    : responseLabels;
+  const responseLabels: Record<string, string> = {};
+  for (const [code, label] of Object.entries(regionDim.category.label as Record<string, string>)) {
+    responseLabels[code] = stripCodePrefix(label);
+  }
+  const labels = externalLabels ? { ...externalLabels, ...responseLabels } : responseLabels;
 
   return { values, labels };
 }

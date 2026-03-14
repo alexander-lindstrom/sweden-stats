@@ -12,16 +12,6 @@ Make the map the most compelling way to explore Swedish public data. The differe
 
 ## Near-term
 
-### Selected area panel _(in progress)_
-
-A panel slides out when a feature is clicked and shows population stats for the selected area. Basic structure is in place.
-
-Still to do:
-
-- National average comparison — visual indicator of how the area sits relative to Sweden as a whole
-- Trend sparkline — a small time-series line for 2–3 key metrics using existing year data
-- Internal spread — if a region/municipality is selected, show how its sub-areas vary (e.g. this municipality's DeSOs range from X to Y on income), surfacing within-area inequality
-
 ### DeSO-level income and demographics
 
 SCB has DeSO-level data for disposable income, country of birth/foreign background, age distribution, housing tenure, and employment rate. Loading this unlocks the most genuinely interesting story in the dataset: two DeSOs a kilometer apart in a Swedish city can look completely different. Hard to find visualized elsewhere.
@@ -62,6 +52,12 @@ Kolada is worth a look — it aggregates many official sources into one clean AP
 ---
 
 ## Known limitations and future work
+
+### SelectionPanel: show deviation from mean alongside rank
+
+The right-hand panel currently shows rank (#5/21) and a percentile bar. It should also show **deviation from the peer mean** — e.g. "+8.3 pp" or "−12 tkr" — so the user immediately understands not just where an area ranks but how different it is from typical. This is especially meaningful for income, foreign background %, and employment rate where the absolute gap matters. Implementation: extend `toStat` to compute `deviation = value − mean`, then display it in `StatRow` alongside the existing rank.
+
+
 
 ### RegSO/DeSO historical data (SCB vintage code problem)
 
