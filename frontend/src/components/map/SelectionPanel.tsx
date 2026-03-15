@@ -6,6 +6,7 @@ import { fetchCached } from '@/datasets/cache';
 import { DATASETS } from '@/datasets/registry';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { Spinner } from '@/components/ui/Spinner';
+import { FeatureSearch, FeatureSearchItem } from '@/components/ui/FeatureSearch';
 
 const LEVEL_BADGE: Record<AdminLevel, string> = {
   Country:      'bg-gray-100 text-slate-600',
@@ -393,6 +394,10 @@ export interface SelectionPanelProps {
   /** Second area selected for comparison (shift-click). */
   comparisonFeature?: { code: string; label: string } | null;
   onClearComparison?: () => void;
+  /** Items for the area search box. When provided, a search field is shown. */
+  searchItems?:              FeatureSearchItem[];
+  onSearchSelect?:           (f: FeatureSearchItem) => void;
+  onSearchComparisonSelect?: (f: FeatureSearchItem) => void;
 }
 
 interface PanelStats {
@@ -403,7 +408,7 @@ interface PanelStats {
   employment:  StatData | null;
 }
 
-export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison }: SelectionPanelProps) {
+export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect }: SelectionPanelProps) {
   const [stats,           setStats]           = useState<PanelStats | null>(null);
   const [statsLoading,    setStatsLoading]    = useState(false);
   const [sparkline,       setSparkline]       = useState<Array<{ year: number; value: number }>>([]);
@@ -776,6 +781,17 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           </button>
         </div>
       </div>
+
+      {/* Search */}
+      {searchItems && searchItems.length > 0 && onSearchSelect && (
+        <div className="px-3 py-2 border-b border-slate-100 flex-shrink-0">
+          <FeatureSearch
+            items={searchItems}
+            onSelect={onSearchSelect}
+            onComparisonSelect={onSearchComparisonSelect}
+          />
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">

@@ -26,6 +26,7 @@ import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useFilterMode } from '@/hooks/useFilterMode';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
+import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
 import BivariateMapLegend from '@/components/map/BivariateMapLegend';
@@ -139,6 +140,22 @@ export default function MapPage() {
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
+
+  const searchItems = useMemo(() => {
+    if (selectionLevel === selectedLevel || !hierarchyData || !activeDescriptor?.sunburstDepthToLevel) {
+      return Object.entries(datasetResult?.labels ?? {}).map(([code, label]) => ({ code, label: stripLanSuffix(label) }));
+    }
+    // Sunburst drill mode — extract labels from the hierarchy at the target depth.
+    const targetDepth = activeDescriptor.sunburstDepthToLevel.indexOf(selectionLevel);
+    if (targetDepth < 0) { return []; }
+    const items: { code: string; label: string }[] = [];
+    const collect = (node: typeof hierarchyData, depth: number) => {
+      if (depth === targetDepth) { items.push({ code: node.code, label: stripLanSuffix(node.name) }); return; }
+      node.children?.forEach(c => collect(c, depth + 1));
+    };
+    collect(hierarchyData, 0);
+    return items;
+  }, [selectionLevel, selectedLevel, datasetResult, hierarchyData, activeDescriptor]);
 
   // For election multiline at Region/Municipality level: allow picking a specific area via dropdowns.
   const needsMultilineAreaFilter = activeChartType === 'multiline' && activeDescriptor?.group === 'val'
@@ -868,6 +885,7 @@ export default function MapPage() {
                     unit={datasetResult?.unit ?? ''}
                     label={activeDescriptor?.label ?? ''}
                     onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? handleFeatureSelect : undefined}
+                    onComparisonSelect={activeDescriptor?.sunburstDepthToLevel ? handleComparisonSelect : undefined}
                     depthToLevel={activeDescriptor?.sunburstDepthToLevel}
                     onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
                   />
@@ -955,6 +973,9 @@ export default function MapPage() {
               onClose={() => setIsPanelOpen(false)}
               comparisonFeature={comparisonFeature}
               onClearComparison={() => setComparisonFeature(null)}
+              searchItems={searchItems}
+              onSearchSelect={handleFeatureSelect}
+              onSearchComparisonSelect={handleComparisonSelect}
             />
           </div>
         </div>

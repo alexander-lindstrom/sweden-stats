@@ -9,6 +9,7 @@ interface Props {
   unit: string;
   label: string;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  onComparisonSelect?: (f: { code: string; label: string } | null) => void;
   /** Maps drill depth (0 = root, 1 = first ring, 2 = second ring, …) to AdminLevel.
    *  When provided, onSelectionLevelChange fires with the level for each click. */
   depthToLevel?: AdminLevel[];
@@ -32,16 +33,18 @@ function fmtShort(v: number): string {
   return v.toLocaleString('sv-SE');
 }
 
-export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, depthToLevel, onSelectionLevelChange }) => {
+export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, onComparisonSelect, depthToLevel, onSelectionLevelChange }) => {
   const containerRef               = useRef<HTMLDivElement>(null);
   const sunRef                     = useRef<SVGSVGElement>(null);
   const barRef                     = useRef<SVGSVGElement>(null);
   const tooltipRef                 = useRef<HTMLDivElement>(null);
   const dims                       = useResizeObserver(containerRef);
   const onFeatureSelectRef         = useRef(onFeatureSelect);
+  const onComparisonSelectRef      = useRef(onComparisonSelect);
   const onSelectionLevelChangeRef  = useRef(onSelectionLevelChange);
   const depthToLevelRef            = useRef(depthToLevel);
   onFeatureSelectRef.current        = onFeatureSelect;
+  onComparisonSelectRef.current     = onComparisonSelect;
   onSelectionLevelChangeRef.current = onSelectionLevelChange;
   depthToLevelRef.current           = depthToLevel;
 
@@ -60,6 +63,18 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
   // Keep refs so d3 event handlers always see current state.
   const focusRef   = useRef(focus);   focusRef.current   = focus;
   const historyRef = useRef(history); historyRef.current = history;
+
+  // When the user shift-clicks a leaf after drilling into a parent, the current
+  // selectedFeature is the parent (e.g. a Region code) which won't be found at
+  // the leaf admin level.  Upgrade it to the best-matching leaf within the focus:
+  // prefer the child whose name matches the focus name (e.g. "Stockholm" stad
+  // inside Stockholm Lan), otherwise fall back to the largest child.
+  const upgradePrimaryToLeaf = useCallback(() => {
+    const focus = focusRef.current;
+    if (!focus.children?.length) { return; }
+    const match = focus.children.find(c => c.name === focus.name) ?? focus.children[0];
+    onFeatureSelectRef.current?.({ code: match.code, label: match.name });
+  }, []);
 
   const drillDown = useCallback((node: GeoHierarchyNode) => {
     if (!node.children?.length) {return;}
@@ -141,11 +156,14 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('stroke', '#000')
       .attr('stroke-width', 0.5)
       .style('cursor', d => (drillable(d) ? 'pointer' : 'default'))
-      .on('click', (_e, d) => {
+      .on('click', (e, d) => {
         if (d.depth === 0) { drillUp(); return; }
-        if (d.children?.length) {drillDown(d.data);}
-        else {
-          emitLevel(historyRef.current.length + d.depth);
+        if (d.children?.length) { drillDown(d.data); return; }
+        emitLevel(historyRef.current.length + d.depth);
+        if ((e as MouseEvent).shiftKey) {
+          upgradePrimaryToLeaf();
+          onComparisonSelectRef.current?.({ code: d.data.code, label: d.data.name });
+        } else {
           onFeatureSelectRef.current?.({ code: d.data.code, label: d.data.name });
         }
       })
@@ -241,10 +259,13 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('fill', d => colorScale(d.name))
       .attr('stroke', '#000').attr('stroke-width', 0.5)
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
-      .on('click', (_e, d) => {
-        if (d.children?.length) {drillDown(d);}
-        else {
-          emitLevel(historyRef.current.length + 1);
+      .on('click', (e, d) => {
+        if (d.children?.length) { drillDown(d); return; }
+        emitLevel(historyRef.current.length + 1);
+        if ((e as MouseEvent).shiftKey) {
+          upgradePrimaryToLeaf();
+          onComparisonSelectRef.current?.({ code: d.code, label: d.name });
+        } else {
           onFeatureSelectRef.current?.({ code: d.code, label: d.name });
         }
       })
