@@ -974,8 +974,19 @@ export default function MapPage() {
               comparisonFeature={comparisonFeature}
               onClearComparison={() => setComparisonFeature(null)}
               searchItems={searchItems}
-              onSearchSelect={handleFeatureSelect}
-              onSearchComparisonSelect={handleComparisonSelect}
+              onSearchSelect={(item) => {
+                // Infer the correct selectionLevel from the code so the panel
+                // fetches at the right admin level (e.g. municipality codes appear
+                // in election results at Country level).
+                if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
+                else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
+                handleFeatureSelect(item);
+              }}
+              onSearchComparisonSelect={(item) => {
+                if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
+                else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
+                handleComparisonSelect(item);
+              }}
             />
           </div>
         </div>

@@ -28,16 +28,19 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
   const tooltipRef   = useRef<HTMLDivElement>(null);
   const dims         = useResizeObserver(containerRef);
 
-  const [visible,     setVisible]     = useState<Record<string, boolean>>({});
-  const [initialized, setInitialized] = useState(false);
+  const [visible,    setVisible]    = useState<Record<string, boolean>>({});
+  const seriesKeyRef = useRef('');
 
-  // Initialise all series as visible on first data load.
+  // Reset visibility whenever the set of series IDs changes (new dataset loaded).
+  // Uses a ref so toggles made by the user are preserved when data refreshes
+  // within the same dataset (e.g. year change keeps hidden series hidden).
   useEffect(() => {
-    if (!initialized && data.length > 0) {
-      setVisible(Object.fromEntries(data.map(s => [s.id, true])));
-      setInitialized(true);
-    }
-  }, [data, initialized]);
+    if (data.length === 0) { return; }
+    const key = data.map(s => s.id).join(',');
+    if (key === seriesKeyRef.current) { return; }
+    seriesKeyRef.current = key;
+    setVisible(Object.fromEntries(data.map(s => [s.id, true])));
+  }, [data]);
 
   const toggle = useCallback((id: string) => {
     setVisible(prev => ({ ...prev, [id]: !prev[id] }));
@@ -69,7 +72,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    if (!initialized || !dims || parsedSeries.length === 0) { return; }
+    if (!dims || parsedSeries.length === 0) { return; }
 
     const { width, height } = dims;
     const adjW = width  - MARGIN.left - MARGIN.right;
@@ -224,7 +227,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
         tooltip.style('opacity', '0');
       });
 
-  }, [parsedSeries, dims, initialized]);
+  }, [parsedSeries, dims]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full flex flex-col">

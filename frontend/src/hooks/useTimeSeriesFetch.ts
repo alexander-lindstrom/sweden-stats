@@ -25,6 +25,9 @@ export function useTimeSeriesFetch(
       return;
     }
 
+    // Clear stale data immediately so callers show a spinner rather than the
+    // previous dataset's chart while the new fetch is in-flight.
+    setTimeSeriesData(null);
     const gen = ++fetchGenRef.current;
     setLoading(true);
     fetchTimeSeriesCached(activeDescriptor, selectedLevel, featureCode ?? undefined)
