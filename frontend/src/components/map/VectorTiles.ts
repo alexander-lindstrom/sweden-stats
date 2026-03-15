@@ -139,6 +139,26 @@ export function buildChoroplethStyle(
   };
 }
 
+// Two-tone style for boolean filter mode — no cache needed (only two outcomes).
+const filterMatchStyle = new Style({
+  fill: new Fill({ color: '#3b82f6' }),
+  stroke: new Stroke({ color: '#1d4ed8', width: 0.8 }),
+});
+const filterNoMatchStyle = new Style({
+  fill: new Fill({ color: 'rgba(190, 182, 170, 0.5)' }),
+  stroke: new Stroke({ color: '#8a9ea8', width: 0.5 }),
+});
+
+export function buildFilterStyle(
+  matchingAreas: Set<string>,
+  codeProperty: string,
+): (feature: FeatureLike) => Style {
+  return (feature: FeatureLike): Style => {
+    const code = String(feature.get(codeProperty) ?? '');
+    return matchingAreas.has(code) ? filterMatchStyle : filterNoMatchStyle;
+  };
+}
+
 export const adminVectorTileLayers = {
   Country: {
     id: "country_mvt",

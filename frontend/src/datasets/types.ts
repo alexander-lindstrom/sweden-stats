@@ -82,6 +82,13 @@ export interface DatasetDescriptor {
   fetchTimeSeries?: (level: AdminLevel, featureCode?: string) => Promise<TimeSeriesNode[]>;
 }
 
+export interface FilterCriterion {
+  datasetId: string;
+  /** Absolute threshold value. NaN = not yet set (criterion is inactive — no filtering). */
+  absoluteThreshold: number;
+  direction: 'above' | 'below';
+}
+
 /** Returns which views are available for a descriptor at a given level. */
 export function viewsForLevel(d: DatasetDescriptor, level: AdminLevel): ViewType[] {
   return d.supportedViewsByLevel?.[level] ?? d.supportedViews;

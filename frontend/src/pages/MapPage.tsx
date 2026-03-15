@@ -14,7 +14,7 @@ import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarCha
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import {
-  AdminLevel, ChartType, ViewType, ScalarDatasetResult,
+  AdminLevel, ChartType, ViewType, ScalarDatasetResult, FilterCriterion,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
 } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
@@ -24,6 +24,7 @@ import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
+import { useFilterMode } from '@/hooks/useFilterMode';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
@@ -91,6 +92,9 @@ export default function MapPage() {
   const [bivariateMode,     setBivariateMode]       = useState(false);
   /** Secondary dataset for the bivariate Y axis. */
   const [bivariateYDatasetId, setBivariateYDatasetId] = useState<string | null>(null);
+  /** Whether threshold filter mode is active. */
+  const [filterEnabled,   setFilterEnabled]   = useState(false);
+  const [filterCriteria,  setFilterCriteria]  = useState<FilterCriterion[]>([]);
 
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -125,6 +129,13 @@ export default function MapPage() {
     selectedYear,
   );
   const bivariateYScalar = bivariateYResult?.kind === 'scalar' ? bivariateYResult as ScalarDatasetResult : null;
+
+  const {
+    matchingAreas,
+    fetchedDatasets: filterFetchedDatasets,
+    loading: filterLoading,
+  } = useFilterMode(filterCriteria, selectedLevel, selectedYear, filterEnabled);
+  const filterMatchingCount = matchingAreas?.size ?? null;
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
@@ -241,6 +252,7 @@ export default function MapPage() {
     setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
     setSelectionLevel(selectedLevel);
     setComparisonFeature(null);
+    setFilterCriteria([]);
     if (pendingSelectionRef.current) {
       setSelectedFeature(pendingSelectionRef.current);
       pendingSelectionRef.current = null;
@@ -327,7 +339,11 @@ export default function MapPage() {
   }, [activeView]);
 
   useEffect(() => {
-    if (activeDescriptor?.group === 'val') { setBivariateMode(false); }
+    if (activeDescriptor?.group === 'val') {
+      setBivariateMode(false);
+      setFilterEnabled(false);
+      setFilterCriteria([]);
+    }
   }, [activeDescriptor]);
 
   // Auto-select a Y dataset when entering bivariate mode or when available datasets change.
@@ -549,6 +565,13 @@ export default function MapPage() {
         onReset={handleReset}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
+        filterEnabled={filterEnabled}
+        onFilterEnabledChange={setFilterEnabled}
+        filterCriteria={filterCriteria}
+        onFilterCriteriaChange={setFilterCriteria}
+        filterFetchedDatasets={filterFetchedDatasets}
+        filterMatchingCount={filterMatchingCount}
+        filterLoading={filterLoading}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
@@ -797,6 +820,7 @@ export default function MapPage() {
                   onDrillDown={handleDrillDown}
                   comparisonFeature={comparisonFeature}
                   onComparisonSelect={handleComparisonSelect}
+                  matchingAreas={matchingAreas}
                 />
               )}
               {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
@@ -906,7 +930,7 @@ export default function MapPage() {
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
               {activeView === 'table' && electionResult && (

@@ -1,22 +1,30 @@
 import YearSlider from '@/components/common/YearSlider';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
+import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
-import { getDatasetsForLevel } from '@/datasets/registry';
-import type { AdminLevel, DatasetDescriptor } from '@/datasets/types';
+import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
+import type { AdminLevel, DatasetDescriptor, FilterCriterion, ScalarDatasetResult } from '@/datasets/types';
 
 interface MapSidebarProps {
-  selectedLevel:     AdminLevel;
-  onLevelChange:     (level: AdminLevel) => void;
-  selectedDatasetId: string | null;
-  onDatasetChange:   (id: string) => void;
-  activeDescriptor:  DatasetDescriptor | null;
-  displayYear:       number;
-  onYearChange:      (year: number) => void;
-  selectedBase:      BaseMapKey;
-  onBaseChange:      (base: BaseMapKey) => void;
-  onReset:           () => void;
-  mobileOpen:        boolean;
-  onMobileClose:     () => void;
+  selectedLevel:          AdminLevel;
+  onLevelChange:          (level: AdminLevel) => void;
+  selectedDatasetId:      string | null;
+  onDatasetChange:        (id: string) => void;
+  activeDescriptor:       DatasetDescriptor | null;
+  displayYear:            number;
+  onYearChange:           (year: number) => void;
+  selectedBase:           BaseMapKey;
+  onBaseChange:           (base: BaseMapKey) => void;
+  onReset:                () => void;
+  mobileOpen:             boolean;
+  onMobileClose:          () => void;
+  filterEnabled:          boolean;
+  onFilterEnabledChange:  (enabled: boolean) => void;
+  filterCriteria:         FilterCriterion[];
+  onFilterCriteriaChange: (criteria: FilterCriterion[]) => void;
+  filterFetchedDatasets:  Record<string, ScalarDatasetResult>;
+  filterMatchingCount:    number | null;
+  filterLoading:          boolean;
 }
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -140,8 +148,18 @@ export function MapSidebar({
   onReset,
   mobileOpen,
   onMobileClose,
+  filterEnabled,
+  onFilterEnabledChange,
+  filterCriteria,
+  onFilterCriteriaChange,
+  filterFetchedDatasets,
+  filterMatchingCount,
+  filterLoading,
 }: MapSidebarProps) {
   const availableDatasets = getDatasetsForLevel(selectedLevel);
+  const filterableDatasets = DATASETS.filter(d =>
+    d.group !== 'val' && d.supportedLevels.includes(selectedLevel),
+  );
 
   return (
     <aside className={[
@@ -216,6 +234,28 @@ export function MapSidebar({
             />
           </section>
         )}
+
+        {/* Filter mode */}
+        <SidebarSection label="Filter">
+          <NavItem
+            active={filterEnabled}
+            onClick={() => onFilterEnabledChange(!filterEnabled)}
+          >
+            {filterEnabled ? 'Filter aktiverat' : 'Aktivera filter'}
+          </NavItem>
+          {filterEnabled && (
+            <div className="mt-2">
+              <FilterPanel
+                criteria={filterCriteria}
+                onCriteriaChange={onFilterCriteriaChange}
+                fetchedDatasets={filterFetchedDatasets}
+                filterableDatasets={filterableDatasets}
+                matchingCount={filterMatchingCount}
+                loading={filterLoading}
+              />
+            </div>
+          )}
+        </SidebarSection>
 
         {/* Base map */}
         <section className="px-4">

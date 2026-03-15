@@ -8,13 +8,14 @@ interface DatasetTableProps {
   data: ScalarDatasetResult;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  matchingAreas?: Set<string> | null;
 }
 
 type SortKey = 'name' | 'value';
 
 const ROW_HEIGHT = 36;
 
-export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect }) => {
+export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect, matchingAreas }) => {
   const { sortKey, sortDir, handleSort } = useTableSort<SortKey>('value', 'desc');
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -28,10 +29,16 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeatur
   );
 
   const sorted = useMemo(() => [...rows].sort((a, b) => {
+    // When filter is active, matching rows float to the top.
+    if (matchingAreas) {
+      const aMatch = matchingAreas.has(a.code) ? 0 : 1;
+      const bMatch = matchingAreas.has(b.code) ? 0 : 1;
+      if (aMatch !== bMatch) { return aMatch - bMatch; }
+    }
     const dir = sortDir === 'asc' ? 1 : -1;
     if (sortKey === 'name') { return dir * a.name.localeCompare(b.name, 'sv'); }
     return dir * (a.value - b.value);
-  }), [rows, sortKey, sortDir]);
+  }), [rows, sortKey, sortDir, matchingAreas]);
 
   const rowVirtualizer = useVirtualizer({
     count: sorted.length,
@@ -80,11 +87,12 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeatur
           {virtualItems.map(virtualRow => {
             const row = sorted[virtualRow.index];
             const isSelected = row.code === selectedFeature?.code;
+            const isDimmed = matchingAreas !== null && matchingAreas !== undefined && !matchingAreas.has(row.code);
             return (
               <tr
                 key={row.code}
                 onClick={() => onFeatureSelect?.(isSelected ? null : { code: row.code, label: row.name })}
-                className={tableRowClass(isSelected, !!onFeatureSelect)}
+                className={[tableRowClass(isSelected, !!onFeatureSelect), isDimmed ? 'opacity-30' : ''].join(' ')}
               >
                 <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">{virtualRow.index + 1}</td>
                 <td className="py-2 text-gray-800">{row.name}</td>

@@ -17,6 +17,7 @@ import {
   baseVectorStyle,
   buildCategoricalStyle,
   buildChoroplethStyle,
+  buildFilterStyle,
   createComparisonSelectionLayer,
   createHighlightLayer,
   createSelectionLayer,
@@ -77,6 +78,8 @@ export interface MapViewProps {
   /** Second selected area for comparison mode. Shift-click to set. */
   comparisonFeature?: { code: string; label: string; parentCode?: string } | null;
   onComparisonSelect?: (f: { code: string; label: string; parentCode?: string } | null) => void;
+  /** When set, switches map to binary filter mode: matching areas highlighted, rest greyed out. */
+  matchingAreas?: Set<string> | null;
   /** Increment to trigger an animated reset of the map view to the initial Sweden overview. */
   resetToken?: number;
 }
@@ -143,6 +146,7 @@ const MapView: React.FC<MapViewProps> = ({
   onDrillDown,
   comparisonFeature,
   onComparisonSelect,
+  matchingAreas,
   resetToken,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
@@ -580,14 +584,16 @@ const MapView: React.FC<MapViewProps> = ({
     const layer = overlayLayerRef.current;
     if (!layer) { return; }
 
-    if (mapColorFn) {
+    if (matchingAreas) {
+      layer.setStyle(buildFilterStyle(matchingAreas, featureCodeProperty));
+    } else if (mapColorFn) {
       layer.setStyle(buildCategoricalStyle(mapColorFn, featureCodeProperty));
     } else if (choroplethData && colorScale) {
       layer.setStyle(buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty));
     } else {
       layer.setStyle(baseVectorStyle);
     }
-  }, [choroplethData, colorScale, mapColorFn, featureCodeProperty]);
+  }, [choroplethData, colorScale, mapColorFn, matchingAreas, featureCodeProperty]);
 
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {
