@@ -27,6 +27,8 @@ import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
+import BivariateMapLegend from '@/components/map/BivariateMapLegend';
+import { buildBivariateColorFn } from '@/util/bivariate';
 
 // Sub-level for tooltip value lookup — when a feature is selected, fetch data
 // one level down so hovering sub-boundaries can show their own values.
@@ -85,6 +87,10 @@ export default function MapPage() {
   const [activeParty,       setActiveParty]        = useState<string | null>(null);
   /** Secondary dataset for the scatter chart Y axis. */
   const [scatterYDatasetId, setScatterYDatasetId]  = useState<string | null>(null);
+  /** Whether bivariate choropleth mode is active. */
+  const [bivariateMode,     setBivariateMode]       = useState(false);
+  /** Secondary dataset for the bivariate Y axis. */
+  const [bivariateYDatasetId, setBivariateYDatasetId] = useState<string | null>(null);
 
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -112,6 +118,13 @@ export default function MapPage() {
     selectedYear,
   );
   const scatterYScalar = scatterYResult?.kind === 'scalar' ? scatterYResult as ScalarDatasetResult : null;
+
+  const { datasetResult: bivariateYResult } = useDatasetFetch(
+    bivariateMode ? bivariateYDatasetId : null,
+    selectedLevel,
+    selectedYear,
+  );
+  const bivariateYScalar = bivariateYResult?.kind === 'scalar' ? bivariateYResult as ScalarDatasetResult : null;
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
@@ -296,6 +309,46 @@ export default function MapPage() {
       setScatterYDatasetId(scatterableDatasets[0]?.id ?? null);
     }
   }, [activeChartType, scatterableDatasets, scatterYDatasetId]);
+
+  // ── Bivariate choropleth ───────────────────────────────────────────────────
+  // Scalar datasets available as the bivariate Y axis (excludes active dataset + elections).
+  const bivariateDatasets = useMemo(
+    () => DATASETS.filter(d =>
+      d.id !== selectedDatasetId &&
+      d.group !== 'val' &&
+      d.supportedLevels.includes(selectedLevel),
+    ),
+    [selectedDatasetId, selectedLevel],
+  );
+
+  // Deactivate bivariate mode when leaving map view or switching to an election dataset.
+  useEffect(() => {
+    if (activeView !== 'map') { setBivariateMode(false); }
+  }, [activeView]);
+
+  useEffect(() => {
+    if (activeDescriptor?.group === 'val') { setBivariateMode(false); }
+  }, [activeDescriptor]);
+
+  // Auto-select a Y dataset when entering bivariate mode or when available datasets change.
+  useEffect(() => {
+    if (!bivariateMode) { return; }
+    const valid = bivariateDatasets.some(d => d.id === bivariateYDatasetId);
+    if (!valid) {
+      setBivariateYDatasetId(bivariateDatasets[0]?.id ?? null);
+    }
+  }, [bivariateMode, bivariateDatasets, bivariateYDatasetId]);
+
+  const bivariateYDescriptor = useMemo(
+    () => DATASETS.find(d => d.id === bivariateYDatasetId) ?? null,
+    [bivariateYDatasetId],
+  );
+
+  // Color function for bivariate mode: maps (code) → 3×3 palette hex.
+  const bivariateFn = useMemo(() => {
+    if (!bivariateMode || !scalarResult || !bivariateYScalar) { return null; }
+    return buildBivariateColorFn(scalarResult.values, bivariateYScalar.values);
+  }, [bivariateMode, scalarResult, bivariateYScalar]);
 
   // ── Lan/Municipality filter ────────────────────────────────────────────────
   // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
@@ -564,6 +617,24 @@ export default function MapPage() {
               </div>
             </div>
           )}
+          {/* Bivariate toggle — only for non-election scalar datasets in map view */}
+          {activeView === 'map' && scalarResult && !electionResult && (
+            <div className="flex items-center ml-3 pl-3 border-l border-slate-200">
+              <button
+                onClick={() => setBivariateMode(m => !m)}
+                title={bivariateMode ? 'Stäng 2D-läge' : 'Visa två variabler på kartan (bivariat)'}
+                className={[
+                  'flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
+                  bivariateMode
+                    ? 'bg-violet-50 border-violet-200 text-violet-700'
+                    : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+                ].join(' ')}
+              >
+                2D
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => setIsPanelOpen(p => !p)}
             title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
@@ -671,6 +742,22 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Y-axis dataset selector for bivariate map */}
+          {activeView === 'map' && bivariateMode && bivariateDatasets.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-violet-50/60 flex-shrink-0">
+              <label className="text-xs font-semibold uppercase tracking-wider text-violet-500 whitespace-nowrap">Y-axel</label>
+              <select
+                value={bivariateYDatasetId ?? ''}
+                onChange={e => setBivariateYDatasetId(e.target.value || null)}
+                className="text-sm border border-violet-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
+              >
+                {bivariateDatasets.map(d => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Y-axis dataset selector for scatter chart */}
           {activeView === 'chart' && activeChartType === 'scatter' && scatterableDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
@@ -694,8 +781,8 @@ export default function MapPage() {
                   adminLevel={selectedLevel}
                   selectedBase={selectedBase}
                   choroplethData={partyChoroplethValues ?? scalarResult?.values ?? null}
-                  colorScale={colorScale}
-                  mapColorFn={mapColorFn}
+                  colorScale={bivariateFn ? null : colorScale}
+                  mapColorFn={bivariateFn ?? mapColorFn}
                   tooltipData={tooltipData}
                   featureLabels={datasetResult?.labels}
                   featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
@@ -712,7 +799,15 @@ export default function MapPage() {
                   onComparisonSelect={handleComparisonSelect}
                 />
               )}
-              {activeView === 'map' && legendData && (
+              {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
+                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+                  <BivariateMapLegend
+                    xLabel={`${activeDescriptor.label}${scalarResult?.unit ? ` (${scalarResult.unit})` : ''}`}
+                    yLabel={`${bivariateYDescriptor.label}${bivariateYScalar?.unit ? ` (${bivariateYScalar.unit})` : ''}`}
+                  />
+                </div>
+              )}
+              {activeView === 'map' && !bivariateFn && legendData && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
                   <MapLegend data={legendData} scale={colorScale} />
                 </div>
