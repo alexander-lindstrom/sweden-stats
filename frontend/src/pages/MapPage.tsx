@@ -839,7 +839,7 @@ export default function MapPage() {
 
               {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
+                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
@@ -896,6 +896,8 @@ export default function MapPage() {
                     rowMeta={rankingRowMeta}
                     selectedFeature={selectedFeature}
                     onFeatureSelect={handleFeatureSelect}
+                    comparisonFeature={comparisonFeature}
+                    onComparisonSelect={handleComparisonSelect}
                   />
                 </div>
               )}
@@ -930,7 +932,7 @@ export default function MapPage() {
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} matchingAreas={matchingAreas} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
               {activeView === 'table' && electionResult && (

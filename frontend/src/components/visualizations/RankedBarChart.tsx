@@ -15,13 +15,18 @@ interface RankedBarChartProps {
   rowMeta?: Record<string, string> | null;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  /** Shift-click sets the comparison feature. */
+  comparisonFeature?: { code: string; label: string } | null;
+  onComparisonSelect?: (f: { code: string; label: string } | null) => void;
+  /** When set, non-matching bars are dimmed. */
+  matchingAreas?: Set<string> | null;
 }
 
 const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
-export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, colorFn, rowMeta, selectedFeature, onFeatureSelect }) => {
+export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, colorFn, rowMeta, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -81,17 +86,31 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('fill', d =>
         colorFn ? colorFn(d.code) : colorScale ? colorScale(d.value) : '#3b82f6'
       )
-      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e40af' : '#000')
-      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
+      .attr('fill-opacity', d =>
+        matchingAreas && !matchingAreas.has(d.code) ? 0.18 : 1
+      )
+      .attr('stroke', d =>
+        d.code === comparisonFeature?.code ? '#f97316'
+          : d.code === selectedFeature?.code ? '#1e40af'
+          : '#000'
+      )
+      .attr('stroke-width', d =>
+        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0.5
+      )
       .style('cursor', 'pointer')
-      .on('click', (_event: MouseEvent, d) => {
-        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      .on('click', (event: MouseEvent, d) => {
+        if (event.shiftKey) {
+          onComparisonSelect?.(d.code === comparisonFeature?.code ? null : { code: d.code, label: d.name });
+        } else {
+          onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+        }
       })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
         if (hoveredElRef.current !== el) {
           if (hoveredElRef.current) {
-            d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+            const prev = d3.select(hoveredElRef.current).datum() as { code: string };
+            d3.select(hoveredElRef.current).attr('fill-opacity', matchingAreas && !matchingAreas.has(prev.code) ? 0.18 : 1);
           }
           hoveredElRef.current = el;
           d3.select(el).attr('fill-opacity', 0.6);
@@ -101,7 +120,8 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
 
     const clearHighlight = () => {
       if (hoveredElRef.current) {
-        d3.select(hoveredElRef.current).attr('fill-opacity', 1);
+        const prev = d3.select(hoveredElRef.current).datum() as { code: string };
+        d3.select(hoveredElRef.current).attr('fill-opacity', matchingAreas && !matchingAreas.has(prev.code) ? 0.18 : 1);
         hoveredElRef.current = null;
       }
       setHovered(null);
@@ -137,6 +157,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('text-anchor', 'end')
       .attr('font-size', 12)
       .attr('fill', '#374151')
+      .attr('fill-opacity', d => matchingAreas && !matchingAreas.has(d.code) ? 0.3 : 1)
       .text(d => d.name);
 
     // X-axis
@@ -180,7 +201,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
       }
     }
-  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, selectedFeature, onFeatureSelect]);
+  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas]);
 
   return (
     <div ref={containerRef} className="w-full h-full overflow-y-auto">

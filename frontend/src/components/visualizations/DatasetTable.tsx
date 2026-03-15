@@ -8,6 +8,8 @@ interface DatasetTableProps {
   data: ScalarDatasetResult;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  comparisonFeature?: { code: string; label: string } | null;
+  onComparisonSelect?: (f: { code: string; label: string } | null) => void;
   matchingAreas?: Set<string> | null;
 }
 
@@ -15,7 +17,7 @@ type SortKey = 'name' | 'value';
 
 const ROW_HEIGHT = 36;
 
-export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect, matchingAreas }) => {
+export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas }) => {
   const { sortKey, sortDir, handleSort } = useTableSort<SortKey>('value', 'desc');
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -86,13 +88,24 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeatur
           {paddingTop > 0 && <tr><td style={{ height: paddingTop }} /></tr>}
           {virtualItems.map(virtualRow => {
             const row = sorted[virtualRow.index];
-            const isSelected = row.code === selectedFeature?.code;
-            const isDimmed = matchingAreas !== null && matchingAreas !== undefined && !matchingAreas.has(row.code);
+            const isSelected   = row.code === selectedFeature?.code;
+            const isComparison = row.code === comparisonFeature?.code;
+            const isDimmed     = matchingAreas != null && !matchingAreas.has(row.code);
             return (
               <tr
                 key={row.code}
-                onClick={() => onFeatureSelect?.(isSelected ? null : { code: row.code, label: row.name })}
-                className={[tableRowClass(isSelected, !!onFeatureSelect), isDimmed ? 'opacity-30' : ''].join(' ')}
+                onClick={(e) => {
+                  if (e.shiftKey) {
+                    onComparisonSelect?.(isComparison ? null : { code: row.code, label: row.name });
+                  } else {
+                    onFeatureSelect?.(isSelected ? null : { code: row.code, label: row.name });
+                  }
+                }}
+                className={[
+                  tableRowClass(isSelected, !!(onFeatureSelect || onComparisonSelect)),
+                  isComparison ? '!bg-orange-50' : '',
+                  isDimmed ? 'opacity-30' : '',
+                ].join(' ')}
               >
                 <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">{virtualRow.index + 1}</td>
                 <td className="py-2 text-gray-800">{row.name}</td>
