@@ -76,6 +76,7 @@ export default function MapPage() {
   const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
+  const [comparisonFeature, setComparisonFeature]  = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen]  = useState(false);
@@ -169,9 +170,19 @@ export default function MapPage() {
     setSelectedLevel, setSelectedFeature, pendingSelectionRef,
   );
 
+  const handleComparisonSelect = (feature: { code: string; label: string; parentCode?: string } | null) => {
+    if (!feature) { setComparisonFeature(null); return; }
+    // Toggle off if the same area is shift-clicked again.
+    if (feature.code === comparisonFeature?.code) { setComparisonFeature(null); return; }
+    // Don't allow comparing an area with itself.
+    if (feature.code === selectedFeature?.code) { return; }
+    setComparisonFeature(feature);
+  };
+
   const handleReset = () => {
     setSelectedLevel('Region');
     setSelectedFeature(null);
+    setComparisonFeature(null);
     setActiveView('map');
     setIsPanelOpen(false);
     setMobileSidebarOpen(false);
@@ -185,6 +196,12 @@ export default function MapPage() {
     yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
   };
 
+  const handleFeatureSelect = (feature: { code: string; label: string; parentCode?: string } | null) => {
+    setSelectedFeature(feature);
+    // Regular click exits comparison mode — shift-click is the explicit comparison entry point.
+    if (feature) { setComparisonFeature(null); }
+  };
+
   const handleDrillDown = (level: AdminLevel, code: string, label: string, parentCode?: string) => {
     pendingSelectionRef.current = { code, label, parentCode };
     setSelectedLevel(level);
@@ -192,6 +209,7 @@ export default function MapPage() {
 
   useEffect(() => {
     if (selectedFeature) { setIsPanelOpen(true); }
+    else { setComparisonFeature(null); }
   }, [selectedFeature]);
 
   useEffect(() => {
@@ -209,6 +227,7 @@ export default function MapPage() {
     const datasets = getDatasetsForLevel(selectedLevel);
     setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
     setSelectionLevel(selectedLevel);
+    setComparisonFeature(null);
     if (pendingSelectionRef.current) {
       setSelectedFeature(pendingSelectionRef.current);
       pendingSelectionRef.current = null;
@@ -687,8 +706,10 @@ export default function MapPage() {
                   subTooltipData={subElectionTooltip}
                   resetToken={mapResetToken}
                   selectedFeature={selectedFeature}
-                  onFeatureSelect={setSelectedFeature}
+                  onFeatureSelect={handleFeatureSelect}
                   onDrillDown={handleDrillDown}
+                  comparisonFeature={comparisonFeature}
+                  onComparisonSelect={handleComparisonSelect}
                 />
               )}
               {activeView === 'map' && legendData && (
@@ -699,7 +720,7 @@ export default function MapPage() {
 
               {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
@@ -709,7 +730,7 @@ export default function MapPage() {
               )}
               {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
                 <div className="w-full h-full p-6">
-                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'election-bar' && filteredElectionResult && (
@@ -717,7 +738,7 @@ export default function MapPage() {
                   <PartyShareBarChart
                     data={filteredElectionResult}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={setSelectedFeature}
+                    onFeatureSelect={handleFeatureSelect}
                   />
                 </div>
               )}
@@ -727,7 +748,7 @@ export default function MapPage() {
                     root={hierarchyData}
                     unit={datasetResult?.unit ?? ''}
                     label={activeDescriptor?.label ?? ''}
-                    onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? setSelectedFeature : undefined}
+                    onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? handleFeatureSelect : undefined}
                     depthToLevel={activeDescriptor?.sunburstDepthToLevel}
                     onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
                   />
@@ -755,7 +776,7 @@ export default function MapPage() {
                     colorFn={rankingColorFn}
                     rowMeta={rankingRowMeta}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={setSelectedFeature}
+                    onFeatureSelect={handleFeatureSelect}
                   />
                 </div>
               )}
@@ -765,7 +786,7 @@ export default function MapPage() {
                     xData={scalarResult}
                     yData={scatterYScalar}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={setSelectedFeature}
+                    onFeatureSelect={handleFeatureSelect}
                   />
                 </div>
               )}
@@ -775,7 +796,7 @@ export default function MapPage() {
                     data={scalarResult}
                     colorScale={colorScale}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={setSelectedFeature}
+                    onFeatureSelect={handleFeatureSelect}
                   />
                 </div>
               )}
@@ -790,12 +811,12 @@ export default function MapPage() {
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
                 </div>
               )}
               {activeView === 'table' && electionResult && (
                 <div className="w-full h-full p-6">
-                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={setSelectedFeature} />
+                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
                 </div>
               )}
               {activeView === 'table' && !datasetResult && (
@@ -810,6 +831,8 @@ export default function MapPage() {
               adminLevel={selectionLevel}
               isOpen={isPanelOpen}
               onClose={() => setIsPanelOpen(false)}
+              comparisonFeature={comparisonFeature}
+              onClearComparison={() => setComparisonFeature(null)}
             />
           </div>
         </div>

@@ -235,3 +235,21 @@ export function createSelectionLayer(
     },
   });
 }
+
+export function createComparisonSelectionLayer(
+  source: VectorTileSource,
+  codeProperty: string,
+  comparisonCodeRef: { current: string | null },
+): VectorTileLayer {
+  const comparisonStyle = new Style({
+    stroke: new Stroke({ color: '#f97316', width: 2.5 }),
+  });
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    style: (feature: FeatureLike) => {
+      const code = String(feature.get(codeProperty) ?? '');
+      return code === comparisonCodeRef.current ? comparisonStyle : undefined;
+    },
+  });
+}

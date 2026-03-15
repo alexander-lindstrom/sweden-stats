@@ -128,29 +128,47 @@ function StatRow({ label, stat }: { label: string; stat: StatData }) {
   );
 }
 
-function Sparkline({ data }: { data: Array<{ year: number; value: number }> }) {
+function Sparkline({
+  data,
+  comparisonData,
+}: {
+  data: Array<{ year: number; value: number }>;
+  comparisonData?: Array<{ year: number; value: number }>;
+}) {
   if (data.length < 2) { return null; }
 
   const W = 220, H = 52, pad = 3;
-  const vals   = data.map(d => d.value);
-  const minV   = Math.min(...vals);
-  const maxV   = Math.max(...vals);
+  const allVals = [...data.map(d => d.value), ...(comparisonData?.map(d => d.value) ?? [])];
+  const minV   = Math.min(...allVals);
+  const maxV   = Math.max(...allVals);
   const range  = maxV - minV || 1;
   const innerH = H - pad * 2;
 
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * W;
-    const y = pad + innerH - ((d.value - minV) / range) * innerH;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+  const toPoints = (series: Array<{ year: number; value: number }>) =>
+    series.map((d, i) => {
+      const x = (i / (series.length - 1)) * W;
+      const y = pad + innerH - ((d.value - minV) / range) * innerH;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    }).join(' ');
 
-  const trend  = vals[vals.length - 1] > vals[0] ? 'up' : vals[vals.length - 1] < vals[0] ? 'down' : 'flat';
+  const trend  = data[data.length - 1].value > data[0].value ? 'up' : data[data.length - 1].value < data[0].value ? 'down' : 'flat';
   const stroke = trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#9ca3af';
 
   return (
     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
+      {comparisonData && comparisonData.length >= 2 && (
+        <polyline
+          points={toPoints(comparisonData)}
+          fill="none"
+          stroke="#f97316"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          strokeDasharray="4 2"
+        />
+      )}
       <polyline
-        points={points}
+        points={toPoints(data)}
         fill="none"
         stroke={stroke}
         strokeWidth="1.5"
@@ -174,9 +192,10 @@ const RADAR_WEB = [0.25, 0.5, 0.75, 1] as const;
 
 /**
  * Spider/radar chart showing percentile scores across multiple axes.
+ * Optionally overlays a second set of axes (comparison, in orange).
  * Hover a vertex dot to see the exact value, percentile, and rank.
  */
-function RadarChart({ axes }: { axes: RadarAxis[] }) {
+function RadarChart({ axes, comparisonAxes }: { axes: RadarAxis[]; comparisonAxes?: RadarAxis[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const N  = axes.length;
@@ -197,6 +216,13 @@ function RadarChart({ axes }: { axes: RadarAxis[] }) {
     .map((a, i) => pt(a.percentile, i))
     .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
     .join(' ') + 'Z';
+
+  const compPath = comparisonAxes && comparisonAxes.length === N
+    ? comparisonAxes
+        .map((a, i) => pt(a.percentile, i))
+        .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
+        .join(' ') + 'Z'
+    : null;
 
   // Build tooltip data when a vertex is hovered.
   const tooltip = hovered !== null ? (() => {
@@ -233,7 +259,17 @@ function RadarChart({ axes }: { axes: RadarAxis[] }) {
         const [x2, y2] = pt(1, i);
         return <line key={i} x1={CX} y1={CY} x2={x2.toFixed(1)} y2={y2.toFixed(1)} stroke="#e2e8f0" strokeWidth={0.75} />;
       })}
-      {/* Value polygon */}
+      {/* Comparison polygon (orange, behind primary) */}
+      {compPath && (
+        <>
+          <path d={compPath} fill="rgba(249,115,22,0.12)" stroke="#f97316" strokeWidth={1.5} strokeLinejoin="round" />
+          {comparisonAxes!.map((a, i) => {
+            const [cx, cy] = pt(a.percentile, i);
+            return <circle key={`comp-${i}`} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={2.5} fill="#f97316" />;
+          })}
+        </>
+      )}
+      {/* Primary value polygon (blue) */}
       <path d={valuePath} fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth={1.5} strokeLinejoin="round" />
       {/* Vertex dots */}
       {axes.map((a, i) => {
@@ -354,6 +390,9 @@ export interface SelectionPanelProps {
   adminLevel: AdminLevel;
   isOpen: boolean;
   onClose: () => void;
+  /** Second area selected for comparison (shift-click). */
+  comparisonFeature?: { code: string; label: string } | null;
+  onClearComparison?: () => void;
 }
 
 interface PanelStats {
@@ -364,7 +403,7 @@ interface PanelStats {
   employment:  StatData | null;
 }
 
-export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }: SelectionPanelProps) {
+export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison }: SelectionPanelProps) {
   const [stats,           setStats]           = useState<PanelStats | null>(null);
   const [statsLoading,    setStatsLoading]    = useState(false);
   const [sparkline,       setSparkline]       = useState<Array<{ year: number; value: number }>>([]);
@@ -372,6 +411,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
   const [electionVotes,   setElectionVotes]   = useState<Record<string, number> | null>(null);
   const [electionLoading, setElectionLoading] = useState(false);
   const fetchIdRef = useRef(0);
+
+  // Comparison feature state
+  const [compStats,           setCompStats]           = useState<PanelStats | null>(null);
+  const [compStatsLoading,    setCompStatsLoading]    = useState(false);
+  const [compSparkline,       setCompSparkline]       = useState<Array<{ year: number; value: number }>>([]);
+  const [compSparkLoading,    setCompSparkLoading]    = useState(false);
+  const [compElectionVotes,   setCompElectionVotes]   = useState<Record<string, number> | null>(null);
+  const [compElectionLoading, setCompElectionLoading] = useState(false);
+  const compFetchIdRef = useRef(0);
 
   useEffect(() => {
     if (!selectedFeature) {
@@ -488,6 +536,119 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     }
   }, [selectedFeature, adminLevel]);
 
+  // Fetch stats for the comparison feature (same logic, different code).
+  useEffect(() => {
+    if (!comparisonFeature) {
+      setCompStats(null);
+      setCompSparkline([]);
+      setCompElectionVotes(null);
+      return;
+    }
+
+    const id   = ++compFetchIdRef.current;
+    const code = comparisonFeature.code;
+
+    setCompStats(null);
+    setCompStatsLoading(true);
+    setCompSparkline([]);
+    setCompSparkLoading(true);
+    setCompElectionVotes(null);
+
+    const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
+    const wantsAge        = AGE_LEVELS.includes(adminLevel);
+    const wantsForeignBg  = FOREIGN_BG_LEVELS.includes(adminLevel);
+    const wantsEmployment = EMPLOYMENT_LEVELS.includes(adminLevel);
+    const wantsElection   = ELECTION_LEVELS.includes(adminLevel);
+
+    let popStat:        StatData | null = null;
+    let incomeStat:     StatData | null = null;
+    let ageStat:        StatData | null = null;
+    let foreignBgStat:  StatData | null = null;
+    let employmentStat: StatData | null = null;
+
+    const statFetches: Promise<void>[] = [
+      fetchCached(popDescriptor, adminLevel, STAT_YEAR)
+        .then(r => { popStat = toStat(r as ScalarDatasetResult, code); })
+        .catch(() => {}),
+    ];
+
+    if (wantsIncome) {
+      statFetches.push(
+        fetchCached(incomeDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { incomeStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+    if (wantsAge) {
+      statFetches.push(
+        fetchCached(ageDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { ageStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+    if (wantsForeignBg) {
+      statFetches.push(
+        fetchCached(foreignBgDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { foreignBgStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+    if (wantsEmployment) {
+      statFetches.push(
+        fetchCached(employmentDescriptor, adminLevel, STAT_YEAR)
+          .then(r => { employmentStat = toStat(r as ScalarDatasetResult, code); })
+          .catch(() => {}),
+      );
+    }
+
+    Promise.all(statFetches).then(() => {
+      if (id !== compFetchIdRef.current) { return; }
+      if (popStat !== null) {
+        setCompStats({
+          population:  popStat,
+          income:      wantsIncome     ? incomeStat     : null,
+          age:         wantsAge        ? ageStat        : null,
+          foreignBg:   wantsForeignBg  ? foreignBgStat  : null,
+          employment:  wantsEmployment ? employmentStat : null,
+        });
+      }
+      setCompStatsLoading(false);
+    });
+
+    Promise.all(
+      SPARKLINE_YEARS.map(year =>
+        fetchCached(popDescriptor, adminLevel, year)
+          .then(r => {
+            const v = (r as ScalarDatasetResult).values[code];
+            return Number.isFinite(v) ? { year, value: v } : null;
+          })
+          .catch(() => null),
+      ),
+    ).then(results => {
+      if (id !== compFetchIdRef.current) { return; }
+      setCompSparkline(results.filter((r): r is { year: number; value: number } => r !== null));
+      setCompSparkLoading(false);
+    });
+
+    if (wantsElection) {
+      setCompElectionLoading(true);
+      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
+        .then(r => {
+          if (id !== compFetchIdRef.current) { return; }
+          if (r.kind === 'election') {
+            const votes = (r as ElectionDatasetResult).partyVotes[code];
+            setCompElectionVotes(votes ?? null);
+          }
+          setCompElectionLoading(false);
+        })
+        .catch(() => {
+          if (id === compFetchIdRef.current) { setCompElectionLoading(false); }
+        });
+    }
+  }, [comparisonFeature, adminLevel]);
+
+  const isComparing = !!comparisonFeature;
+
   // Build radar axes from whatever stats are available (need ≥3 for a meaningful chart).
   const radarAxes: RadarAxis[] = [];
   if (stats) {
@@ -518,6 +679,36 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
     }
   }
 
+  // Comparison radar axes — same labels as primary so axes align.
+  const compRadarAxes: RadarAxis[] = [];
+  if (compStats && radarAxes.length > 0) {
+    if (compStats.population.percentile !== null) {
+      compRadarAxes.push({ label: 'Befolkning', percentile: compStats.population.percentile,
+        value: compStats.population.value, unit: compStats.population.unit,
+        rank: compStats.population.rank, total: compStats.population.total });
+    }
+    if (compStats.income != null && compStats.income.percentile !== null) {
+      compRadarAxes.push({ label: 'Inkomst', percentile: compStats.income.percentile,
+        value: compStats.income.value, unit: compStats.income.unit,
+        rank: compStats.income.rank, total: compStats.income.total });
+    }
+    if (compStats.age != null && compStats.age.percentile !== null) {
+      compRadarAxes.push({ label: 'Ålder', percentile: compStats.age.percentile,
+        value: compStats.age.value, unit: compStats.age.unit,
+        rank: compStats.age.rank, total: compStats.age.total });
+    }
+    if (compStats.foreignBg != null && compStats.foreignBg.percentile !== null) {
+      compRadarAxes.push({ label: 'Utländsk', percentile: compStats.foreignBg.percentile,
+        value: compStats.foreignBg.value, unit: compStats.foreignBg.unit,
+        rank: compStats.foreignBg.rank, total: compStats.foreignBg.total });
+    }
+    if (compStats.employment != null && compStats.employment.percentile !== null) {
+      compRadarAxes.push({ label: 'Syssels.', percentile: compStats.employment.percentile,
+        value: compStats.employment.value, unit: compStats.employment.unit,
+        rank: compStats.employment.rank, total: compStats.employment.total });
+    }
+  }
+
   return (
     <div
       aria-hidden={!isOpen}
@@ -526,11 +717,12 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
         // Mobile: fixed bottom sheet that slides up/down
         'fixed bottom-0 left-0 right-0 z-20',
         'max-h-[65vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
-        'transition-transform duration-300 ease-out',
+        'transition-[transform,width] duration-300 ease-out',
         // Desktop: normal flex panel in the layout
         'sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:z-auto',
         'sm:max-h-none sm:rounded-none sm:shadow-none sm:border-t-0 sm:border-l',
-        'sm:w-72 sm:flex-shrink-0',
+        isComparing ? 'sm:w-[440px]' : 'sm:w-72',
+        'sm:flex-shrink-0',
         // Open / closed
         isOpen ? 'translate-y-0' : 'translate-y-full sm:hidden',
       ].join(' ')}
@@ -542,21 +734,47 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
       {/* Header */}
       <div className="flex items-start gap-3 px-4 py-3 border-b border-slate-200 flex-shrink-0">
-        <div className="flex-1 min-w-0">
-          <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-1.5 ${LEVEL_BADGE[adminLevel]}`}>
-            {LEVEL_LABELS[adminLevel]}
-          </span>
-          <h2 className="text-sm font-semibold text-slate-900 leading-snug">
-            {selectedFeature?.label ?? <span className="text-slate-400 italic">Inget valt</span>}
-          </h2>
+        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 self-center ${LEVEL_BADGE[adminLevel]}`}>
+          {LEVEL_LABELS[adminLevel]}
+        </span>
+        {isComparing ? (
+          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
+              <span className="text-sm font-semibold text-slate-900 truncate">{selectedFeature?.label}</span>
+            </span>
+            <span className="text-slate-300 text-xs">vs</span>
+            <span className="flex items-center gap-1 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+              <span className="text-sm font-semibold text-slate-900 truncate">{comparisonFeature?.label}</span>
+            </span>
+          </div>
+        ) : (
+          <div className="flex-1 min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900 leading-snug">
+              {selectedFeature?.label ?? <span className="text-slate-400 italic">Inget valt</span>}
+            </h2>
+          </div>
+        )}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {isComparing && (
+            <button
+              onClick={onClearComparison}
+              aria-label="Rensa jämförelse"
+              title="Rensa jämförelse"
+              className="text-orange-400 hover:text-orange-600 transition-colors text-xs font-medium px-1.5 py-0.5 rounded hover:bg-orange-50"
+            >
+              Rensa
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            aria-label="Stäng panel"
+            className="text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
+          >
+            ×
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Stäng panel"
-          className="flex-shrink-0 mt-0.5 text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
-        >
-          ×
-        </button>
       </div>
 
       {/* Body */}
@@ -570,12 +788,29 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
 
         {selectedFeature && (
           <>
-            {/* Radar profile — shown once all three axes are available */}
+            {/* Radar profile */}
             {!statsLoading && radarAxes.length >= 3 && (
               <section>
                 <SectionTitle>Profil</SectionTitle>
                 <ChartCard>
-                  <RadarChart axes={radarAxes} />
+                  <RadarChart
+                    axes={radarAxes}
+                    comparisonAxes={isComparing && compRadarAxes.length === radarAxes.length ? compRadarAxes : undefined}
+                  />
+                  {isComparing && (
+                    <div className="flex items-center gap-3 mt-1.5 justify-center">
+                      <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                        <span className="w-2 h-0.5 rounded bg-blue-500 inline-block" />
+                        {selectedFeature.label}
+                      </span>
+                      {compRadarAxes.length > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                          <span className="w-2 h-0.5 rounded bg-orange-500 inline-block" />
+                          {comparisonFeature!.label}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </ChartCard>
               </section>
             )}
@@ -583,11 +818,11 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
             {/* Key stats */}
             <section>
               <SectionTitle>Nyckeltal {STAT_YEAR}</SectionTitle>
-              {statsLoading && <Spinner />}
+              {(statsLoading || (isComparing && compStatsLoading)) && <Spinner />}
               {!statsLoading && !stats && (
                 <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
-              {!statsLoading && stats && (
+              {!statsLoading && stats && !isComparing && (
                 <div className="space-y-3">
                   <StatRow label="Befolkning"       stat={stats.population} />
                   {stats.income     && <StatRow label="Medianinkomst"    stat={stats.income}     />}
@@ -596,16 +831,26 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
                   {stats.employment && <StatRow label="Sysselsättning"   stat={stats.employment} />}
                 </div>
               )}
+              {!statsLoading && stats && isComparing && (
+                <ComparisonStatsTable
+                  primary={stats}
+                  comparison={compStats}
+                  compLoading={compStatsLoading}
+                />
+              )}
             </section>
 
             {/* Population sparkline */}
             {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
               <section>
                 <SectionTitle>Befolkningstrend</SectionTitle>
-                {sparkLoading && <Spinner />}
+                {(sparkLoading || (isComparing && compSparkLoading)) && <Spinner />}
                 {!sparkLoading && sparkline.length >= 2 && (
                   <ChartCard>
-                    <Sparkline data={sparkline} />
+                    <Sparkline
+                      data={sparkline}
+                      comparisonData={isComparing && !compSparkLoading && compSparkline.length >= 2 ? compSparkline : undefined}
+                    />
                     <div className="flex justify-between text-xs text-slate-400 mt-1">
                       <span>{sparkline[0].year}</span>
                       <span>{sparkline[sparkline.length - 1].year}</span>
@@ -622,19 +867,145 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose }:
             {ELECTION_LEVELS.includes(adminLevel) && (
               <section>
                 <SectionTitle>Riksdagsval {ELECTION_YEAR}</SectionTitle>
-                {electionLoading && <Spinner />}
-                {!electionLoading && !electionVotes && (
-                  <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                {(electionLoading || (isComparing && compElectionLoading)) && <Spinner />}
+                {!isComparing && (
+                  <>
+                    {!electionLoading && !electionVotes && (
+                      <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                    )}
+                    {!electionLoading && electionVotes && (
+                      <ChartCard>
+                        <ElectionDonut votes={electionVotes} />
+                      </ChartCard>
+                    )}
+                  </>
                 )}
-                {!electionLoading && electionVotes && (
-                  <ChartCard>
-                    <ElectionDonut votes={electionVotes} />
-                  </ChartCard>
+                {isComparing && !electionLoading && !compElectionLoading && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <ChartCard>
+                      <div className="text-[10px] font-semibold text-slate-400 mb-1.5 truncate">{selectedFeature.label}</div>
+                      {electionVotes
+                        ? <ElectionDonut votes={electionVotes} />
+                        : <p className="text-xs text-slate-400">Ingen data</p>}
+                    </ChartCard>
+                    <ChartCard>
+                      <div className="text-[10px] font-semibold text-orange-400 mb-1.5 truncate">{comparisonFeature!.label}</div>
+                      {compElectionVotes
+                        ? <ElectionDonut votes={compElectionVotes} />
+                        : <p className="text-xs text-slate-400">Ingen data</p>}
+                    </ChartCard>
+                  </div>
                 )}
               </section>
             )}
+
+            {/* Comparison hint — shown only when a single area is selected */}
+            {!isComparing && (
+              <p className="text-[11px] text-slate-400 text-center pt-1 pb-2 hidden sm:block">
+                Shift-klicka ett annat område för att jämföra
+              </p>
+            )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Comparison stats table ─────────────────────────────────────────────────────
+
+interface ComparisonStatsTableProps {
+  primary:    PanelStats;
+  comparison: PanelStats | null;
+  compLoading: boolean;
+}
+
+function ComparisonStatsTable({ primary, comparison, compLoading }: ComparisonStatsTableProps) {
+  const rows: Array<{ label: string; a: StatData; b: StatData | null | undefined }> = [
+    { label: 'Befolkning',        a: primary.population,  b: comparison?.population },
+    ...(primary.income     ? [{ label: 'Medianinkomst',    a: primary.income,     b: comparison?.income     }] : []),
+    ...(primary.age        ? [{ label: 'Medelålder',       a: primary.age,        b: comparison?.age        }] : []),
+    ...(primary.foreignBg  ? [{ label: 'Utländsk bakgr.', a: primary.foreignBg,  b: comparison?.foreignBg  }] : []),
+    ...(primary.employment ? [{ label: 'Sysselsättning',  a: primary.employment, b: comparison?.employment }] : []),
+  ];
+
+  return (
+    <div className="space-y-2.5">
+      {rows.map(({ label, a, b }) => (
+        <ComparisonStatRow key={label} label={label} a={a} b={b ?? null} compLoading={compLoading} />
+      ))}
+    </div>
+  );
+}
+
+function ComparisonStatRow({
+  label, a, b, compLoading,
+}: {
+  label: string;
+  a: StatData;
+  b: StatData | null;
+  compLoading: boolean;
+}) {
+  const delta = a.value !== null && b?.value !== null && b?.value !== undefined
+    ? a.value - b.value
+    : null;
+
+  const fmtVal = (v: number | null, unit: string) =>
+    v !== null ? `${v.toLocaleString('sv-SE')} ${unit}`.trim() : '—';
+
+  const fmtDelta = (d: number | null, unit: string) => {
+    if (d === null) { return null; }
+    const sign = d > 0 ? '+' : '';
+    return `${sign}${d.toLocaleString('sv-SE')} ${unit}`.trim();
+  };
+
+  const deltaStr = fmtDelta(delta, a.unit);
+  const deltaColor = delta === null ? '' : delta > 0 ? 'text-blue-600' : delta < 0 ? 'text-orange-600' : 'text-slate-400';
+
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</div>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-baseline">
+        {/* Area A */}
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 self-center" />
+            <span className="text-base font-bold text-slate-900 tabular-nums truncate">
+              {a.value !== null ? a.value.toLocaleString('sv-SE') : '—'}
+            </span>
+            <span className="text-[10px] text-slate-500 flex-shrink-0">{a.unit}</span>
+          </div>
+          {a.rank !== null && a.total !== null && (
+            <div className="text-[10px] text-slate-400 tabular-nums pl-2.5">#{a.rank}/{a.total}</div>
+          )}
+        </div>
+
+        {/* Delta */}
+        <div className={`text-[10px] font-semibold tabular-nums text-center ${deltaColor}`}>
+          {deltaStr ?? (compLoading ? '…' : '—')}
+        </div>
+
+        {/* Area B */}
+        <div className="min-w-0 text-right">
+          {compLoading ? (
+            <span className="text-xs text-slate-300">…</span>
+          ) : b ? (
+            <>
+              <div className="flex items-baseline gap-1 justify-end">
+                <span className="text-base font-bold text-slate-900 tabular-nums truncate">
+                  {b.value !== null ? b.value.toLocaleString('sv-SE') : '—'}
+                </span>
+                <span className="text-[10px] text-slate-500 flex-shrink-0">{b.unit}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 self-center" />
+              </div>
+              {b.rank !== null && b.total !== null && (
+                <div className="text-[10px] text-slate-400 tabular-nums pr-2.5">#{b.rank}/{b.total}</div>
+              )}
+            </>
+          ) : (
+            <span className="text-xs text-slate-400">{fmtVal(null, '')}</span>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   baseVectorStyle,
   buildCategoricalStyle,
   buildChoroplethStyle,
+  createComparisonSelectionLayer,
   createHighlightLayer,
   createSelectionLayer,
   createSubBoundaryLayer,
@@ -73,6 +74,9 @@ export interface MapViewProps {
   selectedFeature: { code: string; label: string; parentCode?: string } | null;
   onFeatureSelect: (f: { code: string; label: string; parentCode?: string } | null) => void;
   onDrillDown: (level: AdminLevel, code: string, label: string, parentCode?: string) => void;
+  /** Second selected area for comparison mode. Shift-click to set. */
+  comparisonFeature?: { code: string; label: string; parentCode?: string } | null;
+  onComparisonSelect?: (f: { code: string; label: string; parentCode?: string } | null) => void;
   /** Increment to trigger an animated reset of the map view to the initial Sweden overview. */
   resetToken?: number;
 }
@@ -137,6 +141,8 @@ const MapView: React.FC<MapViewProps> = ({
   selectedFeature,
   onFeatureSelect,
   onDrillDown,
+  comparisonFeature,
+  onComparisonSelect,
   resetToken,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
@@ -157,8 +163,10 @@ const MapView: React.FC<MapViewProps> = ({
   const selectedCodeRef      = useRef<string | null>(null);
   const subLayerRef          = useRef<VectorTileLayer | null>(null);
   const subHighlightLayerRef = useRef<VectorTileLayer | null>(null);
-  const selectionLayerRef    = useRef<VectorTileLayer | null>(null);
-  const hoveredSubCodeRef    = useRef<string | null>(null);
+  const selectionLayerRef          = useRef<VectorTileLayer | null>(null);
+  const comparisonCodeRef          = useRef<string | null>(null);
+  const comparisonSelectionLayerRef = useRef<VectorTileLayer | null>(null);
+  const hoveredSubCodeRef          = useRef<string | null>(null);
 
   // Keep latest sub-data refs so the pointer-move handler always sees current values
   // without needing them in the useCallback dep array.
@@ -236,13 +244,23 @@ const MapView: React.FC<MapViewProps> = ({
       { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 },
     );
 
+    const isShift = (evt.originalEvent as MouseEvent).shiftKey;
+
     if (!clickedCode) {
-      onFeatureSelect(null); // empty-space click → deselect
+      if (isShift) {
+        onComparisonSelect?.(null);
+      } else {
+        onFeatureSelect(null); // empty-space click → deselect
+      }
       return;
     }
 
-    onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown]);
+    if (isShift) {
+      onComparisonSelect?.({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
+    } else {
+      onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
+    }
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown, onComparisonSelect]);
 
   // --- Pointer-move handler: hover tooltip + highlight ----------------------
   // Defined as a useCallback so the registration effect stays a clean 3-liner.
@@ -441,6 +459,8 @@ const MapView: React.FC<MapViewProps> = ({
 
     // Highlight layer is source-coupled — always recreated, remove immediately.
     if (highlightLayerRef.current) { map.removeLayer(highlightLayerRef.current); highlightLayerRef.current = null; }
+    // Comparison outline is source-coupled too — remove and let the comparison effect recreate it.
+    if (comparisonSelectionLayerRef.current) { map.removeLayer(comparisonSelectionLayerRef.current); comparisonSelectionLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
 
@@ -528,6 +548,26 @@ const MapView: React.FC<MapViewProps> = ({
 
     return () => controller.abort();
   }, [selectedFeature, adminLevel, featureCodeProperty]);
+
+  // --- Show/update comparison outline when comparisonFeature changes ------
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) { return; }
+
+    if (comparisonSelectionLayerRef.current) {
+      map.removeLayer(comparisonSelectionLayerRef.current);
+      comparisonSelectionLayerRef.current = null;
+    }
+
+    comparisonCodeRef.current = comparisonFeature?.code ?? null;
+
+    if (!comparisonFeature || !sourceRef.current) { return; }
+
+    const compLayer = createComparisonSelectionLayer(sourceRef.current, featureCodeProperty, comparisonCodeRef);
+    compLayer.setZIndex(4);
+    map.addLayer(compLayer);
+    comparisonSelectionLayerRef.current = compLayer;
+  }, [comparisonFeature, featureCodeProperty]);
 
   // --- Reset map view to Sweden overview when resetToken increments --------
   useEffect(() => {
