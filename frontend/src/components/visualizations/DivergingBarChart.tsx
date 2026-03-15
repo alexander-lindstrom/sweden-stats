@@ -10,6 +10,8 @@ interface Props {
   data: ScalarDatasetResult;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  comparisonFeature?: { code: string; label: string } | null;
+  onComparisonSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 const MARGIN     = { top: 28, right: 76, bottom: 24, left: 152 };
@@ -37,7 +39,7 @@ function fmtAbs(v: number): string {
   return v.toFixed(1);
 }
 
-export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
+export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
@@ -137,11 +139,21 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill',   d => d.value >= mean ? COLOR_ABOVE : COLOR_BELOW)
-      .attr('stroke', d => d.code === selectedFeature?.code ? '#1e293b' : '#000')
-      .attr('stroke-width', d => d.code === selectedFeature?.code ? 2 : 0.5)
+      .attr('stroke', d =>
+        d.code === comparisonFeature?.code ? '#f97316'
+          : d.code === selectedFeature?.code ? '#1e293b'
+          : '#000'
+      )
+      .attr('stroke-width', d =>
+        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0.5
+      )
       .style('cursor', 'pointer')
-      .on('click', (_event: MouseEvent, d) => {
-        onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+      .on('click', (event: MouseEvent, d) => {
+        if (event.shiftKey) {
+          onComparisonSelect?.(d.code === comparisonFeature?.code ? null : { code: d.code, label: d.name });
+        } else {
+          onFeatureSelect?.(d.code === selectedFeature?.code ? null : { code: d.code, label: d.name });
+        }
       })
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;
@@ -237,7 +249,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
         containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
       }
     }
-  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect]);
+  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect]);
 
   const svgH = Math.max(dimensions?.height ?? 0, needed + MARGIN.top + MARGIN.bottom);
 

@@ -849,7 +849,7 @@ export default function MapPage() {
               )}
               {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
                 <div className="w-full h-full p-6">
-                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
+                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'election-bar' && filteredElectionResult && (
@@ -908,6 +908,8 @@ export default function MapPage() {
                     yData={scatterYScalar}
                     selectedFeature={selectedFeature}
                     onFeatureSelect={handleFeatureSelect}
+                    comparisonFeature={comparisonFeature}
+                    onComparisonSelect={handleComparisonSelect}
                   />
                 </div>
               )}
@@ -917,7 +919,6 @@ export default function MapPage() {
                     data={scalarResult}
                     colorScale={colorScale}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
                   />
                 </div>
               )}

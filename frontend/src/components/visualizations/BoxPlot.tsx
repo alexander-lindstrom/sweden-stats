@@ -8,7 +8,6 @@ interface Props {
   data: ScalarDatasetResult;
   colorScale?: ((v: number) => string) | null;
   selectedFeature?: { code: string; label: string } | null;
-  onFeatureSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 interface BoxStats {
@@ -85,14 +84,12 @@ function fmtVal(v: number, unit: string): string {
   return d3.format(',.0f')(v) + (unit ? ` ${unit}` : '');
 }
 
-export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature, onFeatureSelect }) => {
+export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const onFeatureSelectRef = useRef(onFeatureSelect);
-  onFeatureSelectRef.current = onFeatureSelect;
 
   useEffect(() => {
     if (!svgRef.current || !dimensions) { return; }
@@ -239,22 +236,10 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature, on
         .attr('width', innerW).attr('height', ROW_H)
         .attr('fill', 'none')
         .attr('pointer-events', 'all')
-        .style('cursor', 'pointer')
         .on('mousemove', (event: MouseEvent) => {
           setHovered({ stats: b, clientX: event.clientX, clientY: event.clientY });
         })
-        .on('mouseleave', () => setHovered(null))
-        .on('click', () => {
-          // Clicking a county row selects the area in the main dataset that
-          // is the median area for that county (closest to median value).
-          const codesInCounty = Object.entries(data.values)
-            .filter(([c]) => c.startsWith(b.countyCode) && Number.isFinite(data.values[c]))
-            .sort(([, a], [, bv]) => Math.abs(a - b.median) - Math.abs(bv - b.median));
-          if (codesInCounty.length > 0) {
-            const [code] = codesInCounty[0];
-            onFeatureSelectRef.current?.({ code, label: data.labels[code] ?? code });
-          }
-        });
+        .on('mouseleave', () => setHovered(null));
     });
 
   }, [data, colorScale, selectedFeature, dimensions]);

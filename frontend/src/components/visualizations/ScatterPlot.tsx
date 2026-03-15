@@ -8,6 +8,8 @@ interface Props {
   yData: ScalarDatasetResult;
   selectedFeature?: { code: string; label: string } | null;
   onFeatureSelect?: (f: { code: string; label: string } | null) => void;
+  comparisonFeature?: { code: string; label: string } | null;
+  onComparisonSelect?: (f: { code: string; label: string } | null) => void;
 }
 
 interface Point {
@@ -49,14 +51,16 @@ function fmt(v: number, unit: string): string {
   return String(Math.round(v));
 }
 
-export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, onFeatureSelect }) => {
+export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
-  const onFeatureSelectRef = useRef(onFeatureSelect);
-  onFeatureSelectRef.current = onFeatureSelect;
+  const onFeatureSelectRef    = useRef(onFeatureSelect);
+  onFeatureSelectRef.current  = onFeatureSelect;
+  const onComparisonSelectRef = useRef(onComparisonSelect);
+  onComparisonSelectRef.current = onComparisonSelect;
 
   useEffect(() => {
     if (!svgRef.current || !dimensions) { return; }
@@ -214,6 +218,29 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
         .text(selPoint.label);
     }
 
+    // Comparison feature point.
+    const cmpPoint = comparisonFeature ? points.find(p => p.code === comparisonFeature.code) : null;
+    if (cmpPoint) {
+      g.append('circle')
+        .attr('cx', xFn(cmpPoint.x)).attr('cy', yFn(cmpPoint.y))
+        .attr('r', r + 3)
+        .attr('fill', '#f97316').attr('stroke', 'white').attr('stroke-width', 1.5)
+        .attr('pointer-events', 'none');
+
+      const lx = xFn(cmpPoint.x);
+      const ly = yFn(cmpPoint.y);
+      const labelRight = lx < innerW * 0.75;
+      g.append('text')
+        .attr('x', lx + (labelRight ? r + 6 : -(r + 6)))
+        .attr('y', ly + 4)
+        .attr('text-anchor', labelRight ? 'start' : 'end')
+        .attr('font-size', 11)
+        .attr('font-weight', '600')
+        .attr('fill', '#f97316')
+        .attr('pointer-events', 'none')
+        .text(cmpPoint.label);
+    }
+
     // Hover ring (hidden initially).
     const hoverRing = g.append('circle')
       .attr('r', r + 3)
@@ -251,10 +278,14 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
         const idx = delaunay.find(mx, my);
         if (idx < 0) { return; }
         const pt = points[idx];
-        onFeatureSelectRef.current?.({ code: pt.code, label: pt.label });
+        if (event.shiftKey) {
+          onComparisonSelectRef.current?.({ code: pt.code, label: pt.label });
+        } else {
+          onFeatureSelectRef.current?.({ code: pt.code, label: pt.label });
+        }
       });
 
-  }, [xData, yData, dimensions, selectedFeature]);
+  }, [xData, yData, dimensions, selectedFeature, comparisonFeature]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
