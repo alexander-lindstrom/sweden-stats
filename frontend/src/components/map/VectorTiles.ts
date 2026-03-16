@@ -159,6 +159,47 @@ export function buildFilterStyle(
   };
 }
 
+const dimmedStroke = new Stroke({ color: 'rgba(120,120,120,0.4)', width: 0.5 });
+const filteredOutStyle = new Style({
+  fill:   new Fill({ color: 'rgba(195,188,178,0.82)' }),
+  stroke: dimmedStroke,
+});
+
+/**
+ * Choropleth style with filter overlay: matching features keep their choropleth
+ * color; non-matching features are rendered as a uniform flat warm gray so the
+ * filter boundary is visually unambiguous.
+ */
+export function buildFilteredChoroplethStyle(
+  data: Record<string, number>,
+  colorScale: (value: number) => string,
+  codeProperty: string,
+  matchingAreas: Set<string>,
+): (feature: FeatureLike) => Style {
+  const styleCache = new Map<string, Style>();
+
+  return (feature: FeatureLike): Style => {
+    const code    = String(feature.get(codeProperty) ?? '');
+    const matches = matchingAreas.has(code);
+
+    if (!matches) { return filteredOutStyle; }
+
+    const cached = styleCache.get(code);
+    if (cached) { return cached; }
+
+    const value = data[code];
+    const style = value === undefined
+      ? noDataStyle
+      : new Style({
+          fill:   new Fill({ color: colorScale(value) }),
+          stroke: choroplethStroke,
+        });
+
+    styleCache.set(code, style);
+    return style;
+  };
+}
+
 export const adminVectorTileLayers = {
   Country: {
     id: "country_mvt",
