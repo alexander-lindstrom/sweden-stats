@@ -4,9 +4,9 @@ import { DATASETS } from '@/datasets/registry';
 import { fetchCached } from '@/datasets/cache';
 
 interface FilterModeResult {
-  matchingAreas:   Set<string> | null;
-  fetchedDatasets: Record<string, ScalarDatasetResult>;
-  loading:         boolean;
+  matchingAreas: Set<string> | null;
+  sortedValues:  Record<string, number[]>;
+  loading:       boolean;
 }
 
 export function useFilterMode(
@@ -85,7 +85,15 @@ export function useFilterMode(
     return new Set(matching);
   }, [enabled, criteria, fetchedDatasets]);
 
-  return { matchingAreas, fetchedDatasets, loading };
+  const sortedValues = useMemo<Record<string, number[]>>(() => {
+    const result: Record<string, number[]> = {};
+    for (const [id, dataset] of Object.entries(fetchedDatasets)) {
+      result[id] = sortedValuesFor(dataset);
+    }
+    return result;
+  }, [fetchedDatasets]);
+
+  return { matchingAreas, sortedValues, loading };
 }
 
 // ── Threshold utilities ────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
-import type { DatasetDescriptor, FilterCriterion, ScalarDatasetResult } from '@/datasets/types';
-import { percentileOf, sortedValuesFor, valueAtPercentile } from '@/hooks/useFilterMode';
+import type { DatasetDescriptor, FilterCriterion } from '@/datasets/types';
+import { percentileOf, valueAtPercentile } from '@/hooks/useFilterMode';
 
 interface CriterionRowProps {
   criterion:          FilterCriterion;
@@ -121,7 +121,7 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
 interface FilterPanelProps {
   criteria:           FilterCriterion[];
   onCriteriaChange:   (criteria: FilterCriterion[]) => void;
-  fetchedDatasets:    Record<string, ScalarDatasetResult>;
+  sortedValues:       Record<string, number[]>;
   filterableDatasets: DatasetDescriptor[];
   matchingCount:      number | null;
   loading:            boolean;
@@ -130,7 +130,7 @@ interface FilterPanelProps {
 export function FilterPanel({
   criteria,
   onCriteriaChange,
-  fetchedDatasets,
+  sortedValues,
   filterableDatasets,
   matchingCount,
   loading,
@@ -159,13 +159,11 @@ export function FilterPanel({
   return (
     <div className="space-y-2 px-4">
       {criteria.map((criterion, index) => {
-        const result = fetchedDatasets[criterion.datasetId];
-        const sorted = result ? sortedValuesFor(result) : null;
         return (
           <CriterionRow
             key={index}
             criterion={criterion}
-            sortedVals={sorted}
+            sortedVals={sortedValues[criterion.datasetId] ?? null}
             filterableDatasets={filterableDatasets}
             onUpdate={c => handleUpdate(index, c)}
             onRemove={() => handleRemove(index)}

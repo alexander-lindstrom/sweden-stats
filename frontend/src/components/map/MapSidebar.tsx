@@ -3,7 +3,7 @@ import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
 import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
-import type { AdminLevel, DatasetDescriptor, FilterCriterion, ScalarDatasetResult } from '@/datasets/types';
+import type { AdminLevel, DatasetDescriptor, FilterCriterion } from '@/datasets/types';
 
 interface MapSidebarProps {
   selectedLevel:          AdminLevel;
@@ -22,7 +22,7 @@ interface MapSidebarProps {
   onFilterEnabledChange:  (enabled: boolean) => void;
   filterCriteria:         FilterCriterion[];
   onFilterCriteriaChange: (criteria: FilterCriterion[]) => void;
-  filterFetchedDatasets:  Record<string, ScalarDatasetResult>;
+  filterSortedValues:     Record<string, number[]>;
   filterMatchingCount:    number | null;
   filterLoading:          boolean;
 }
@@ -152,7 +152,7 @@ export function MapSidebar({
   onFilterEnabledChange,
   filterCriteria,
   onFilterCriteriaChange,
-  filterFetchedDatasets,
+  filterSortedValues,
   filterMatchingCount,
   filterLoading,
 }: MapSidebarProps) {
@@ -248,7 +248,7 @@ export function MapSidebar({
               <FilterPanel
                 criteria={filterCriteria}
                 onCriteriaChange={onFilterCriteriaChange}
-                fetchedDatasets={filterFetchedDatasets}
+                sortedValues={filterSortedValues}
                 filterableDatasets={filterableDatasets}
                 matchingCount={filterMatchingCount}
                 loading={filterLoading}

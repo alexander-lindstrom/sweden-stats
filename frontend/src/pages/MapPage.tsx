@@ -133,7 +133,7 @@ export default function MapPage() {
 
   const {
     matchingAreas,
-    fetchedDatasets: filterFetchedDatasets,
+    sortedValues: filterSortedValues,
     loading: filterLoading,
   } = useFilterMode(filterCriteria, selectedLevel, selectedYear, filterEnabled);
   const filterMatchingCount = matchingAreas?.size ?? null;
@@ -586,7 +586,7 @@ export default function MapPage() {
         onFilterEnabledChange={setFilterEnabled}
         filterCriteria={filterCriteria}
         onFilterCriteriaChange={setFilterCriteria}
-        filterFetchedDatasets={filterFetchedDatasets}
+        filterSortedValues={filterSortedValues}
         filterMatchingCount={filterMatchingCount}
         filterLoading={filterLoading}
       />
