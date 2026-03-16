@@ -60,7 +60,7 @@ Vector tile layers (Region, Municipality, RegSO, DeSO) are served by a local Geo
 
 **API Layer** — two patterns coexist:
 1. **RTK Query** (`frontend/src/api/BaseApi.ts`, `ScbApi.ts`): Redux store-backed, used for population statistics (direct to SCB v2beta API).
-2. **Plain fetch** (`frontend/src/api/backend/`): Used for state expenses/revenue and SCB v1 proxy, all hitting the FastAPI backend at `localhost:3001`.
+2. **Plain fetch** (`frontend/src/api/backend/`): Used for state expenses/revenue, hitting the FastAPI backend at `localhost:3001`.
 
 Path alias `@/` resolves to `frontend/src/`.
 
@@ -70,13 +70,11 @@ Path alias `@/` resolves to `frontend/src/`.
 
 **Map** (`frontend/src/components/map/`): OpenLayers map with switchable base layers (Esri tiles) and Swedish administrative boundary overlays as MVT vector tiles from GeoServer. Admin levels: Region (län), Municipality (kommuner), RegSO, DeSO.
 
-**KPI** (`frontend/src/components/Kpi/`): Fetches CPI data from SCB (KPICOI80MN table) via the backend proxy, transforms it, and renders as a line chart.
+**KPI** (`frontend/src/components/Kpi/`): Fetches CPI data from SCB (KPICOI80MN table) via the SCB v2beta API directly, transforms it, and renders as a line chart.
 
 ### Backend Structure
 
-`backend/main.py` — FastAPI app with two responsibilities:
-1. **SCB proxy** (`POST /api/scb/{path}`): Forwards requests to `https://api.scb.se/OV0104/v1/doris/sv/ssd/{path}` to avoid CORS issues with the v1 API.
-2. **Static data** (via `state_expenses_api.py`): Serves pre-processed JSON from `data/economy/` at `/api/expenses/` and `/api/revenue/`.
+`backend/main.py` — FastAPI app serving static pre-processed data (via `state_expenses_api.py`) from `data/economy/` at `/api/expenses/` and `/api/revenue/`. All SCB data is now fetched directly from SCB v2beta in the frontend — no proxy.
 
 ### Data Pipeline
 
@@ -89,6 +87,5 @@ The processed JSON files (`state_expenses_1997_2024.json`, `state_revenue_2006_2
 - **Never commit without explicit user approval.** Always show what you plan to commit and wait for an "ok", "go ahead", or equivalent before running `git commit`.
 
 ### SCB API Notes
-- **v1** (`api.scb.se/OV0104/v1/doris/sv/ssd`): Used for KPI and other table queries, proxied through backend.
-- **v2beta** (`api.scb.se/OV0104/v2beta/api/v2/tables`): Used directly by the RTK Query population endpoint (no proxy needed).
+- **v2beta** (`api.scb.se/OV0104/v2beta/api/v2/tables`): All SCB data is fetched directly from v2beta in the frontend — no backend proxy.
 - SCB responses use JSON-stat2 format; types are defined in `frontend/src/util/scb.ts`.

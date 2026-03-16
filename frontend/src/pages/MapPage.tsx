@@ -18,6 +18,7 @@ import {
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
 } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
+import { preload } from '@/datasets/cache';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
@@ -137,6 +138,17 @@ export default function MapPage() {
     loading: filterLoading,
   } = useFilterMode(filterCriteria, selectedLevel, selectedYear, filterEnabled);
   const filterMatchingCount = matchingAreas?.size ?? null;
+
+  // Warm the cache for all filterable datasets at the current level so the
+  // filter panel feels instant when the user opens it.
+  useEffect(() => {
+    const filterable = DATASETS.filter(
+      d => d.group !== 'val' && d.supportedLevels.includes(selectedLevel),
+    );
+    for (const descriptor of filterable) {
+      preload(descriptor, [selectedLevel], selectedYear);
+    }
+  }, [selectedLevel, selectedYear]);
 
   const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
