@@ -30,6 +30,7 @@ import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
+import { Dropdown } from '@/components/ui/Dropdown';
 import BivariateMapLegend from '@/components/map/BivariateMapLegend';
 import { buildBivariateColorFn } from '@/util/bivariate';
 
@@ -650,23 +651,15 @@ export default function MapPage() {
           {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
             <div className="flex items-center gap-2 ml-3 pl-3 border-l border-slate-200">
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
-              <div className="relative">
-                <select
-                  value={activeParty ?? ''}
-                  onChange={e => setActiveParty(e.target.value || null)}
-                  className="appearance-none text-xs border border-slate-200 rounded px-2.5 py-1 pr-6 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                >
-                  <option value="">Vinnare</option>
-                  {PARTY_CODES.map(p => (
-                    <option key={p} value={p}>{PARTY_LABELS[p] ?? p}</option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5 text-slate-400">
-                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+              <Dropdown
+                inputSize="sm"
+                value={activeParty ?? ''}
+                onChange={val => setActiveParty(val || null)}
+                options={[
+                  { value: '', label: 'Vinnare' },
+                  ...PARTY_CODES.map(p => ({ value: p, label: PARTY_LABELS[p] ?? p })),
+                ]}
+              />
             </div>
           )}
           {/* Bivariate toggle — only for non-election scalar datasets in map view */}
@@ -727,38 +720,30 @@ export default function MapPage() {
           {activeView === 'chart' && needsMultilineAreaFilter && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
-              <select
+              <Dropdown
+                inputSize="sm"
                 value={effectiveMultilineLan ?? ''}
-                onChange={e => {
-                  const code = e.target.value;
+                onChange={code => {
                   if (selectedLevel === 'Region') {
                     setSelectedFeature({ code, label: COUNTY_NAMES[code] ?? code });
                   } else {
                     setSelectedLan(code);
                   }
                 }}
-                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {availableMultilineLans.map(({ code, name }) => (
-                  <option key={code} value={code}>{name}</option>
-                ))}
-              </select>
+                options={availableMultilineLans.map(({ code, name }) => ({ value: code, label: name }))}
+              />
               {selectedLevel === 'Municipality' && (
                 <>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
-                  <select
+                  <Dropdown
+                    inputSize="sm"
                     value={effectiveMultilineMuni ?? ''}
-                    onChange={e => {
-                      const code = e.target.value;
+                    onChange={code => {
                       const name = electionResult?.labels[code] ?? code;
                       setSelectedFeature({ code, label: name });
                     }}
-                    className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {availableMultilineMunis.map(({ code, name }) => (
-                      <option key={code} value={code}>{name}</option>
-                    ))}
-                  </select>
+                    options={availableMultilineMunis.map(({ code, name }) => ({ value: code, label: name }))}
+                  />
                 </>
               )}
             </div>
@@ -768,27 +753,21 @@ export default function MapPage() {
           {activeView === 'chart' && needsLanFilter && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
-              <select
+              <Dropdown
+                inputSize="sm"
                 value={effectiveLan ?? ''}
-                onChange={e => setSelectedLan(e.target.value || null)}
-                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {availableLans.map(({ code, name }) => (
-                  <option key={code} value={code}>{name}</option>
-                ))}
-              </select>
+                onChange={code => setSelectedLan(code || null)}
+                options={availableLans.map(({ code, name }) => ({ value: code, label: name }))}
+              />
               {needsMuniFilter && (
                 <>
                   <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
-                  <select
+                  <Dropdown
+                    inputSize="sm"
                     value={effectiveMuni ?? ''}
-                    onChange={e => setSelectedMuni(e.target.value || null)}
-                    className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {availableMunis.map(({ code, name }) => (
-                      <option key={code} value={code}>{name}</option>
-                    ))}
-                  </select>
+                    onChange={code => setSelectedMuni(code || null)}
+                    options={availableMunis.map(({ code, name }) => ({ value: code, label: name }))}
+                  />
                 </>
               )}
             </div>
@@ -798,15 +777,12 @@ export default function MapPage() {
           {activeView === 'map' && bivariateMode && bivariateDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-violet-50/60 flex-shrink-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-violet-500 whitespace-nowrap">Y-axel</label>
-              <select
+              <Dropdown
+                inputSize="sm"
                 value={bivariateYDatasetId ?? ''}
-                onChange={e => setBivariateYDatasetId(e.target.value || null)}
-                className="text-sm border border-violet-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
-              >
-                {bivariateDatasets.map(d => (
-                  <option key={d.id} value={d.id}>{d.label}</option>
-                ))}
-              </select>
+                onChange={val => setBivariateYDatasetId(val || null)}
+                options={bivariateDatasets.map(d => ({ value: d.id, label: d.label }))}
+              />
             </div>
           )}
 
@@ -814,15 +790,12 @@ export default function MapPage() {
           {activeView === 'chart' && activeChartType === 'scatter' && scatterableDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
               <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Y-axel</label>
-              <select
+              <Dropdown
+                inputSize="sm"
                 value={scatterYDatasetId ?? ''}
-                onChange={e => setScatterYDatasetId(e.target.value || null)}
-                className="text-sm border border-slate-200 rounded-md px-2.5 py-1 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {scatterableDatasets.map(d => (
-                  <option key={d.id} value={d.id}>{d.label}</option>
-                ))}
-              </select>
+                onChange={val => setScatterYDatasetId(val || null)}
+                options={scatterableDatasets.map(d => ({ value: d.id, label: d.label }))}
+              />
             </div>
           )}
 

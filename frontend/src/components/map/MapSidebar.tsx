@@ -1,4 +1,5 @@
 import YearSlider from '@/components/common/YearSlider';
+import { Dropdown } from '@/components/ui/Dropdown';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
 import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
@@ -30,9 +31,12 @@ interface MapSidebarProps {
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5 px-4">
-        {label}
-      </h2>
+      <div className="flex items-center gap-2 mb-1.5 px-4">
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">
+          {label}
+        </span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
       {children}
     </section>
   );
@@ -45,7 +49,7 @@ function NavItem({ active, onClick, children }: { active: boolean; onClick: () =
       className={[
         'w-full text-left py-1.5 pr-4 pl-3.5 text-sm transition-colors border-l-[3px]',
         active
-          ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
+          ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
           : 'border-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900',
       ].join(' ')}
     >
@@ -111,16 +115,16 @@ function DatasetList({
               {groupLabel}
             </NavItem>
             {isGroupActive && (
-              <div className="flex gap-1 px-3.5 pb-2 pt-0.5">
+              <div className="flex gap-1 px-3.5 pb-2 pt-1">
                 {items.map(ds => (
                   <button
                     key={ds.id}
                     onClick={() => onDatasetChange(ds.id)}
                     className={[
-                      'flex-1 text-xs py-0.5 rounded text-center transition-colors',
+                      'flex-1 text-xs py-0.5 rounded-md text-center transition-colors font-medium',
                       selectedDatasetId === ds.id
-                        ? 'bg-blue-100 text-blue-700 font-medium'
-                        : 'text-slate-500 hover:bg-slate-200',
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
                     ].join(' ')}
                   >
                     {ds.shortLabel ?? ds.label}
@@ -165,9 +169,10 @@ export function MapSidebar({
     <aside className={[
       // Desktop: always-visible inline panel
       'sm:relative sm:inset-auto sm:z-auto sm:translate-x-0 sm:w-52 sm:flex-shrink-0',
-      'sm:border-r sm:border-slate-200 sm:bg-slate-50 sm:flex sm:flex-col sm:overflow-y-auto',
+      'sm:border-r sm:border-slate-200 sm:bg-white sm:flex sm:flex-col sm:overflow-y-auto',
+      'sm:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]',
       // Mobile: fixed full-height overlay sliding in from the left
-      'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-slate-50 flex flex-col overflow-y-auto',
+      'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white flex flex-col overflow-y-auto',
       'transition-transform duration-300 ease-out shadow-xl',
       mobileOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
     ].join(' ')}>
@@ -223,8 +228,9 @@ export function MapSidebar({
         {/* Year slider */}
         {activeDescriptor && activeDescriptor.availableYears.length > 1 && !['RegSO', 'DeSO'].includes(selectedLevel) && (
           <section className="px-4">
-            <div className="flex items-baseline justify-between mb-2">
-              <h2 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">År</h2>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">År</span>
+              <div className="flex-1 h-px bg-slate-200" />
               <span className="text-sm font-semibold text-slate-700 tabular-nums">{displayYear}</span>
             </div>
             <YearSlider
@@ -259,25 +265,15 @@ export function MapSidebar({
 
         {/* Base map */}
         <section className="px-4">
-          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-            Bakgrundskarta
-          </h2>
-          <div className="relative">
-            <select
-              value={selectedBase}
-              onChange={(e) => onBaseChange(e.target.value as BaseMapKey)}
-              className="w-full appearance-none text-sm border border-slate-200 rounded-md px-3 py-1.5 pr-8 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
-            >
-              {(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map((key) => (
-                <option key={key} value={key}>{baseMapLabels[key]}</option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">Bakgrundskarta</span>
+            <div className="flex-1 h-px bg-slate-200" />
           </div>
+          <Dropdown
+            value={selectedBase}
+            onChange={val => onBaseChange(val as BaseMapKey)}
+            options={(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map(key => ({ value: key, label: baseMapLabels[key] }))}
+          />
         </section>
 
       </div>

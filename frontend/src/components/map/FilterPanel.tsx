@@ -1,5 +1,6 @@
 import type { DatasetDescriptor, FilterCriterion } from '@/datasets/types';
 import { percentileOf, valueAtPercentile } from '@/hooks/useFilterMode';
+import { Dropdown } from '@/components/ui/Dropdown';
 
 interface CriterionRowProps {
   criterion:          FilterCriterion;
@@ -33,61 +34,45 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
     ? String(criterion.absoluteThreshold)
     : '';
 
-  return (
-    <div className="border border-slate-200 rounded-md p-2.5 bg-white space-y-2">
-      {/* Dataset selector + remove */}
-      <div className="flex items-center gap-1.5">
-        <div className="relative flex-1 min-w-0">
-          <select
-            value={criterion.datasetId}
-            onChange={e => handleDatasetChange(e.target.value)}
-            className="w-full appearance-none text-xs border border-slate-200 rounded px-2 py-1 pr-5 bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400 truncate"
-          >
-            {filterableDatasets.map(d => (
-              <option key={d.id} value={d.id}>{d.label}</option>
-            ))}
-          </select>
-          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-1.5 text-slate-400">
-            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </div>
-        </div>
-        <button
-          onClick={onRemove}
-          aria-label="Ta bort villkor"
-          className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors rounded hover:bg-red-50 text-base leading-none"
-        >
-          ×
-        </button>
-      </div>
+  const datasetOptions = filterableDatasets.map(d => ({ value: d.id, label: d.label }));
 
-      {/* Direction toggle */}
-      <div className="flex gap-1">
-        {(['above', 'below'] as const).map(dir => (
-          <button
-            key={dir}
-            onClick={() => onUpdate({ ...criterion, direction: dir })}
-            className={[
-              'flex-1 text-xs py-0.5 rounded transition-colors',
-              criterion.direction === dir
-                ? 'bg-blue-100 text-blue-700 font-medium'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-            ].join(' ')}
-          >
-            {dir === 'above' ? '≥ Över' : '≤ Under'}
-          </button>
-        ))}
-      </div>
+  return (
+    <div className="border border-slate-200 rounded-lg p-3 bg-white shadow-sm space-y-2.5 relative">
+      {/* Remove button — top-right of card */}
+      <button
+        onClick={onRemove}
+        aria-label="Ta bort villkor"
+        className="absolute top-2.5 right-2.5 w-5 h-5 flex items-center justify-center text-slate-300 hover:text-red-400 transition-colors rounded hover:bg-red-50 text-base leading-none"
+      >
+        ×
+      </button>
+
+      {/* Dataset selector */}
+      <Dropdown
+        inputSize="sm"
+        value={criterion.datasetId}
+        onChange={handleDatasetChange}
+        options={datasetOptions}
+        wrapperClassName="pr-6"
+      />
+
+      {/* Direction — single toggle button */}
+      <button
+        onClick={() => onUpdate({ ...criterion, direction: criterion.direction === 'above' ? 'below' : 'above' })}
+        className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+      >
+        <span>{criterion.direction === 'above' ? '≥ Över' : '≤ Under'}</span>
+        <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 10 14" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+          <path d="M5 1v12M2 4l3-3 3 3M2 10l3 3 3-3" />
+        </svg>
+      </button>
 
       {/* Percentile slider */}
       <div>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] text-slate-400 uppercase tracking-wider">Percentil</span>
-          {hasData && (
-            <span className="text-[11px] text-slate-600 tabular-nums">
-              {Number.isFinite(criterion.absoluteThreshold) ? `p${sliderPct}` : '—'}
-            </span>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Percentil</span>
+          {hasData && Number.isFinite(criterion.absoluteThreshold) && (
+            <span className="text-[11px] font-semibold text-blue-600 tabular-nums">p{sliderPct}</span>
           )}
         </div>
         <input
@@ -103,15 +88,16 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
       </div>
 
       {/* Absolute value input */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] text-slate-400 uppercase tracking-wider whitespace-nowrap">Värde</span>
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Värde</span>
         <input
-          type="number"
+          type="text"
+          inputMode="decimal"
           value={absDisplay}
           disabled={!hasData}
           onChange={e => handleAbsoluteChange(e.target.value)}
           placeholder="—"
-          className="flex-1 min-w-0 text-xs border border-slate-200 rounded px-2 py-0.5 text-right tabular-nums text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:text-slate-400 disabled:bg-slate-50"
+          className="flex-1 min-w-0 text-xs border border-slate-200 rounded-md px-2 py-0.5 text-right tabular-nums text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-400 disabled:text-slate-400 disabled:bg-slate-50"
         />
       </div>
     </div>
@@ -173,7 +159,7 @@ export function FilterPanel({
 
       <button
         onClick={handleAdd}
-        className="w-full text-xs text-slate-500 hover:text-blue-600 hover:bg-blue-50 py-1.5 border border-dashed border-slate-300 hover:border-blue-300 rounded-md transition-colors"
+        className="w-full text-xs font-medium text-slate-500 hover:text-blue-600 hover:bg-blue-50 py-2 border border-dashed border-slate-300 hover:border-blue-300 rounded-lg transition-colors"
       >
         + Lägg till villkor
       </button>
