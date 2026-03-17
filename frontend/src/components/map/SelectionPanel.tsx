@@ -767,17 +767,22 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
       aria-hidden={!isOpen}
       className={[
         'flex flex-col bg-white',
-        // Mobile: fixed bottom sheet that slides up/down
-        'fixed bottom-0 left-0 right-0 z-20',
-        'max-h-[65vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
         'transition-[transform,width] duration-300 ease-out',
-        // Desktop: normal flex panel in the layout
-        'sm:relative sm:bottom-auto sm:left-auto sm:right-auto sm:z-auto',
-        'sm:max-h-none sm:rounded-none sm:shadow-none sm:border-t-0 sm:border-l',
-        isComparing ? 'sm:w-[440px]' : 'sm:w-72',
+        // Mobile (<sm): fixed bottom sheet
+        'fixed bottom-0 left-0 right-0 z-30',
+        'max-h-[65vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
+        // sm–lg: absolute right-side overlay drawer within the positioned map container
+        'sm:absolute sm:left-auto sm:right-0 sm:top-0 sm:bottom-auto',
+        'sm:h-full sm:max-h-none sm:z-20',
+        'sm:rounded-none sm:shadow-xl sm:border-t-0 sm:border-l sm:border-slate-200',
+        // lg+: in-flow push sidebar
+        'lg:static lg:h-auto lg:inset-auto lg:shadow-none lg:z-auto',
+        isComparing ? 'sm:w-[400px] lg:w-[440px]' : 'sm:w-80 lg:w-72',
         'sm:flex-shrink-0',
         // Open / closed
-        isOpen ? 'translate-y-0' : 'translate-y-full sm:hidden',
+        isOpen
+          ? 'translate-y-0 sm:translate-x-0'
+          : 'translate-y-full sm:translate-y-0 sm:translate-x-full lg:translate-x-0 lg:hidden',
       ].join(' ')}
     >
       {/* Drag handle — mobile only */}
@@ -1025,7 +1030,8 @@ function ComparisonStatRow({
   return (
     <div>
       <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">{label}</div>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-baseline">
+      {/* sm: 2-column (A | B); lg: 3-column (A | delta | B) */}
+      <div className="grid grid-cols-2 lg:grid-cols-[1fr_auto_1fr] gap-x-2 items-start lg:items-baseline">
         {/* Area A */}
         <div className="min-w-0">
           <div className="flex items-baseline gap-1">
@@ -1040,8 +1046,8 @@ function ComparisonStatRow({
           )}
         </div>
 
-        {/* Delta */}
-        <div className={`text-xs font-bold tabular-nums text-center ${deltaColor}`}>
+        {/* Delta — center column at lg+, hidden in grid at sm */}
+        <div className={`hidden lg:block text-xs font-bold tabular-nums text-center ${deltaColor}`}>
           {deltaStr ?? (compLoading ? '…' : '—')}
         </div>
 
@@ -1067,6 +1073,13 @@ function ComparisonStatRow({
           )}
         </div>
       </div>
+
+      {/* Delta — shown below values at sm-lg, hidden at lg+ */}
+      {(deltaStr || compLoading) && (
+        <div className={`lg:hidden text-xs font-bold tabular-nums text-center mt-0.5 ${deltaColor}`}>
+          {deltaStr ?? (compLoading ? '…' : '—')}
+        </div>
+      )}
     </div>
   );
 }

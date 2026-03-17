@@ -826,7 +826,7 @@ export default function MapPage() {
             </div>
           )}
 
-          <div className="flex-1 flex min-h-0 overflow-hidden">
+          <div className="flex-1 flex min-h-0 overflow-hidden relative">
             <div className="flex-1 relative overflow-hidden min-w-0" style={{ isolation: 'isolate' }}>
               {activeView === 'map' && (
                 <MapView
@@ -978,6 +978,13 @@ export default function MapPage() {
               )}
             </div>
 
+            {/* Backdrop: dims map when panel overlays it at sm–lg */}
+            {isPanelOpen && (
+              <div
+                className="hidden sm:block lg:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
+                onClick={() => setIsPanelOpen(false)}
+              />
+            )}
             <SelectionPanel
               selectedFeature={selectedFeature}
               adminLevel={selectionLevel}
