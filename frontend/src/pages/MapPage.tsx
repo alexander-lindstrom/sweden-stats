@@ -984,7 +984,7 @@ export default function MapPage() {
               isOpen={isPanelOpen}
               onClose={() => setIsPanelOpen(false)}
               comparisonFeature={comparisonFeature}
-              onClearComparison={() => setComparisonFeature(null)}
+              onClearComparison={() => { setComparisonFeature(null); setSelectedFeature(null); setIsPanelOpen(false); }}
               searchItems={searchItems}
               onSearchSelect={(item) => {
                 // Infer the correct selectionLevel from the code so the panel

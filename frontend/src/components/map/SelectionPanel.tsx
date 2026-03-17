@@ -31,7 +31,7 @@ const INCOME_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'De
 const AGE_LEVELS:         AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const FOREIGN_BG_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const EMPLOYMENT_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const ELECTION_LEVELS:    AdminLevel[] = ['Region', 'Municipality'];
+const ELECTION_LEVELS:    AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
 interface StatData {
   value:      number | null;
@@ -55,20 +55,38 @@ function toStat(result: ScalarDatasetResult, code: string): StatData {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+
+function CollapsibleSection({ title, children, defaultOpen = true }: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="flex items-center gap-2 mb-3">
-      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
-        {children}
-      </span>
-      <div className="flex-1 h-px bg-slate-100" />
-    </div>
+    <section>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 mb-3 group"
+      >
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">
+          {title}
+        </span>
+        <div className="flex-1 h-px bg-slate-200 group-hover:bg-slate-300 transition-colors" />
+        <svg
+          className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
+          viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5}
+        >
+          <path d="M2 4.5l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && children}
+    </section>
   );
 }
 
 function ChartCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-lg bg-slate-50 border border-slate-100 p-3">
+    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 shadow-sm">
       {children}
     </div>
   );
@@ -77,26 +95,36 @@ function ChartCard({ children }: { children: React.ReactNode }) {
 /**
  * Thin horizontal bar showing where a value sits relative to all peers.
  * The vertical tick marks the median (50th percentile).
+ * Hover to see the rank and exact percentile.
  */
-function PercentileBar({ percentile }: { percentile: number }) {
+function PercentileBar({ percentile, rank, total }: { percentile: number; rank?: number | null; total?: number | null }) {
+  const [showTip, setShowTip] = useState(false);
   const pct = Math.max(0, Math.min(1, percentile)) * 100;
   return (
-    // py-2 gives the overflowing dot room above and below the 4px track
-    <div className="py-2 relative">
-      <div className="relative h-1 rounded-full bg-slate-100">
+    <div
+      className="py-2 relative cursor-default select-none"
+      onMouseEnter={() => setShowTip(true)}
+      onMouseLeave={() => setShowTip(false)}
+    >
+      <div className="relative h-1.5 rounded-full bg-slate-100">
         {/* Fill */}
         <div
           className="absolute inset-y-0 left-0 rounded-full bg-blue-200"
           style={{ width: `${pct}%` }}
         />
         {/* Median tick */}
-        <div className="absolute top-0 bottom-0 w-px bg-slate-400" style={{ left: '50%' }} />
+        <div className="absolute top-0 bottom-0 w-px bg-slate-300" style={{ left: '50%' }} />
         {/* Position dot */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-blue-500 ring-2 ring-white shadow-sm"
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-blue-500 ring-2 ring-white shadow-sm"
           style={{ left: `${pct}%` }}
         />
       </div>
+      {showTip && rank != null && total != null && (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 px-2 py-1 bg-slate-800 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-10 shadow-md">
+          #{rank} av {total}
+        </div>
+      )}
     </div>
   );
 }
@@ -104,25 +132,22 @@ function PercentileBar({ percentile }: { percentile: number }) {
 function StatRow({ label, stat }: { label: string; stat: StatData }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-0.5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-0.5">
         {label}
       </div>
       {stat.value === null ? (
         <div className="text-sm text-slate-400">—</div>
       ) : (
         <>
-          <div className="flex items-baseline gap-2">
-            <span className="text-xl font-bold text-slate-900 tabular-nums">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
               {stat.value.toLocaleString('sv-SE')}
             </span>
-            <span className="text-xs text-slate-500">{stat.unit}</span>
-            {stat.rank !== null && stat.total !== null && (
-              <span className="ml-auto text-[10px] text-slate-400 tabular-nums">
-                #{stat.rank}/{stat.total}
-              </span>
-            )}
+            <span className="text-xs text-slate-500 font-medium">{stat.unit}</span>
           </div>
-          {stat.percentile !== null && <PercentileBar percentile={stat.percentile} />}
+          {stat.percentile !== null && (
+            <PercentileBar percentile={stat.percentile} rank={stat.rank} total={stat.total} />
+          )}
         </>
       )}
     </div>
@@ -138,44 +163,67 @@ function Sparkline({
 }) {
   if (data.length < 2) { return null; }
 
-  const W = 220, H = 52, pad = 3;
+  const W = 220, H = 56, pad = 4;
+  const isComparing = !!comparisonData && comparisonData.length >= 2;
   const allVals = [...data.map(d => d.value), ...(comparisonData?.map(d => d.value) ?? [])];
   const minV   = Math.min(...allVals);
   const maxV   = Math.max(...allVals);
   const range  = maxV - minV || 1;
   const innerH = H - pad * 2;
 
+  const toXY = (d: { value: number }, i: number, len: number): [number, number] => [
+    (i / (len - 1)) * W,
+    pad + innerH - ((d.value - minV) / range) * innerH,
+  ];
+
   const toPoints = (series: Array<{ year: number; value: number }>) =>
     series.map((d, i) => {
-      const x = (i / (series.length - 1)) * W;
-      const y = pad + innerH - ((d.value - minV) / range) * innerH;
+      const [x, y] = toXY(d, i, series.length);
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     }).join(' ');
 
   const trend  = data[data.length - 1].value > data[0].value ? 'up' : data[data.length - 1].value < data[0].value ? 'down' : 'flat';
-  const stroke = trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#9ca3af';
+  const primaryStroke = isComparing ? '#3b82f6' : (trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#9ca3af');
+
+  const lastPrimary = toXY(data[data.length - 1], data.length - 1, data.length);
+  const lastComp    = isComparing ? toXY(comparisonData![comparisonData!.length - 1], comparisonData!.length - 1, comparisonData!.length) : null;
+
+  const midY = pad + innerH / 2;
 
   return (
     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
-      {comparisonData && comparisonData.length >= 2 && (
-        <polyline
-          points={toPoints(comparisonData)}
-          fill="none"
-          stroke="#f97316"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          strokeDasharray="4 2"
-        />
+      {/* Midrange reference line */}
+      <line x1={0} y1={midY} x2={W} y2={midY} stroke="#e2e8f0" strokeWidth={0.75} strokeDasharray="3 3" />
+
+      {/* Comparison line (orange, dashed) */}
+      {isComparing && (
+        <>
+          <polyline
+            points={toPoints(comparisonData!)}
+            fill="none"
+            stroke="#f97316"
+            strokeWidth="1.5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            strokeDasharray="4 2"
+          />
+          {lastComp && (
+            <circle cx={lastComp[0].toFixed(1)} cy={lastComp[1].toFixed(1)} r={3} fill="#f97316" />
+          )}
+        </>
       )}
+
+      {/* Primary line */}
       <polyline
         points={toPoints(data)}
         fill="none"
-        stroke={stroke}
+        stroke={primaryStroke}
         strokeWidth="1.5"
         strokeLinejoin="round"
         strokeLinecap="round"
       />
+      {/* Primary endpoint dot */}
+      <circle cx={lastPrimary[0].toFixed(1)} cy={lastPrimary[1].toFixed(1)} r={3} fill={primaryStroke} />
     </svg>
   );
 }
@@ -738,26 +786,26 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
       </div>
 
       {/* Header */}
-      <div className="flex items-start gap-3 px-4 py-3 border-b border-slate-200 flex-shrink-0">
-        <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full flex-shrink-0 self-center ${LEVEL_BADGE[adminLevel]}`}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 flex-shrink-0">
+        <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${LEVEL_BADGE[adminLevel]}`}>
           {LEVEL_LABELS[adminLevel]}
         </span>
         {isComparing ? (
           <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-            <span className="flex items-center gap-1 min-w-0">
+            <span className="flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />
-              <span className="text-sm font-semibold text-slate-900 truncate">{selectedFeature?.label}</span>
+              <span className="text-sm font-bold text-slate-800 truncate">{selectedFeature?.label}</span>
             </span>
-            <span className="text-slate-300 text-xs">vs</span>
-            <span className="flex items-center gap-1 min-w-0">
+            <span className="text-slate-300 text-[11px] font-medium">vs</span>
+            <span className="flex items-center gap-1.5 min-w-0">
               <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
-              <span className="text-sm font-semibold text-slate-900 truncate">{comparisonFeature?.label}</span>
+              <span className="text-sm font-bold text-slate-800 truncate">{comparisonFeature?.label}</span>
             </span>
           </div>
         ) : (
           <div className="flex-1 min-w-0">
-            <h2 className="text-sm font-semibold text-slate-900 leading-snug">
-              {selectedFeature?.label ?? <span className="text-slate-400 italic">Inget valt</span>}
+            <h2 className="text-base font-bold text-slate-900 leading-snug truncate">
+              {selectedFeature?.label ?? <span className="text-slate-400 font-normal italic">Inget valt</span>}
             </h2>
           </div>
         )}
@@ -767,7 +815,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
               onClick={onClearComparison}
               aria-label="Rensa jämförelse"
               title="Rensa jämförelse"
-              className="text-orange-400 hover:text-orange-600 transition-colors text-xs font-medium px-1.5 py-0.5 rounded hover:bg-orange-50"
+              className="text-orange-400 hover:text-orange-600 transition-colors text-xs font-semibold px-1.5 py-0.5 rounded hover:bg-orange-50"
             >
               Rensa
             </button>
@@ -775,7 +823,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           <button
             onClick={onClose}
             aria-label="Stäng panel"
-            className="text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
+            className="text-slate-400 hover:text-slate-700 transition-colors text-xl leading-none w-6 h-6 flex items-center justify-center rounded hover:bg-slate-100"
           >
             ×
           </button>
@@ -794,7 +842,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
       )}
 
       {/* Body */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3.5">
 
         {!selectedFeature && (
           <p className="text-sm text-slate-400 italic">
@@ -806,8 +854,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           <>
             {/* Radar profile */}
             {!statsLoading && radarAxes.length >= 3 && (
-              <section>
-                <SectionTitle>Profil</SectionTitle>
+              <CollapsibleSection title="Profil">
                 <ChartCard>
                   <RadarChart
                     axes={radarAxes}
@@ -828,12 +875,11 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                     </div>
                   )}
                 </ChartCard>
-              </section>
+              </CollapsibleSection>
             )}
 
             {/* Key stats */}
-            <section>
-              <SectionTitle>Nyckeltal {STAT_YEAR}</SectionTitle>
+            <CollapsibleSection title={`Nyckeltal ${STAT_YEAR}`}>
               {(statsLoading || (isComparing && compStatsLoading)) && <Spinner />}
               {!statsLoading && !stats && (
                 <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
@@ -854,12 +900,11 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                   compLoading={compStatsLoading}
                 />
               )}
-            </section>
+            </CollapsibleSection>
 
             {/* Population sparkline */}
             {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
-              <section>
-                <SectionTitle>Befolkningstrend</SectionTitle>
+              <CollapsibleSection title="Befolkningstrend">
                 {(sparkLoading || (isComparing && compSparkLoading)) && <Spinner />}
                 {!sparkLoading && sparkline.length >= 2 && (
                   <ChartCard>
@@ -876,13 +921,12 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                 {!sparkLoading && sparkline.length < 2 && (
                   <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
                 )}
-              </section>
+              </CollapsibleSection>
             )}
 
             {/* Election distribution */}
             {ELECTION_LEVELS.includes(adminLevel) && (
-              <section>
-                <SectionTitle>Riksdagsval {ELECTION_YEAR}</SectionTitle>
+              <CollapsibleSection title={`Riksdagsval ${ELECTION_YEAR}`}>
                 {(electionLoading || (isComparing && compElectionLoading)) && <Spinner />}
                 {!isComparing && (
                   <>
@@ -912,12 +956,12 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                     </ChartCard>
                   </div>
                 )}
-              </section>
+              </CollapsibleSection>
             )}
 
             {/* Comparison hint — shown only when a single area is selected */}
             {!isComparing && (
-              <p className="text-[11px] text-slate-400 text-center pt-1 pb-2 hidden sm:block">
+              <p className="text-[11px] text-slate-400 text-center hidden sm:block">
                 Shift-klicka ett annat område för att jämföra
               </p>
             )}
@@ -980,7 +1024,7 @@ function ComparisonStatRow({
 
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">{label}</div>
       <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-baseline">
         {/* Area A */}
         <div className="min-w-0">
@@ -997,7 +1041,7 @@ function ComparisonStatRow({
         </div>
 
         {/* Delta */}
-        <div className={`text-[10px] font-semibold tabular-nums text-center ${deltaColor}`}>
+        <div className={`text-xs font-bold tabular-nums text-center ${deltaColor}`}>
           {deltaStr ?? (compLoading ? '…' : '—')}
         </div>
 
