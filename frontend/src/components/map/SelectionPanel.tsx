@@ -776,7 +776,8 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
         'sm:h-full sm:max-h-none sm:z-20',
         'sm:rounded-none sm:shadow-xl sm:border-t-0 sm:border-l sm:border-slate-200',
         // lg+: in-flow push sidebar
-        'lg:static lg:h-auto lg:inset-auto lg:shadow-none lg:z-auto',
+        'lg:static lg:h-auto lg:inset-auto lg:z-auto',
+        'lg:[box-shadow:-4px_0_12px_rgba(0,0,0,0.06)]',
         isComparing ? 'sm:w-[400px] lg:w-[440px]' : 'sm:w-80 lg:w-72',
         'sm:flex-shrink-0',
         // Open / closed

@@ -827,7 +827,7 @@ export default function MapPage() {
           )}
 
           <div className="flex-1 flex min-h-0 overflow-hidden relative">
-            <div className="flex-1 relative overflow-hidden min-w-0" style={{ isolation: 'isolate' }}>
+            <div className="flex-1 relative overflow-hidden min-w-0 bg-slate-50" style={{ isolation: 'isolate' }}>
               {activeView === 'map' && (
                 <MapView
                   adminLevel={selectedLevel}
