@@ -22,7 +22,7 @@ interface TT {
   value: number;
 }
 
-const BAR_M      = { top: 20, right: 72, bottom: 36, left: 168 };
+const BAR_M      = { top: 20, right: 72, bottom: 50, left: 168 };
 const MAX_BARS   = 40;
 const MAX_BAR_H  = 20;   // max bar height in px — matches budget chart density
 const BAR_GAP    = 1;    // gap between bars in px
@@ -240,13 +240,42 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .range([vOffset, vOffset + effH])
       .paddingInner(padding);
 
-    // Light grid lines.
+    // Grid lines — behind everything.
     g.selectAll('line.grid')
       .data(xScale.ticks(4))
       .join('line').attr('class', 'grid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', vOffset).attr('y2', vOffset + effH)
-      .attr('stroke', '#f3f4f6').attr('stroke-width', 1);
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+
+    // Top border.
+    g.append('line')
+      .attr('x1', -BAR_M.left).attr('x2', innerW)
+      .attr('y1', vOffset).attr('y2', vOffset)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Row separators.
+    if (n > 1) {
+      g.selectAll('line.sep')
+        .data(d3.range(n - 1))
+        .join('line').attr('class', 'sep')
+        .attr('x1', -BAR_M.left).attr('x2', innerW)
+        .attr('y1', i => yScale(sorted[i + 1].name)! - 0.5)
+        .attr('y2', i => yScale(sorted[i + 1].name)! - 0.5)
+        .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
+    }
+
+    // Bottom border.
+    g.append('line')
+      .attr('x1', -BAR_M.left).attr('x2', innerW)
+      .attr('y1', vOffset + effH).attr('y2', vOffset + effH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Shelf line at label/chart boundary.
+    g.append('line')
+      .attr('x1', 0).attr('x2', 0)
+      .attr('y1', vOffset).attr('y2', vOffset + effH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
 
     // Bars.
     g.selectAll<SVGRectElement, GeoHierarchyNode>('rect.bar')
@@ -325,12 +354,13 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
 
-    // Dataset label.
-    svg.append('text')
-      .attr('x', w - 4).attr('y', 14)
-      .attr('text-anchor', 'end')
+    // X-axis label.
+    g.append('text')
+      .attr('x', innerW / 2)
+      .attr('y', vOffset + effH + BAR_M.bottom - 10)
+      .attr('text-anchor', 'middle')
       .attr('font-size', 11).attr('fill', '#9ca3af')
-      .text(label);
+      .text(`${label}${unit ? ` (${unit})` : ''}`);
 
   }, [focus, dims, colorScale, unit, label, drillDown]);
 
