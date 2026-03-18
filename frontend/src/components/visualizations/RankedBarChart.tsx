@@ -60,6 +60,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
     const g = svg
       .attr('width',  svgWidth)
       .attr('height', svgHeight)
+      .attr('font-family', 'system-ui, sans-serif')
       .append('g')
       .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 

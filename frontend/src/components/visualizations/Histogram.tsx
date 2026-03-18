@@ -68,7 +68,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
-    svg.attr('width', width).attr('height', height);
+    svg.attr('width', width).attr('height', height).attr('font-family', 'system-ui, sans-serif');
 
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
