@@ -84,9 +84,10 @@ export default function MapPage() {
   const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [comparisonFeature, setComparisonFeature]  = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
-  const [isPanelOpen,       setIsPanelOpen]        = useState(false);
-  const userDismissedPanel  = useRef(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen]  = useState(false);
+  const [isPanelOpen,         setIsPanelOpen]         = useState(false);
+  const userDismissedPanel    = useRef(false);
+  const [desktopSidebarOpen,  setDesktopSidebarOpen]  = useState(true);
+  const [mobileSidebarOpen,   setMobileSidebarOpen]   = useState(false);
   const [mapResetToken,     setMapResetToken]       = useState(0);
   /** Which party to show on the choropleth map (null = winner coloring). */
   const [activeParty,       setActiveParty]        = useState<string | null>(null);
@@ -608,6 +609,7 @@ export default function MapPage() {
         selectedBase={selectedBase}
         onBaseChange={setSelectedBase}
         onReset={handleReset}
+        desktopOpen={desktopSidebarOpen}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
         filterEnabled={filterEnabled}
@@ -632,6 +634,24 @@ export default function MapPage() {
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
+          </button>
+
+          {/* Sidebar toggle — md+ only */}
+          <button
+            onClick={() => setDesktopSidebarOpen(o => !o)}
+            title={desktopSidebarOpen ? 'Dölj sidopanel' : 'Visa sidopanel'}
+            className={[
+              'hidden md:flex self-center mr-2 items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
+              desktopSidebarOpen
+                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+            ].join(' ')}
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
+              <line x1="5.5" y1="1.5" x2="5.5" y2="14.5" />
+            </svg>
+            <span className="hidden lg:inline">{desktopSidebarOpen ? 'Dölj' : 'Meny'}</span>
           </button>
 
           {/* View tabs */}

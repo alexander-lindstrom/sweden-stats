@@ -18,6 +18,7 @@ interface MapSidebarProps {
   selectedBase:           BaseMapKey;
   onBaseChange:           (base: BaseMapKey) => void;
   onReset:                () => void;
+  desktopOpen:            boolean;
   mobileOpen:             boolean;
   onMobileClose:          () => void;
   filterEnabled:          boolean;
@@ -175,6 +176,7 @@ export function MapSidebar({
   selectedBase,
   onBaseChange,
   onReset,
+  desktopOpen,
   mobileOpen,
   onMobileClose,
   filterEnabled,
@@ -192,14 +194,14 @@ export function MapSidebar({
 
   return (
     <aside className={[
-      // lg+: always-visible inline push panel
-      'md:relative md:inset-auto md:z-auto md:translate-x-0 md:w-52 md:flex-shrink-0',
-      'md:border-r md:border-slate-200 md:bg-white md:flex md:flex-col md:overflow-y-auto',
-      'md:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]',
+      // md+: always-visible inline push panel (hidden when desktopOpen is false)
+      desktopOpen
+        ? 'md:relative md:inset-auto md:z-auto md:translate-x-0 md:w-52 md:flex-shrink-0 md:border-r md:border-slate-200 md:bg-white md:flex md:flex-col md:overflow-y-auto md:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]'
+        : 'md:hidden',
       // <md: fixed full-height overlay sliding in from the left
       'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white flex flex-col overflow-y-auto',
       'transition-transform duration-300 ease-out shadow-xl',
-      mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full',
     ].join(' ')}>
 
       {/* Wordmark */}
