@@ -13,13 +13,18 @@ interface DropdownProps {
   wrapperClassName?: string;
 }
 
+// Radix Select.Item forbids empty-string values. Use a sentinel internally.
+const EMPTY_SENTINEL = '__empty__';
+const toRadix  = (v: string) => v === '' ? EMPTY_SENTINEL : v;
+const fromRadix = (v: string) => v === EMPTY_SENTINEL ? '' : v;
+
 export function Dropdown({ value, onChange, options, inputSize = 'md', wrapperClassName }: DropdownProps) {
   const isSm = inputSize === 'sm';
   const selected = options.find(o => o.value === value);
 
   return (
     <div className={`relative ${wrapperClassName ?? ''}`}>
-    <Select.Root value={value} onValueChange={onChange}>
+    <Select.Root value={toRadix(value)} onValueChange={v => onChange(fromRadix(v))}>
       <Select.Trigger
         className={[
           'w-full flex items-center justify-between gap-2',
@@ -59,7 +64,7 @@ export function Dropdown({ value, onChange, options, inputSize = 'md', wrapperCl
             {options.map(opt => (
               <Select.Item
                 key={opt.value}
-                value={opt.value}
+                value={toRadix(opt.value)}
                 className={[
                   'w-full text-left cursor-default select-none outline-none',
                   'transition-colors',
