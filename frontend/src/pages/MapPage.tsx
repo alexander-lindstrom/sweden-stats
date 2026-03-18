@@ -85,6 +85,7 @@ export default function MapPage() {
   const [comparisonFeature, setComparisonFeature]  = useState<{ code: string; label: string; parentCode?: string } | null>(null);
   const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
   const [isPanelOpen,       setIsPanelOpen]        = useState(false);
+  const userDismissedPanel  = useRef(false);
   const [mobileSidebarOpen, setMobileSidebarOpen]  = useState(false);
   const [mapResetToken,     setMapResetToken]       = useState(0);
   /** Which party to show on the choropleth map (null = winner coloring). */
@@ -238,6 +239,7 @@ export default function MapPage() {
     setSelectedFeature(null);
     setComparisonFeature(null);
     setActiveView('map');
+    userDismissedPanel.current = false;
     setIsPanelOpen(false);
     setMobileSidebarOpen(false);
     setActiveParty(null);
@@ -262,7 +264,7 @@ export default function MapPage() {
   };
 
   useEffect(() => {
-    if (selectedFeature) { setIsPanelOpen(true); }
+    if (selectedFeature) { if (!userDismissedPanel.current) setIsPanelOpen(true); }
     else { setComparisonFeature(null); }
   }, [selectedFeature]);
 
@@ -704,7 +706,11 @@ export default function MapPage() {
 
           {/* Panel toggle */}
           <button
-            onClick={() => setIsPanelOpen(p => !p)}
+            onClick={() => {
+              const opening = !isPanelOpen;
+              userDismissedPanel.current = !opening;
+              setIsPanelOpen(opening);
+            }}
             title={isPanelOpen ? 'Dölj panel' : 'Visa detaljpanel'}
             className={[
               'self-center ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
@@ -717,7 +723,15 @@ export default function MapPage() {
               <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
               <line x1="10.5" y1="1.5" x2="10.5" y2="14.5" />
             </svg>
-            <span className="hidden sm:inline">{isPanelOpen ? 'Dölj' : 'Detaljer'}</span>
+            <span className="hidden sm:inline">
+              {isPanelOpen
+                ? 'Dölj'
+                : selectedFeature
+                  ? comparisonFeature
+                    ? `${selectedFeature.label} +1`
+                    : selectedFeature.label
+                  : 'Detaljer'}
+            </span>
           </button>
         </div>
 
@@ -983,16 +997,16 @@ export default function MapPage() {
           {isPanelOpen && (
             <div
               className="hidden sm:block md:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
-              onClick={() => setIsPanelOpen(false)}
+              onClick={() => { userDismissedPanel.current = true; setIsPanelOpen(false); }}
             />
           )}
           <SelectionPanel
             selectedFeature={selectedFeature}
             adminLevel={selectionLevel}
             isOpen={isPanelOpen}
-            onClose={() => setIsPanelOpen(false)}
+            onClose={() => { userDismissedPanel.current = true; setIsPanelOpen(false); }}
             comparisonFeature={comparisonFeature}
-            onClearComparison={() => { setComparisonFeature(null); setSelectedFeature(null); setIsPanelOpen(false); }}
+            onClearComparison={() => { setComparisonFeature(null); setSelectedFeature(null); userDismissedPanel.current = false; setIsPanelOpen(false); }}
             searchItems={searchItems}
             onSearchSelect={(item) => {
               // Infer the correct selectionLevel from the code so the panel
