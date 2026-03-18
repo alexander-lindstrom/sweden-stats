@@ -245,7 +245,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
   }, [data, colorScale, selectedFeature, dimensions]);
 
   return (
-    <div ref={containerRef} className="relative w-full overflow-y-auto" style={{ maxHeight: '100%' }}>
+    <div ref={containerRef} className="relative w-full">
       <svg ref={svgRef} style={{ display: 'block' }} />
       {hovered && (
         <div

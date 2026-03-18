@@ -156,7 +156,7 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
     : [];
 
   return (
-    <div ref={containerRef} className="relative w-full h-full overflow-y-auto">
+    <div ref={containerRef} className="relative w-full">
       <svg ref={svgRef} className="w-full" />
 
       {tooltip && tooltipRows.length > 0 && (

@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { ScalarDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
+import { findScrollParent } from '@/utils/scrollUtils';
 
 interface Hovered { code: string; name: string; value: number; x: number; y: number; }
 
@@ -41,10 +42,8 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
     return raw.map((d, i) => ({ ...d, name: stripped[i] }));
   }, [data.values, data.labels]);
 
-  const idealHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
-  const containerH  = dimensions?.height ?? 0;
-  const svgHeight   = containerH > 0 ? Math.min(idealHeight, containerH) : idealHeight;
-  const svgWidth    = dimensions?.width ?? 0;
+  const svgHeight = sorted.length * ROW_HEIGHT + MARGIN.top + MARGIN.bottom;
+  const svgWidth  = dimensions?.width ?? 0;
 
   useEffect(() => {
     if (!svgRef.current || svgWidth === 0 || sorted.length === 0) {
@@ -194,18 +193,24 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('stroke', '#f3f4f6')
       .attr('stroke-width', 1);
 
-    // Scroll the selected bar into view.
-    if (selectedFeature && containerRef.current) {
+    // Scroll the selected bar into view — targets the nearest scrollable ancestor.
+    if (selectedFeature && svgRef.current && containerRef.current) {
       const idx = sorted.findIndex(d => d.code === selectedFeature.code);
       if (idx >= 0) {
-        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
-        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+        const scrollEl = findScrollParent(containerRef.current);
+        if (scrollEl) {
+          const barMidY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+          const svgTop  = svgRef.current.getBoundingClientRect().top
+            - scrollEl.getBoundingClientRect().top
+            + scrollEl.scrollTop;
+          scrollEl.scrollTop = svgTop + barMidY - scrollEl.clientHeight / 2;
+        }
       }
     }
   }, [sorted, svgWidth, svgHeight, colorScale, colorFn, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas]);
 
   return (
-    <div ref={containerRef} className="w-full h-full overflow-y-auto">
+    <div ref={containerRef} className="w-full">
       <svg ref={svgRef} />
       {hovered && (
         <div

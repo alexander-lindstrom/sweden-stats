@@ -570,6 +570,19 @@ export default function MapPage() {
     [electionResult, activeDescriptor],
   );
 
+  // Content-sized charts should shrink the render area to content height instead of filling.
+  // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.
+  // Charts whose SVG height is data-driven (not container-driven) get a content-sized render area —
+  // the bg-slate-50 card shrinks to content height and bg-white shows below as a clean terminus.
+  // Only add a chart type here once it has been refactored to be truly content-sized.
+  const isContentSized = activeView === 'chart' && (
+    activeChartType === 'diverging' ||
+    activeChartType === 'bar' ||
+    activeChartType === 'party-ranking' ||
+    activeChartType === 'boxplot' ||
+    activeChartType === 'election-bar'
+  );
+
   return (
     <main className="flex h-screen overflow-hidden bg-white">
       <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
@@ -709,8 +722,8 @@ export default function MapPage() {
         </div>
 
         {/* Main view area */}
-        <div className="flex-1 flex min-h-0 overflow-hidden relative">
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+          <div className={`flex-1 flex flex-col min-h-0 ${isContentSized ? '' : 'overflow-hidden'}`}>
           {/* Chart type sub-selector */}
           {activeView === 'chart' && availableChartTypes.length > 1 && (
             <div className="flex gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
@@ -814,7 +827,7 @@ export default function MapPage() {
             </div>
           )}
 
-            <div className="flex-1 relative overflow-hidden min-w-0 bg-slate-50" style={{ isolation: 'isolate' }}>
+            <div className={`relative min-w-0 bg-slate-50 ${isContentSized ? '' : 'flex-1 overflow-hidden'}`} style={{ isolation: 'isolate' }}>
               {activeView === 'map' && (
                 <MapView
                   adminLevel={selectedLevel}
@@ -854,7 +867,7 @@ export default function MapPage() {
               )}
 
               {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
-                <div className="w-full h-full p-6">
+                <div className="w-full p-6">
                   <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
@@ -864,12 +877,12 @@ export default function MapPage() {
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
-                <div className="w-full h-full p-6">
+                <div className="w-full p-6">
                   <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'election-bar' && filteredElectionResult && (
-                <div className="w-full h-full p-6">
+                <div className="w-full p-6">
                   <PartyShareBarChart
                     data={filteredElectionResult}
                     selectedFeature={selectedFeature}
@@ -905,7 +918,7 @@ export default function MapPage() {
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'party-ranking' && partyRankingResult && (
-                <div className="w-full h-full p-6">
+                <div className="w-full p-6">
                   <RankedBarChart
                     data={partyRankingResult}
                     colorScale={activeParty ? colorScale : null}
@@ -931,7 +944,7 @@ export default function MapPage() {
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'boxplot' && scalarResult && (
-                <div className="w-full h-full p-6 overflow-y-auto">
+                <div className="w-full p-6">
                   <BoxPlot
                     data={scalarResult}
                     colorScale={colorScale}

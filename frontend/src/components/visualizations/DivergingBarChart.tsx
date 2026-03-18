@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { ScalarDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
+import { findScrollParent } from '@/utils/scrollUtils';
 
 interface Hovered { name: string; value: number; x: number; y: number; }
 
@@ -231,12 +232,18 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .call(ax => ax.selectAll('line').remove())
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
 
-    // Scroll selected bar into view.
-    if (selectedFeature && containerRef.current) {
+    // Scroll selected bar into view — targets the nearest scrollable ancestor.
+    if (selectedFeature && svgRef.current && containerRef.current) {
       const idx = sorted.findIndex(d => d.code === selectedFeature.code);
       if (idx >= 0) {
-        const barCenterY = margin.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
-        containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
+        const scrollEl = findScrollParent(containerRef.current);
+        if (scrollEl) {
+          const barMidY = margin.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+          const svgTop = svgRef.current.getBoundingClientRect().top
+            - scrollEl.getBoundingClientRect().top
+            + scrollEl.scrollTop;
+          scrollEl.scrollTop = svgTop + barMidY - scrollEl.clientHeight / 2;
+        }
       }
     }
   }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect]);
@@ -244,7 +251,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
   const svgH = needed + MARGIN.top + MARGIN.bottom;
 
   return (
-    <div ref={containerRef} className="w-full h-full overflow-y-auto">
+    <div ref={containerRef} className="w-full">
       <svg ref={svgRef} style={{ height: svgH }} />
       {hovered && (
         <div
