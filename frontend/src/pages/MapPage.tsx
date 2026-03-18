@@ -26,7 +26,7 @@ import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useFilterMode } from '@/hooks/useFilterMode';
-import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
+import { useMapKeyboardNavigation, type DrillStackEntry } from '@/hooks/useMapKeyboardNavigation';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
@@ -100,6 +100,8 @@ export default function MapPage() {
   /** Whether threshold filter mode is active. */
   const [filterEnabled,   setFilterEnabled]   = useState(false);
   const [filterCriteria,  setFilterCriteria]  = useState<FilterCriterion[]>([]);
+
+  const [drillStack, setDrillStack] = useState<DrillStackEntry[]>([]);
 
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -224,6 +226,7 @@ export default function MapPage() {
   useMapKeyboardNavigation(
     selectedFeature, selectedLevel, scalarResult,
     setSelectedLevel, setSelectedFeature, pendingSelectionRef,
+    drillStack, setDrillStack,
   );
 
   const handleComparisonSelect = (feature: { code: string; label: string; parentCode?: string } | null) => {
@@ -236,6 +239,7 @@ export default function MapPage() {
   };
 
   const handleReset = () => {
+    setDrillStack([]);
     setSelectedLevel('Region');
     setSelectedFeature(null);
     setComparisonFeature(null);
@@ -260,8 +264,20 @@ export default function MapPage() {
   };
 
   const handleDrillDown = (level: AdminLevel, code: string, label: string, parentCode?: string) => {
+    // Push the current position onto the drill stack so we can retrace later.
+    if (selectedFeature) {
+      setDrillStack(s => [...s, { level: selectedLevel, code: selectedFeature.code, label: selectedFeature.label }]);
+    }
     pendingSelectionRef.current = { code, label, parentCode };
     setSelectedLevel(level);
+  };
+
+  const handleBreadcrumbNavigate = (index: number) => {
+    if (index < 0) { handleReset(); return; }
+    const target = drillStack[index];
+    setDrillStack(s => s.slice(0, index));
+    pendingSelectionRef.current = { code: target.code, label: target.label };
+    setSelectedLevel(target.level);
   };
 
   useEffect(() => {
@@ -886,6 +902,38 @@ export default function MapPage() {
                   matchingAreas={matchingAreas}
                 />
               )}
+              {/* Breadcrumb — overlaid on the map, centred along the top */}
+              {activeView === 'map' && (drillStack.length > 0 || selectedFeature) && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm px-3 py-1.5 text-xs pointer-events-auto select-none">
+                  <button
+                    onClick={() => handleBreadcrumbNavigate(-1)}
+                    className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
+                  >
+                    Sverige
+                  </button>
+                  {drillStack.map((entry, i) => (
+                    <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
+                      <span className="text-slate-300 mx-0.5">›</span>
+                      <button
+                        onClick={() => handleBreadcrumbNavigate(i)}
+                        className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap max-w-[9rem] truncate"
+                        title={entry.label}
+                      >
+                        {entry.label}
+                      </button>
+                    </span>
+                  ))}
+                  {selectedFeature && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-slate-300 mx-0.5">›</span>
+                      <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
+                        {selectedFeature.label}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
+
               {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
                   <BivariateMapLegend

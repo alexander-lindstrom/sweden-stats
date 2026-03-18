@@ -6,7 +6,6 @@ import TileLayer from "ol/layer/Tile";
 import DoubleClickZoom from "ol/interaction/DoubleClickZoom";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
-import { getCenter } from "ol/extent";
 import GeoJSON from "ol/format/GeoJSON";
 import VectorTileSource from "ol/source/VectorTile";
 import "ol/ol.css";
@@ -36,12 +35,14 @@ import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cleanCountyLabel } from "@/utils/labelFormatting";
 
-const LEVEL_CLICK_ZOOM: Record<AdminLevel, number> = {
-  Country:      5,
-  Region:       7,
-  Municipality: 8,
-  RegSO:        9,
-  DeSO:         10,
+// Maximum zoom applied when fitting a feature's extent into view.
+// Prevents tiny features (a small DeSO) from zooming in absurdly close.
+const LEVEL_MAX_ZOOM: Record<AdminLevel, number> = {
+  Country:      7,
+  Region:       9,
+  Municipality: 13,
+  RegSO:        15,
+  DeSO:         16,
 };
 
 const SWEDEN_CENTER = fromLonLat([15.0, 63.0]);
@@ -85,15 +86,17 @@ export interface MapViewProps {
   resetToken?: number;
 }
 
-// Module-level helper — zoom the OL view to a WFS feature, falling back to a
-// pre-computed centre if the GeoServer request fails or returns nothing.
+// Module-level helper — fit the OL view to a WFS feature's extent.
+// Uses 22% padding on each side (relative to the map viewport) so features
+// are shown with generous context. maxZoom guards against absurdly close zoom
+// on tiny features (small DeSO areas etc.).
 function zoomToWfsFeature(
   view: View,
+  map: Map,
   wfsTypeName: string,
   codeProperty: string,
   code: string,
-  zoom: number,
-  fallbackCenter: [number, number] | null,
+  maxZoom: number,
   signal?: AbortSignal,
 ): void {
   const params = new URLSearchParams({
@@ -113,19 +116,14 @@ function zoomToWfsFeature(
         const features = new GeoJSON().readFeatures(geojson);
         const extent   = features[0].getGeometry()?.getExtent();
         if (extent) {
-          view.animate({ center: getCenter(extent), zoom, duration: 800 });
-          return;
+          const size = map.getSize() ?? [800, 600];
+          const padH = Math.round(size[0] * 0.22);
+          const padV = Math.round(size[1] * 0.22);
+          view.fit(extent, { padding: [padV, padH, padV, padH], maxZoom, duration: 800 });
         }
       }
-      if (fallbackCenter) {
-        view.animate({ center: fallbackCenter, zoom, duration: 800 });
-      }
     })
-    .catch(() => {
-      if (fallbackCenter) {
-        view.animate({ center: fallbackCenter, zoom, duration: 800 });
-      }
-    });
+    .catch(() => { /* WFS failed — leave map as-is */ });
 }
 
 const MapView: React.FC<MapViewProps> = ({
@@ -222,8 +220,13 @@ const MapView: React.FC<MapViewProps> = ({
         );
 
         if (subCode) {
-          // Zoom is handled by the selection effect via WFS after state updates.
-          onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
+          // Ctrl/Cmd + click drills down; plain click does nothing (sub-boundary
+          // is just informational unless you explicitly opt in with the modifier).
+          const isCtrl = (evt.originalEvent as MouseEvent).ctrlKey
+                      || (evt.originalEvent as MouseEvent).metaKey;
+          if (isCtrl) {
+            onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
+          }
           return;
         }
       }
@@ -527,8 +530,8 @@ const MapView: React.FC<MapViewProps> = ({
     // cancels any in-flight WFS request when this effect re-runs or when React
     // StrictMode unmounts the first mount, so only the live view gets animated.
     const controller = new AbortController();
-    const view       = mapInstanceRef.current!.getView();
-    zoomToWfsFeature(view, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_CLICK_ZOOM[adminLevel], null, controller.signal);
+    const view       = map.getView();
+    zoomToWfsFeature(view, map, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_MAX_ZOOM[adminLevel], controller.signal);
 
     // Selection outline (z=4) — shares source with main layer, no extra tile fetches
     const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
@@ -598,6 +601,11 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       layer.setStyle(baseVectorStyle);
     }
+
+    // Bump the source revision so OL's hybrid-mode renderer knows to regenerate
+    // cached tile canvases. Without this, stale canvases can persist after a
+    // breadcrumb/Escape navigation returns to a previously-rendered level.
+    sourceRef.current?.changed();
   }, [choroplethData, colorScale, mapColorFn, matchingAreas, featureCodeProperty]);
 
   // --- Swap base map layer -------------------------------------------------

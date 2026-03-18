@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { AdminLevel, DatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
-import { fetchCached, preload } from '@/datasets/cache';
+import { fetchCached, isCached, preload } from '@/datasets/cache';
 import { ADMIN_LEVELS } from '@/datasets/adminLevels';
 import { PARTY_COLORS } from '@/datasets/parties';
 
@@ -25,14 +25,23 @@ export function useDatasetFetch(
   const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
   const [mapColorFn,    setMapColorFn]    = useState<((code: string) => string) | null>(null);
   const [loading,       setLoading]       = useState(false);
-  const fetchGenRef = useRef(0);
+  const fetchGenRef    = useRef(0);
+  // Ref so the clearing effect can read the current year without adding it to
+  // its deps (year changes intentionally keep old data visible until new data arrives).
+  const selectedYearRef = useRef(selectedYear);
+  selectedYearRef.current = selectedYear;
 
   // Immediately clear stale data when the level or dataset changes.
   // Year changes intentionally keep old data visible until new data arrives.
+  // Skip clearing when the incoming data is already in the session cache —
+  // the async .then() will deliver it in the same event-loop tick anyway,
+  // so clearing first just causes a needless blank-choropleth flash.
   useEffect(() => {
-    setDatasetResult(null);
-    setColorScale(null);
-    setMapColorFn(null);
+    if (!isCached(selectedDatasetId ?? '', selectedLevel, selectedYearRef.current)) {
+      setDatasetResult(null);
+      setColorScale(null);
+      setMapColorFn(null);
+    }
   }, [selectedDatasetId, selectedLevel]);
 
   useEffect(() => {
