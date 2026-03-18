@@ -607,18 +607,19 @@ export default function MapPage() {
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* View toggle bar */}
-        <div className="flex items-center border-b border-slate-200 px-4 bg-white flex-shrink-0">
-          {/* Hamburger — mobile only */}
+        <div className="flex items-stretch h-11 border-b border-slate-200 px-3 bg-white flex-shrink-0">
+          {/* Hamburger — below md only */}
           <button
             onClick={() => setMobileSidebarOpen(o => !o)}
             aria-label="Öppna meny"
-            className="md:hidden mr-2 p-1 -ml-1 text-slate-500 hover:text-slate-800 transition-colors"
+            className="md:hidden flex items-center justify-center w-8 mr-1 text-slate-500 hover:text-slate-800 transition-colors"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
+          {/* View tabs */}
           {ALL_VIEWS.map(({ key, label }) => {
             const supported = availableViews.includes(key);
             return (
@@ -627,11 +628,11 @@ export default function MapPage() {
                 onClick={() => { if (supported) { setActiveView(key); } }}
                 disabled={!supported}
                 className={[
-                  'px-4 py-3 text-sm font-medium transition-colors -mb-px border-b-2',
+                  'px-3 text-sm font-medium transition-colors -mb-px border-b-2 whitespace-nowrap',
                   !supported
                     ? 'text-slate-300 border-transparent cursor-not-allowed'
                     : activeView === key
-                      ? 'text-blue-600 border-blue-600'
+                      ? 'text-blue-600 border-blue-500'
                       : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300',
                 ].join(' ')}
               >
@@ -640,17 +641,24 @@ export default function MapPage() {
             );
           })}
 
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Dataset info pill — hidden on mobile */}
           {activeDescriptor && (
-            <span className="ml-auto text-xs text-slate-400">
-              {activeDescriptor.label} · {activeDescriptor.source} · {selectedYear}
-            </span>
+            <div className="hidden sm:flex items-center gap-1.5 self-center mr-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-0.5">
+              <span className="text-xs font-semibold text-slate-600 max-w-[10rem] truncate">{activeDescriptor.label}</span>
+              <span className="text-slate-300 text-xs select-none">·</span>
+              <span className="text-xs text-slate-400">{activeDescriptor.source}</span>
+              <span className="text-slate-300 text-xs select-none">·</span>
+              <span className="text-xs text-slate-400 tabular-nums">{selectedYear}</span>
+            </div>
           )}
 
-          {/* Party selector — shown when an election dataset is active in map view
-              or in chart view for the party-ranking chart type */}
+          {/* Party selector */}
           {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
-            <div className="flex items-center gap-2 ml-3 pl-3 border-l border-slate-200">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
+            <div className="flex items-center gap-2 self-center pl-3 border-l border-slate-200">
+              <span className="hidden sm:block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
               <Dropdown
                 inputSize="sm"
                 value={activeParty ?? ''}
@@ -662,14 +670,15 @@ export default function MapPage() {
               />
             </div>
           )}
-          {/* Bivariate toggle — only for non-election scalar datasets in map view */}
+
+          {/* Bivariate toggle */}
           {activeView === 'map' && scalarResult && !electionResult && (
-            <div className="flex items-center ml-3 pl-3 border-l border-slate-200">
+            <div className="flex items-center self-center pl-3 border-l border-slate-200">
               <button
                 onClick={() => setBivariateMode(m => !m)}
                 title={bivariateMode ? 'Stäng 2D-läge' : 'Visa två variabler på kartan (bivariat)'}
                 className={[
-                  'flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
+                  'flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
                   bivariateMode
                     ? 'bg-violet-50 border-violet-200 text-violet-700'
                     : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
@@ -680,17 +689,22 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Panel toggle */}
           <button
             onClick={() => setIsPanelOpen(p => !p)}
-            title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
+            title={isPanelOpen ? 'Dölj panel' : 'Visa detaljpanel'}
             className={[
-              'ml-3 flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors border',
+              'self-center ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
               isPanelOpen
-                ? 'bg-blue-50 border-blue-100 text-blue-600'
+                ? 'bg-blue-50 border-blue-200 text-blue-600'
                 : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
             ].join(' ')}
           >
-            {isPanelOpen ? '▶ Dölj' : '◀ Detaljer'}
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
+              <line x1="10.5" y1="1.5" x2="10.5" y2="14.5" />
+            </svg>
+            <span className="hidden sm:inline">{isPanelOpen ? 'Dölj' : 'Detaljer'}</span>
           </button>
         </div>
 
