@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { TimeSeriesNode } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 
-const MARGIN    = { top: 12, right: 24, bottom: 44, left: 62 };
+const MARGIN    = { top: 12, right: 100, bottom: 44, left: 62 };
 const parseDate = d3.timeParse('%Y-%m-%d');
 const fmtYear   = d3.timeFormat('%Y');
 const fmtTip    = d3.timeFormat('%b %Y');
@@ -22,7 +22,7 @@ interface ParsedSeries {
   pts:   Array<{ parsed: Date; value: number }>;
 }
 
-export function MultiLineChart({ data, label, colorOverrides }: Props) {
+export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const tooltipRef   = useRef<HTMLDivElement>(null);
@@ -107,14 +107,14 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       .join('line').attr('class', 'grid')
       .attr('x1', 0).attr('x2', adjW)
       .attr('y1', d => yScale(d)).attr('y2', d => yScale(d))
-      .attr('stroke', '#f0f0f0').attr('stroke-width', 1);
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
 
     // ── X axis ────────────────────────────────────────────────────────────────
     g.append('g')
       .attr('transform', `translate(0,${adjH})`)
       .call(
         d3.axisBottom(xScale)
-          .ticks(8)
+          .ticks(Math.max(3, Math.floor(adjW / 80)))
           .tickFormat(d => fmtYear(d as Date))
           .tickSize(4),
       )
@@ -138,13 +138,42 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       .curve(d3.curveMonotoneX);
 
     const linesG = g.append('g').attr('clip-path', `url(#${clipId})`);
+    // Store DOM elements for hover dimming.
+    const lineEls = new Map<string, SVGPathElement>();
     parsedSeries.forEach(series => {
-      linesG.append('path')
+      const el = linesG.append('path')
         .datum(series.pts)
         .attr('fill', 'none')
         .attr('stroke', series.color)
         .attr('stroke-width', 2)
-        .attr('d', line(series.pts));
+        .attr('d', line(series.pts))
+        .node();
+      if (el) { lineEls.set(series.id, el); }
+    });
+
+    // ── End-of-line labels ────────────────────────────────────────────────────
+    const LABEL_MAX = 15;
+    const truncate  = (s: string) => s.length > LABEL_MAX ? s.slice(0, LABEL_MAX - 1) + '…' : s;
+    // Build positions from each series' last point.
+    const labelPos = parsedSeries
+      .filter(s => s.pts.length > 0)
+      .map(s => ({ id: s.id, color: s.color, text: truncate(s.label), y: yScale(s.pts[s.pts.length - 1].value) }))
+      .sort((a, b) => a.y - b.y);
+    // Iterative push-down to resolve collisions.
+    const MIN_GAP = 13;
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 1; i < labelPos.length; i++) {
+        if (labelPos[i].y - labelPos[i - 1].y < MIN_GAP) {
+          labelPos[i].y = labelPos[i - 1].y + MIN_GAP;
+        }
+      }
+    }
+    labelPos.forEach(lp => {
+      g.append('text')
+        .attr('x', adjW + 6).attr('y', Math.min(adjH, lp.y))
+        .attr('dy', '0.35em').attr('font-size', 10)
+        .attr('fill', lp.color)
+        .text(lp.text);
     });
 
     // ── Hover elements ────────────────────────────────────────────────────────
@@ -171,18 +200,24 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       .attr('width', adjW).attr('height', adjH)
       .style('fill', 'none').style('pointer-events', 'all')
       .on('mousemove', (event: MouseEvent) => {
-        const [svgX]  = d3.pointer(event, svgRef.current);
-        const chartX  = svgX - MARGIN.left;
+        const [svgX, svgY] = d3.pointer(event, svgRef.current);
+        const chartX = svgX - MARGIN.left;
+        const chartY = svgY - MARGIN.top;
 
         if (chartX < 0 || chartX > adjW) {
           crosshair.style('opacity', 0);
           hoverDots.forEach(dot => dot.style('opacity', 0));
           tooltip.style('opacity', '0');
+          lineEls.forEach(el => d3.select(el).attr('stroke-opacity', 1));
           return;
         }
 
         const x0 = xScale.invert(chartX);
         crosshair.attr('x1', chartX).attr('x2', chartX).style('opacity', 1);
+
+        // Find the series whose line is closest to the cursor's y position.
+        let closestId = '';
+        let minDist   = Infinity;
 
         const rows = parsedSeries.map((series, i) => {
           const idx = bisect(series.pts, x0, 1);
@@ -193,7 +228,14 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
             .attr('cx', xScale(pt.parsed))
             .attr('cy', yScale(pt.value))
             .style('opacity', 1);
+          const dist = Math.abs(yScale(pt.value) - chartY);
+          if (dist < minDist) { minDist = dist; closestId = series.id; }
           return { label: series.label, color: series.color, value: pt.value, date: pt.parsed };
+        });
+
+        // Dim all lines except the closest.
+        lineEls.forEach((el, id) => {
+          d3.select(el).attr('stroke-opacity', id === closestId ? 1 : 0.12);
         });
 
         // Sort by value descending so highest series is at the top.
@@ -230,21 +272,16 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
         crosshair.style('opacity', 0);
         hoverDots.forEach(dot => dot.style('opacity', 0));
         tooltip.style('opacity', '0');
+        lineEls.forEach(el => d3.select(el).attr('stroke-opacity', 1));
       });
 
   }, [parsedSeries, dims]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
 
-      {label && (
-        <div className="px-3 pt-3 flex-shrink-0 text-sm font-semibold uppercase tracking-wide text-gray-500">
-          {label}
-        </div>
-      )}
-
-      {/* Legend — line-segment indicators, not dots */}
-      <div className="flex flex-nowrap gap-x-3 overflow-x-auto px-3 py-2 flex-shrink-0 scrollbar-none">
+      {/* Legend — visibility toggles; end-of-line labels handle identification */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 flex-shrink-0">
         {data.map(series => {
           const color = colorMap.get(series.id) ?? '#888';
           const on    = visible[series.id] !== false;
@@ -252,7 +289,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
             <button
               key={series.id}
               onClick={() => toggle(series.id)}
-              className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-opacity"
+              className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-opacity whitespace-nowrap"
               style={{ opacity: on ? 1 : 0.3 }}
             >
               <svg width="22" height="12" viewBox="0 0 22 12" className="flex-shrink-0">
@@ -265,7 +302,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 relative min-h-0">
+      <div ref={containerRef} className="flex-1 relative min-h-0">
         <svg ref={svgRef} className="w-full h-full" />
         <div
           ref={tooltipRef}
