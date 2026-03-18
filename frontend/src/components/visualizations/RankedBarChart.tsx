@@ -244,7 +244,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         }
       }
     }
-  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas]);
+  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, data.label, data.unit, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas]);
 
   return (
     <div ref={containerRef} className="w-full">

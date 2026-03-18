@@ -200,7 +200,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
         .attr('pointer-events', 'none')
         .text('↑ tillbaka');
     }
-  }, [focus, dims, history.length, colorScale, unit, drillDown, drillUp]);
+  }, [focus, dims, history.length, colorScale, unit, drillDown, drillUp, upgradePrimaryToLeaf]);
 
   // ── Bar chart ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -362,7 +362,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('font-size', 11).attr('fill', '#9ca3af')
       .text(`${label}${unit ? ` (${unit})` : ''}`);
 
-  }, [focus, dims, colorScale, unit, label, drillDown]);
+  }, [focus, dims, colorScale, unit, label, drillDown, upgradePrimaryToLeaf]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full flex">

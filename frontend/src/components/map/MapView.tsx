@@ -265,7 +265,7 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
     }
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, onFeatureSelect, onDrillDown, onComparisonSelect]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, featureLabels, onFeatureSelect, onDrillDown, onComparisonSelect]);
 
   // --- Pointer-move handler: hover tooltip + highlight ----------------------
   // Defined as a useCallback so the registration effect stays a clean 3-liner.
@@ -395,7 +395,7 @@ const MapView: React.FC<MapViewProps> = ({
         mapRef.current!.style.cursor = '';
       }
     }, 50);
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, choroplethData, tooltipData]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureLabels, choroplethData, tooltipData]);
 
   // --- Initialise map once -------------------------------------------------
   useEffect(() => {

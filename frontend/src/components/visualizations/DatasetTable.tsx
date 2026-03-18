@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ScalarDatasetResult } from '@/datasets/types';
 import { stripLanSuffix } from '@/utils/labelFormatting';
-import { useTableSort, SortIndicator, tableRowClass, TH } from '@/hooks/useTableSort';
+import { useTableSort, tableRowClass, TH } from '@/hooks/useTableSort';
+import { SortIndicator } from '@/components/ui/SortIndicator';
 
 interface DatasetTableProps {
   data: ScalarDatasetResult;

@@ -3,7 +3,8 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { ElectionDatasetResult } from '@/datasets/types';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { stripLanSuffix } from '@/utils/labelFormatting';
-import { useTableSort, SortIndicator, tableRowClass, TH } from '@/hooks/useTableSort';
+import { useTableSort, tableRowClass, TH } from '@/hooks/useTableSort';
+import { SortIndicator } from '@/components/ui/SortIndicator';
 
 interface Props {
   data: ElectionDatasetResult;

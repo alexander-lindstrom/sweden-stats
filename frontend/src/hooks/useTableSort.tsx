@@ -22,12 +22,6 @@ export function useTableSort<K extends string>(defaultKey: K, defaultDir: SortDi
   return { sortKey, sortDir, handleSort };
 }
 
-/** Sort direction indicator shown in column headers. */
-export function SortIndicator({ active, dir }: { active: boolean; dir: SortDir }) {
-  if (!active) { return <span className="text-gray-300 ml-1">↕</span>; }
-  return <span className="text-blue-500 ml-1">{dir === 'asc' ? '↑' : '↓'}</span>;
-}
-
 /** Consistent row className for all data tables. */
 export function tableRowClass(isSelected: boolean, clickable: boolean): string {
   return [

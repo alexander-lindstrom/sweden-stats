@@ -265,7 +265,7 @@ export default function MapPage() {
   };
 
   useEffect(() => {
-    if (selectedFeature) { if (!userDismissedPanel.current) setIsPanelOpen(true); }
+    if (selectedFeature) { if (!userDismissedPanel.current) { setIsPanelOpen(true); } }
     else { setComparisonFeature(null); }
   }, [selectedFeature]);
 

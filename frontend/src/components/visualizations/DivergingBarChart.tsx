@@ -255,7 +255,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
         }
       }
     }
-  }, [sorted, mean, needed, n, dimensions, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect]);
+  }, [sorted, mean, needed, n, dimensions, data.label, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect]);
 
   const svgH = needed + MARGIN.top + MARGIN.bottom;
 
