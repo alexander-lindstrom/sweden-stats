@@ -840,7 +840,7 @@ export default function MapPage() {
                 />
               )}
               {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
-                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
                   <BivariateMapLegend
                     xLabel={`${activeDescriptor.label}${scalarResult?.unit ? ` (${scalarResult.unit})` : ''}`}
                     yLabel={`${bivariateYDescriptor.label}${bivariateYScalar?.unit ? ` (${bivariateYScalar.unit})` : ''}`}
@@ -848,7 +848,7 @@ export default function MapPage() {
                 </div>
               )}
               {activeView === 'map' && !bivariateFn && legendData && (
-                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-md p-3 pointer-events-none">
+                <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
                   <MapLegend data={legendData} scale={colorScale} />
                 </div>
               )}

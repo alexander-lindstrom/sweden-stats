@@ -8,8 +8,8 @@ interface MapLegendProps {
   scale: d3.ScaleSequential<string> | null;
 }
 
-const GRADIENT_HEIGHT = 160;
-const GRADIENT_WIDTH  = 20;
+const GRADIENT_HEIGHT = 96;
+const GRADIENT_WIDTH  = 14;
 const STOPS = 10;
 
 export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
@@ -26,20 +26,19 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
     const presentParties = new Set(Object.values(data.winnerByGeo));
     const parties = PARTY_CODES.filter(p => presentParties.has(p));
     return (
-      <div className="flex flex-col gap-2">
-        <p className="text-sm font-semibold text-slate-700">{data.label}</p>
-        <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 w-24">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}</p>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           {parties.map(p => (
-            <div key={p} className="flex items-center gap-2">
+            <div key={p} className="flex items-center gap-1.5">
               <span
-                className="w-3 h-3 rounded-sm flex-shrink-0"
+                className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
                 style={{ backgroundColor: PARTY_COLORS[p] }}
               />
-              <span className="text-xs text-slate-600">{PARTY_LABELS[p] ?? p}</span>
+              <span className="text-[10px] text-slate-600">{PARTY_LABELS[p] ?? p}</span>
             </div>
           ))}
         </div>
-        <p className="text-xs text-slate-400">Största parti</p>
       </div>
     );
   }
@@ -72,10 +71,10 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
   const gradientId = 'legend-gradient';
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-slate-700">{data.label}</p>
-      <div className="flex items-stretch gap-3">
-        <svg width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT}>
+    <div className="flex flex-col gap-2 w-24">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}</p>
+      <div className="flex items-stretch gap-2">
+        <svg width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT} className="flex-shrink-0">
           <defs>
             <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               {stops.map((s) => (
@@ -90,15 +89,14 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale }) => {
           />
         </svg>
         <div
-          className="flex flex-col justify-between text-xs text-slate-600"
+          className="flex flex-col justify-between"
           style={{ height: GRADIENT_HEIGHT }}
         >
-          <span>{fmt(maxVal)}</span>
-          <span>{fmt(midVal)}</span>
-          <span>{fmt(minVal)}</span>
+          <span className="text-[10px] font-medium text-slate-600 tabular-nums">{fmt(maxVal)}{data.unit ? ` ${data.unit}` : ''}</span>
+          <span className="text-[10px] text-slate-400 tabular-nums">{fmt(midVal)}</span>
+          <span className="text-[10px] font-medium text-slate-600 tabular-nums">{fmt(minVal)}</span>
         </div>
       </div>
-      <p className="text-xs text-slate-400">{data.unit}</p>
     </div>
   );
 };
