@@ -102,32 +102,37 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
     let yFn: (v: number) => number;
     let xAxisDef: d3.Axis<d3.NumberValue>;
     let yAxisDef: d3.Axis<d3.NumberValue>;
+    let xTickVals: number[];
+    let yTickVals: number[];
     const xTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), xData.unit);
     const yTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), yData.unit);
+
+    // For log scales filter to 1×/2×/5× per decade — avoids crowding.
+    const sparseLogTicks = (ticks: number[]) => ticks.filter(v => {
+      const b = Math.pow(10, Math.floor(Math.log10(v)));
+      const r = Math.round(v / b);
+      return r === 1 || r === 2 || r === 5;
+    });
 
     const xTickCount = Math.max(3, Math.floor(innerW / 80));
     if (useLogX) {
       const s = d3.scaleLog().domain([xMin, xMax]).range([0, innerW]).nice();
-      xFn = s; xAxisDef = d3.axisBottom(s).ticks(xTickCount).tickFormat(xTickFmt);
+      xTickVals = sparseLogTicks(s.ticks());
+      xFn = s; xAxisDef = d3.axisBottom(s).tickValues(xTickVals).tickFormat(xTickFmt);
     } else {
       const s = d3.scaleLinear().domain([xMin, xMax]).range([0, innerW]).nice();
+      xTickVals = s.ticks(xTickCount);
       xFn = s; xAxisDef = d3.axisBottom(s).ticks(xTickCount).tickFormat(xTickFmt);
     }
     if (useLogY) {
       const s = d3.scaleLog().domain([yMin, yMax]).range([innerH, 0]).nice();
+      yTickVals = s.ticks(5);
       yFn = s; yAxisDef = d3.axisLeft(s).ticks(5).tickFormat(yTickFmt);
     } else {
       const s = d3.scaleLinear().domain([yMin, yMax]).range([innerH, 0]).nice();
+      yTickVals = s.ticks(5);
       yFn = s; yAxisDef = d3.axisLeft(s).ticks(5).tickFormat(yTickFmt);
     }
-
-    // Grid tick values: ask the scale for representative ticks.
-    const xTickVals = useLogX
-      ? d3.scaleLog().domain([xMin, xMax]).range([0, innerW]).nice().ticks(xTickCount)
-      : d3.scaleLinear().domain([xMin, xMax]).range([0, innerW]).nice().ticks(xTickCount);
-    const yTickVals = useLogY
-      ? d3.scaleLog().domain([yMin, yMax]).range([innerH, 0]).nice().ticks(5)
-      : d3.scaleLinear().domain([yMin, yMax]).range([innerH, 0]).nice().ticks(5);
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();

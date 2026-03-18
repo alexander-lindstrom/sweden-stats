@@ -15,7 +15,7 @@ interface Props {
   onComparisonSelect?: (f: { code: string; label: string } | null) => void;
 }
 
-const MARGIN     = { top: 20, right: 8, bottom: 28, left: 152 };
+const MARGIN     = { top: 20, right: 8, bottom: 42, left: 152 };
 const MAX_BAR_H  = 20;
 const BAR_GAP    = 1;
 const BAR_RADIUS = 2;
@@ -231,6 +231,15 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').remove())
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
+
+    // X-axis label.
+    g.append('text')
+      .attr('x', innerW / 2)
+      .attr('y', innerH + margin.bottom - 6)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 10)
+      .attr('fill', '#9ca3af')
+      .text(`${data.label}${data.unit ? ` (${data.unit})` : ''}`);
 
     // Scroll selected bar into view — targets the nearest scrollable ancestor.
     if (selectedFeature && svgRef.current && containerRef.current) {
