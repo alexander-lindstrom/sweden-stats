@@ -81,6 +81,10 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
 
     svg.attr('width', width).attr('height', height);
 
+    const clipId = 'mlc-clip';
+    svg.append('defs').append('clipPath').attr('id', clipId)
+      .append('rect').attr('width', adjW).attr('height', adjH);
+
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
     const allPts = parsedSeries.flatMap(s => s.pts);
@@ -133,8 +137,9 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       .y(p => yScale(p.value))
       .curve(d3.curveMonotoneX);
 
+    const linesG = g.append('g').attr('clip-path', `url(#${clipId})`);
     parsedSeries.forEach(series => {
-      g.append('path')
+      linesG.append('path')
         .datum(series.pts)
         .attr('fill', 'none')
         .attr('stroke', series.color)
@@ -239,7 +244,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
       )}
 
       {/* Legend — line-segment indicators, not dots */}
-      <div className="flex flex-wrap gap-x-5 gap-y-2 px-3 py-2.5 flex-shrink-0">
+      <div className="flex flex-nowrap gap-x-3 overflow-x-auto px-3 py-2 flex-shrink-0 scrollbar-none">
         {data.map(series => {
           const color = colorMap.get(series.id) ?? '#888';
           const on    = visible[series.id] !== false;
@@ -247,7 +252,7 @@ export function MultiLineChart({ data, label, colorOverrides }: Props) {
             <button
               key={series.id}
               onClick={() => toggle(series.id)}
-              className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-opacity"
+              className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-opacity"
               style={{ opacity: on ? 1 : 0.3 }}
             >
               <svg width="22" height="12" viewBox="0 0 22 12" className="flex-shrink-0">

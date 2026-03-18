@@ -4,7 +4,7 @@ import { ScalarDatasetResult } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 
-interface Hovered { name: string; value: number; deviation: number; x: number; y: number; }
+interface Hovered { name: string; value: number; x: number; y: number; }
 
 interface Props {
   data: ScalarDatasetResult;
@@ -14,7 +14,7 @@ interface Props {
   onComparisonSelect?: (f: { code: string; label: string } | null) => void;
 }
 
-const MARGIN     = { top: 28, right: 76, bottom: 24, left: 152 };
+const MARGIN     = { top: 12, right: 8, bottom: 24, left: 152 };
 const MAX_BAR_H  = 20;
 const BAR_GAP    = 1;
 const BAR_RADIUS = 2;
@@ -23,19 +23,10 @@ const BAR_RADIUS = 2;
 const COLOR_BELOW = '#60a5fa';
 const COLOR_ABOVE = '#fb923c';
 
-function fmtDev(dev: number, unit: string): string {
-  const sign = dev >= 0 ? '+' : '−';
-  const abs  = Math.abs(dev);
-  let num: string;
-  if      (abs >= 1_000_000) { num = `${(abs / 1_000_000).toFixed(1)}M`; }
-  else if (abs >= 1_000)     { num = `${Math.round(abs / 1_000)}k`; }
-  else                       { num = abs >= 10 ? String(Math.round(abs)) : abs.toFixed(1); }
-  return `${sign}${num} ${unit}`;
-}
 
 function fmtAbs(v: number): string {
-  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
-  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
+  if (v >= 1_000_000) { return `${(v / 1_000_000).toFixed(1)}M`; }
+  if (v >= 1_000)     { return `${(v / 1_000).toFixed(0)}k`; }
   return v.toFixed(1);
 }
 
@@ -66,22 +57,22 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
     if (!svgRef.current || !dimensions || sorted.length === 0) {return;}
 
     const { width, height } = dimensions;
-    const innerW = width  - MARGIN.left - MARGIN.right;
-    const innerH = height - MARGIN.top  - MARGIN.bottom;
+    const margin = {
+      top: MARGIN.top, bottom: MARGIN.bottom,
+      left:  width < 500 ? 90 : width < 700 ? 120 : 152,
+      right: width < 500 ? 56 : 76,
+    };
+    const innerW = width  - margin.left - margin.right;
+    const innerH = height - margin.top  - margin.bottom;
     if (innerW <= 0 || innerH <= 0) {return;}
 
     const effH    = Math.min(innerH, needed);
-    const vOffset = (innerH - effH) / 2;
+    const vOffset = innerH - effH;
     const padding = n > 1 ? BAR_GAP / MAX_BAR_H : 0;
 
     const maxDev = d3.max(sorted, d => Math.abs(d.value - mean)) ?? 1;
 
-    // Cap the domain at the 90th-percentile deviation × 1.5 so a single outlier
-    // (e.g. Stockholm at Region level) doesn't compress all other bars. Bars
-    // that exceed the domain are clipped; their labels are clamped to the edge.
-    const sortedDevs = sorted.map(d => Math.abs(d.value - mean)).sort(d3.ascending);
-    const p90Dev     = d3.quantile(sortedDevs, 0.9) ?? maxDev;
-    const extent     = Math.min(p90Dev * 1.5, maxDev * 1.1);
+    const extent = maxDev * 1.1;
 
     // Symmetric domain centred on mean.
     const xScale = d3.scaleLinear()
@@ -97,11 +88,12 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
 
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+    const svgHeight = Math.max(height, needed + margin.top + margin.bottom);
     svg
       .attr('width',  width)
-      .attr('height', Math.max(height, needed + MARGIN.top + MARGIN.bottom));
+      .attr('height', svgHeight);
 
-    const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
     // Vertical grid lines at x-axis tick positions — drawn first so they sit behind bars.
     g.append('g')
@@ -124,9 +116,9 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
     svg.append('defs')
       .append('clipPath').attr('id', clipId)
       .append('rect')
-        .attr('x', MARGIN.left).attr('y', 0)
+        .attr('x', 0).attr('y', 0)
         .attr('width', innerW)
-        .attr('height', Math.max(height, needed + MARGIN.top + MARGIN.bottom));
+        .attr('height', svgHeight);
 
     // Bars (inside clipped group).
     g.append('g').attr('clip-path', `url(#${clipId})`)
@@ -164,7 +156,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
           hoveredElRef.current = el;
           d3.select(el).attr('fill-opacity', 0.6);
         }
-        setHovered({ name: d.name, value: d.value, deviation: d.value - mean, x: event.clientX, y: event.clientY });
+        setHovered({ name: d.name, value: d.value, x: event.clientX, y: event.clientY });
       });
 
     const clearHighlight = () => {
@@ -188,31 +180,6 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .attr('y1', vOffset).attr('y2', vOffset + effH)
       .attr('stroke', '#374151').attr('stroke-width', 1.5);
 
-    // Mean label at top of axis line.
-    g.append('text')
-      .attr('x', center).attr('y', vOffset - 6)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', 11).attr('fill', '#374151').attr('font-weight', '500')
-      .text(`↕ medel ${fmtAbs(mean)} ${data.unit}`);
-
-    // Deviation labels (right of each bar).
-    g.selectAll<SVGTextElement, typeof sorted[0]>('text.dev')
-      .data(sorted)
-      .join('text').attr('class', 'dev')
-      .attr('x', d => {
-        const tipX = xScale(d.value);
-        if (d.value >= mean) { return Math.min(tipX + 5, innerW - 4); }
-        return Math.max(tipX - 5, 4);
-      })
-      .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
-      .attr('dy', '0.35em')
-      .attr('text-anchor', d => {
-        if (d.value >= mean) { return xScale(d.value) > innerW ? 'end' : 'start'; }
-        return xScale(d.value) < 0 ? 'start' : 'end';
-      })
-      .attr('font-size', 10).attr('fill', '#6b7280')
-      .attr('pointer-events', 'none')
-      .text(d => fmtDev(d.value - mean, data.unit));
 
     // Y-axis — names, truncated with getComputedTextLength.
     const nameByCode = new Map(sorted.map(d => [d.code, d.name]));
@@ -224,7 +191,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
         .attr('font-size', 12).attr('fill', '#374151')
         .each(function() {
           const el  = this as SVGTextElement;
-          const max = MARGIN.left - 16;
+          const max = margin.left - 16;
           if (el.getComputedTextLength() <= max) {return;}
           let t = el.textContent ?? '';
           while (t.length > 2 && el.getComputedTextLength() > max) {
@@ -245,7 +212,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
     if (selectedFeature && containerRef.current) {
       const idx = sorted.findIndex(d => d.code === selectedFeature.code);
       if (idx >= 0) {
-        const barCenterY = MARGIN.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
+        const barCenterY = margin.top + yScale(sorted[idx].code)! + yScale.bandwidth() / 2;
         containerRef.current.scrollTop = barCenterY - containerRef.current.clientHeight / 2;
       }
     }
@@ -263,7 +230,6 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
         >
           <div className="font-semibold">{hovered.name}</div>
           <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
-          <div className="text-gray-400">{fmtDev(hovered.deviation, data.unit)} från medel</div>
         </div>
       )}
     </div>

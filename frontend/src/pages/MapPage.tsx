@@ -709,7 +709,8 @@ export default function MapPage() {
         </div>
 
         {/* Main view area */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-1 flex min-h-0 overflow-hidden relative">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Chart type sub-selector */}
           {activeView === 'chart' && availableChartTypes.length > 1 && (
             <div className="flex gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
@@ -813,7 +814,6 @@ export default function MapPage() {
             </div>
           )}
 
-          <div className="flex-1 flex min-h-0 overflow-hidden relative">
             <div className="flex-1 relative overflow-hidden min-w-0 bg-slate-50" style={{ isolation: 'isolate' }}>
               {activeView === 'map' && (
                 <MapView
@@ -964,37 +964,37 @@ export default function MapPage() {
                 </div>
               )}
             </div>
-
-            {/* Backdrop: dims map when panel overlays it at sm–lg */}
-            {isPanelOpen && (
-              <div
-                className="hidden sm:block md:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
-                onClick={() => setIsPanelOpen(false)}
-              />
-            )}
-            <SelectionPanel
-              selectedFeature={selectedFeature}
-              adminLevel={selectionLevel}
-              isOpen={isPanelOpen}
-              onClose={() => setIsPanelOpen(false)}
-              comparisonFeature={comparisonFeature}
-              onClearComparison={() => { setComparisonFeature(null); setSelectedFeature(null); setIsPanelOpen(false); }}
-              searchItems={searchItems}
-              onSearchSelect={(item) => {
-                // Infer the correct selectionLevel from the code so the panel
-                // fetches at the right admin level (e.g. municipality codes appear
-                // in election results at Country level).
-                if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
-                else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
-                handleFeatureSelect(item);
-              }}
-              onSearchComparisonSelect={(item) => {
-                if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
-                else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
-                handleComparisonSelect(item);
-              }}
-            />
           </div>
+
+          {/* Backdrop: dims map when panel overlays it at sm–lg */}
+          {isPanelOpen && (
+            <div
+              className="hidden sm:block md:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
+              onClick={() => setIsPanelOpen(false)}
+            />
+          )}
+          <SelectionPanel
+            selectedFeature={selectedFeature}
+            adminLevel={selectionLevel}
+            isOpen={isPanelOpen}
+            onClose={() => setIsPanelOpen(false)}
+            comparisonFeature={comparisonFeature}
+            onClearComparison={() => { setComparisonFeature(null); setSelectedFeature(null); setIsPanelOpen(false); }}
+            searchItems={searchItems}
+            onSearchSelect={(item) => {
+              // Infer the correct selectionLevel from the code so the panel
+              // fetches at the right admin level (e.g. municipality codes appear
+              // in election results at Country level).
+              if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
+              else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
+              handleFeatureSelect(item);
+            }}
+            onSearchComparisonSelect={(item) => {
+              if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
+              else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
+              handleComparisonSelect(item);
+            }}
+          />
         </div>
       </div>
     </main>

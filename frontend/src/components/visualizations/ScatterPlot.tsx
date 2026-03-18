@@ -26,7 +26,7 @@ interface Hovered {
   clientY: number;
 }
 
-const MARGIN = { top: 20, right: 24, bottom: 52, left: 64 };
+const MARGIN_BASE = { top: 20, right: 24, left: 64 };
 
 // Stable county-index palette — same county always gets the same colour.
 const COUNTY_CODES = [
@@ -46,8 +46,8 @@ function countyColor(code: string): string {
 
 function fmt(v: number, unit: string): string {
   if (unit === '%' || Math.abs(v) < 100) { return d3.format('.1f')(v); }
-  if (Math.abs(v) >= 1_000_000)          { return d3.format('.2s')(v); }
-  if (Math.abs(v) >= 1_000)              { return d3.format(',.0f')(v); }
+  if (Math.abs(v) >= 1_000_000) { return `${(v / 1_000_000).toFixed(1)}M`; }
+  if (Math.abs(v) >= 1_000)     { return `${Math.round(v / 1_000)}k`; }
   return String(Math.round(v));
 }
 
@@ -66,6 +66,8 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
     if (!svgRef.current || !dimensions) { return; }
 
     const { width, height } = dimensions;
+    const rotateLabels = width < 600;
+    const MARGIN = { ...MARGIN_BASE, bottom: rotateLabels ? 72 : 52 };
     const innerW = width  - MARGIN.left - MARGIN.right;
     const innerH = height - MARGIN.top  - MARGIN.bottom;
     if (innerW <= 0 || innerH <= 0) { return; }
@@ -103,12 +105,13 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
     const xTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), xData.unit);
     const yTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), yData.unit);
 
+    const xTickCount = Math.max(3, Math.floor(innerW / 80));
     if (useLogX) {
       const s = d3.scaleLog().domain([xMin, xMax]).range([0, innerW]).nice();
-      xFn = s; xAxisDef = d3.axisBottom(s).ticks(5).tickFormat(xTickFmt);
+      xFn = s; xAxisDef = d3.axisBottom(s).ticks(xTickCount).tickFormat(xTickFmt);
     } else {
       const s = d3.scaleLinear().domain([xMin, xMax]).range([0, innerW]).nice();
-      xFn = s; xAxisDef = d3.axisBottom(s).ticks(6).tickFormat(xTickFmt);
+      xFn = s; xAxisDef = d3.axisBottom(s).ticks(xTickCount).tickFormat(xTickFmt);
     }
     if (useLogY) {
       const s = d3.scaleLog().domain([yMin, yMax]).range([innerH, 0]).nice();
@@ -120,8 +123,8 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
 
     // Grid tick values: ask the scale for representative ticks.
     const xTickVals = useLogX
-      ? d3.scaleLog().domain([xMin, xMax]).range([0, innerW]).nice().ticks(5)
-      : d3.scaleLinear().domain([xMin, xMax]).range([0, innerW]).nice().ticks(5);
+      ? d3.scaleLog().domain([xMin, xMax]).range([0, innerW]).nice().ticks(xTickCount)
+      : d3.scaleLinear().domain([xMin, xMax]).range([0, innerW]).nice().ticks(xTickCount);
     const yTickVals = useLogY
       ? d3.scaleLog().domain([yMin, yMax]).range([innerH, 0]).nice().ticks(5)
       : d3.scaleLinear().domain([yMin, yMax]).range([innerH, 0]).nice().ticks(5);
@@ -155,7 +158,10 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
       .call(xAxisDef)
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
+        .attr('fill', '#9ca3af').attr('font-size', 11)
+        .attr('text-anchor', rotateLabels ? 'end' : 'middle')
+        .attr('transform', rotateLabels ? 'rotate(-45) translate(-4, 0)' : null));
 
     g.append('g')
       .call(yAxisDef)
@@ -165,7 +171,7 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
 
     // Axis labels.
     g.append('text')
-      .attr('x', innerW / 2).attr('y', innerH + 40)
+      .attr('x', innerW / 2).attr('y', innerH + MARGIN.bottom - 10)
       .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#6b7280')
       .text(`${xData.label}${xData.unit ? ` (${xData.unit})` : ''}`);
 
