@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
@@ -38,6 +39,30 @@ function SidebarSection({ label, children }: { label: string; children: React.Re
         <div className="flex-1 h-px bg-slate-200" />
       </div>
       {children}
+    </section>
+  );
+}
+
+function CollapsibleSection({ label, children, defaultOpen = true }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 mb-1.5 px-4 group"
+      >
+        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap group-hover:text-slate-700 transition-colors">
+          {label}
+        </span>
+        <div className="flex-1 h-px bg-slate-200 group-hover:bg-slate-300 transition-colors" />
+        <svg
+          className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
+          fill="none" viewBox="0 0 10 8" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M1 2l4 4 4-4" />
+        </svg>
+      </button>
+      {open && children}
     </section>
   );
 }
@@ -167,14 +192,14 @@ export function MapSidebar({
 
   return (
     <aside className={[
-      // Desktop: always-visible inline panel
-      'sm:relative sm:inset-auto sm:z-auto sm:translate-x-0 sm:w-52 sm:flex-shrink-0',
-      'sm:border-r sm:border-slate-200 sm:bg-white sm:flex sm:flex-col sm:overflow-y-auto',
-      'sm:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]',
-      // Mobile: fixed full-height overlay sliding in from the left
+      // lg+: always-visible inline push panel
+      'md:relative md:inset-auto md:z-auto md:translate-x-0 md:w-52 md:flex-shrink-0',
+      'md:border-r md:border-slate-200 md:bg-white md:flex md:flex-col md:overflow-y-auto',
+      'md:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]',
+      // <md: fixed full-height overlay sliding in from the left
       'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white flex flex-col overflow-y-auto',
       'transition-transform duration-300 ease-out shadow-xl',
-      mobileOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
+      mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
     ].join(' ')}>
 
       {/* Wordmark */}
@@ -189,7 +214,7 @@ export function MapSidebar({
         <button
           onClick={onMobileClose}
           aria-label="Stäng meny"
-          className="sm:hidden text-slate-400 hover:text-slate-700 text-xl leading-none ml-2"
+          className="md:hidden text-slate-400 hover:text-slate-700 text-xl leading-none ml-2"
         >
           ×
         </button>
@@ -197,7 +222,7 @@ export function MapSidebar({
 
       <div className="flex flex-col gap-5 py-4 flex-1">
 
-        {/* Admin level */}
+        {/* Admin level — always visible, only 5 items */}
         <SidebarSection label="Nivå">
           <ul>
             {ADMIN_LEVELS.map((level) => (
@@ -211,7 +236,7 @@ export function MapSidebar({
         </SidebarSection>
 
         {/* Dataset */}
-        <SidebarSection label="Dataset">
+        <CollapsibleSection label="Dataset">
           {availableDatasets.length === 0 ? (
             <p className="text-xs text-slate-400 italic px-4">
               Inga dataset för denna nivå.
@@ -223,7 +248,7 @@ export function MapSidebar({
               onDatasetChange={onDatasetChange}
             />
           )}
-        </SidebarSection>
+        </CollapsibleSection>
 
         {/* Year slider */}
         {activeDescriptor && activeDescriptor.availableYears.length > 1 && !['RegSO', 'DeSO'].includes(selectedLevel) && (
@@ -242,7 +267,7 @@ export function MapSidebar({
         )}
 
         {/* Filter mode */}
-        <SidebarSection label="Filter">
+        <CollapsibleSection label="Filter">
           <NavItem
             active={filterEnabled}
             onClick={() => onFilterEnabledChange(!filterEnabled)}
@@ -261,20 +286,18 @@ export function MapSidebar({
               />
             </div>
           )}
-        </SidebarSection>
+        </CollapsibleSection>
 
-        {/* Base map */}
-        <section className="px-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">Bakgrundskarta</span>
-            <div className="flex-1 h-px bg-slate-200" />
+        {/* Base map — collapsed by default, least-used setting */}
+        <CollapsibleSection label="Bakgrundskarta" defaultOpen={false}>
+          <div className="px-4">
+            <Dropdown
+              value={selectedBase}
+              onChange={val => onBaseChange(val as BaseMapKey)}
+              options={(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map(key => ({ value: key, label: baseMapLabels[key] }))}
+            />
           </div>
-          <Dropdown
-            value={selectedBase}
-            onChange={val => onBaseChange(val as BaseMapKey)}
-            options={(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map(key => ({ value: key, label: baseMapLabels[key] }))}
-          />
-        </section>
+        </CollapsibleSection>
 
       </div>
     </aside>

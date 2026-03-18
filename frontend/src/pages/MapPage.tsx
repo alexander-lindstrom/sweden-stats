@@ -574,10 +574,10 @@ export default function MapPage() {
     <main className="flex h-screen overflow-hidden bg-white">
       <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
 
-      {/* Mobile sidebar backdrop */}
+      {/* Sidebar backdrop — visible below lg where sidebar is an overlay */}
       {mobileSidebarOpen && (
         <div
-          className="sm:hidden fixed inset-0 z-20 bg-black/30"
+          className="md:hidden fixed inset-0 z-20 bg-black/30"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
@@ -612,7 +612,7 @@ export default function MapPage() {
           <button
             onClick={() => setMobileSidebarOpen(o => !o)}
             aria-label="Öppna meny"
-            className="sm:hidden mr-2 p-1 -ml-1 text-slate-500 hover:text-slate-800 transition-colors"
+            className="md:hidden mr-2 p-1 -ml-1 text-slate-500 hover:text-slate-800 transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
@@ -954,7 +954,7 @@ export default function MapPage() {
             {/* Backdrop: dims map when panel overlays it at sm–lg */}
             {isPanelOpen && (
               <div
-                className="hidden sm:block lg:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
+                className="hidden sm:block md:hidden absolute inset-0 z-10 bg-black/20 transition-opacity duration-300"
                 onClick={() => setIsPanelOpen(false)}
               />
             )}
