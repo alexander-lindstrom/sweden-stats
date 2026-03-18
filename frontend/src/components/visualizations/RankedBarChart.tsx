@@ -23,7 +23,7 @@ interface RankedBarChartProps {
   matchingAreas?: Set<string> | null;
 }
 
-const MARGIN = { top: 8, right: 80, bottom: 28, left: 148 };
+const MARGIN = { top: 8, right: 80, bottom: 42, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
@@ -72,6 +72,46 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .domain(sorted.map(d => d.code))
       .range([0, innerH])
       .padding(0.25);
+
+    const n = sorted.length;
+
+    // Vertical grid lines — behind everything.
+    g.selectAll('line.grid')
+      .data(xScale.ticks(4))
+      .join('line')
+      .attr('class', 'grid')
+      .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
+      .attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+
+    // Top border spanning label + chart area.
+    g.append('line')
+      .attr('x1', -MARGIN.left).attr('x2', innerW)
+      .attr('y1', 0).attr('y2', 0)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Horizontal separators between rows.
+    if (n > 1) {
+      g.selectAll('line.sep')
+        .data(d3.range(n - 1))
+        .join('line').attr('class', 'sep')
+        .attr('x1', -MARGIN.left).attr('x2', innerW)
+        .attr('y1', i => yScale(sorted[i + 1].code)! - 0.5)
+        .attr('y2', i => yScale(sorted[i + 1].code)! - 0.5)
+        .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
+    }
+
+    // Bottom border.
+    g.append('line')
+      .attr('x1', -MARGIN.left).attr('x2', innerW)
+      .attr('y1', innerH).attr('y2', innerH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Vertical shelf line at label/chart boundary.
+    g.append('line')
+      .attr('x1', 0).attr('x2', 0)
+      .attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
 
     // Bars
     g.selectAll('rect.bar')
@@ -181,17 +221,14 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
 
-    // Vertical grid lines
-    g.selectAll('line.grid')
-      .data(xScale.ticks(4))
-      .join('line')
-      .attr('class', 'grid')
-      .attr('x1', d => xScale(d))
-      .attr('x2', d => xScale(d))
-      .attr('y1', 0)
-      .attr('y2', innerH)
-      .attr('stroke', '#f3f4f6')
-      .attr('stroke-width', 1);
+    // X-axis label.
+    g.append('text')
+      .attr('x', innerW / 2)
+      .attr('y', innerH + MARGIN.bottom - 6)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 11)
+      .attr('fill', '#9ca3af')
+      .text(`${data.label}${data.unit ? ` (${data.unit})` : ''}`);
 
     // Scroll the selected bar into view — targets the nearest scrollable ancestor.
     if (selectedFeature && svgRef.current && containerRef.current) {
