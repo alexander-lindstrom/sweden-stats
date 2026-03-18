@@ -43,7 +43,20 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
   }, [data]);
 
   const toggle = useCallback((id: string) => {
-    setVisible(prev => ({ ...prev, [id]: !prev[id] }));
+    setVisible(prev => {
+      const keys       = Object.keys(prev);
+      const visibleIds = keys.filter(k => prev[k]);
+      // Last visible series clicked → reset all.
+      if (visibleIds.length === 1 && visibleIds[0] === id) {
+        return Object.fromEntries(keys.map(k => [k, true]));
+      }
+      // All visible → isolate this series (one-click shortcut).
+      if (visibleIds.length === keys.length) {
+        return Object.fromEntries(keys.map(k => [k, k === id]));
+      }
+      // Subset active → toggle individually.
+      return { ...prev, [id]: !prev[id] };
+    });
   }, []);
 
   // Stable per-series color: use overrides when provided (e.g. party colors), else Tableau10.
@@ -235,7 +248,7 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
 
         // Dim all lines except the closest.
         lineEls.forEach((el, id) => {
-          d3.select(el).attr('stroke-opacity', id === closestId ? 1 : 0.12);
+          d3.select(el).attr('stroke-opacity', id === closestId ? 1 : 0.25);
         });
 
         // Sort by value descending so highest series is at the top.
