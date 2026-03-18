@@ -722,8 +722,8 @@ export default function MapPage() {
         </div>
 
         {/* Main view area */}
-        <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto' : 'overflow-hidden'}`}>
-          <div className={`flex-1 flex flex-col min-h-0 ${isContentSized ? '' : 'overflow-hidden'}`}>
+        <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
+          <div className={`flex-1 flex flex-col min-h-0 min-w-0 ${isContentSized ? '' : 'overflow-hidden'}`}>
           {/* Chart type sub-selector */}
           {activeView === 'chart' && availableChartTypes.length > 1 && (
             <div className="flex gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
