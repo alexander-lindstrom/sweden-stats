@@ -198,35 +198,26 @@ const MapView: React.FC<MapViewProps> = ({
     // -- Priority 1: sub-layer --
     const subLayer = subLayerRef.current;
     if (subLayer && selectedCodeRef.current) {
-      const subLevel     = SUB_LEVEL[adminLevel];
-      const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
-      const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
-      const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
+      const subLevel    = SUB_LEVEL[adminLevel];
+      const subCodeProp = SUB_LEVEL_CODE_PROP[adminLevel];
+      const filterProp  = SUB_LEVEL_FILTER_PROP[adminLevel];
 
-      if (subLevel && subCodeProp && subLabelProp && filterProp) {
-        let subCode: string | null = null;
-        let subLabel: string | null = null;
+      if (subLevel && subCodeProp && filterProp) {
+        let hitSub = false;
 
         map.forEachFeatureAtPixel(
           evt.pixel,
           (feature) => {
             // Only accept features that belong to the selected parent.
             if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) {return;}
-            subCode  = String(feature.get(subCodeProp) ?? '');
-            subLabel = String(feature.get(subLabelProp) ?? subCode);
+            hitSub = true;
             return true;
           },
           { layerFilter: (l) => l === subLayer, hitTolerance: 5 },
         );
 
-        if (subCode) {
-          // Ctrl/Cmd + click drills down; plain click does nothing (sub-boundary
-          // is just informational unless you explicitly opt in with the modifier).
-          const isCtrl = (evt.originalEvent as MouseEvent).ctrlKey
-                      || (evt.originalEvent as MouseEvent).metaKey;
-          if (isCtrl) {
-            onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
-          }
+        if (hitSub) {
+          // Single click on a sub-boundary does nothing; double-click drills down.
           return;
         }
       }
@@ -268,7 +259,40 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       onFeatureSelect({ code: clickedCode, label: clickedLabel ?? clickedCode, parentCode: clickedParentCode });
     }
-  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, featureLabels, onFeatureSelect, onDrillDown, onComparisonSelect]);
+  }, [adminLevel, featureCodeProperty, featureLabelProperty, featureParentProperty, featureLabels, onFeatureSelect, onComparisonSelect]);
+
+  // --- Double-click handler: drill down into sub-boundary -------------------
+  const handleMapDblClick = useCallback((evt: MapBrowserEvent) => {
+    const map = mapInstanceRef.current;
+    if (!map) { return; }
+
+    const subLayer = subLayerRef.current;
+    if (!subLayer || !selectedCodeRef.current) { return; }
+
+    const subLevel     = SUB_LEVEL[adminLevel];
+    const subCodeProp  = SUB_LEVEL_CODE_PROP[adminLevel];
+    const subLabelProp = SUB_LEVEL_LABEL_PROP[adminLevel];
+    const filterProp   = SUB_LEVEL_FILTER_PROP[adminLevel];
+    if (!subLevel || !subCodeProp || !subLabelProp || !filterProp) { return; }
+
+    let subCode: string | null  = null;
+    let subLabel: string | null = null;
+
+    map.forEachFeatureAtPixel(
+      evt.pixel,
+      (feature) => {
+        if (String(feature.get(filterProp) ?? '') !== selectedCodeRef.current) { return; }
+        subCode  = String(feature.get(subCodeProp) ?? '');
+        subLabel = String(feature.get(subLabelProp) ?? subCode);
+        return true;
+      },
+      { layerFilter: (l) => l === subLayer, hitTolerance: 5 },
+    );
+
+    if (subCode) {
+      onDrillDown(subLevel, subCode, subLabel ?? subCode, selectedCodeRef.current ?? undefined);
+    }
+  }, [adminLevel, onDrillDown]);
 
   // --- Pointer-move handler: hover tooltip + highlight ----------------------
   // Defined as a useCallback so the registration effect stays a clean 3-liner.
@@ -430,6 +454,14 @@ const MapView: React.FC<MapViewProps> = ({
     map.on('click', handleMapClick);
     return () => { map.un('click', handleMapClick); };
   }, [handleMapClick]);
+
+  // --- Register dblclick handler --------------------------------------------
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) { return; }
+    map.on('dblclick', handleMapDblClick);
+    return () => { map.un('dblclick', handleMapDblClick); };
+  }, [handleMapDblClick]);
 
   // --- Register pointermove handler ----------------------------------------
   useEffect(() => {
@@ -601,7 +633,7 @@ const MapView: React.FC<MapViewProps> = ({
     } else {
       layer.setStyle(baseVectorStyle);
     }
-
+    // Probably bad for performance but fewer visual issues.
     // Bump the source revision so OL's hybrid-mode renderer knows to regenerate
     // cached tile canvases. Without this, stale canvases can persist after a
     // breadcrumb/Escape navigation returns to a previously-rendered level.

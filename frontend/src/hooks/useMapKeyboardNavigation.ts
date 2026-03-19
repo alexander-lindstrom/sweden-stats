@@ -17,7 +17,7 @@ export interface DrillStackEntry {
 /**
  * Handles Escape-key navigation: moves up one admin level.
  *
- * If a drill stack is present (built by Ctrl+click drill-downs), the top entry
+ * If a drill stack is present (built by double-click drill-downs), the top entry
  * is popped and the user is taken back to that level with that feature selected.
  *
  * When the stack is empty, falls back to code-prefix derivation:
@@ -40,7 +40,7 @@ export function useMapKeyboardNavigation(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || !selectedFeature) { return; }
 
-      // If we drilled down via Ctrl+click, pop the stack to retrace the path.
+      // If we drilled down via double-click, pop the stack to retrace the path.
       if (drillStack.length > 0) {
         const top = drillStack[drillStack.length - 1];
         setDrillStack(s => s.slice(0, -1));
