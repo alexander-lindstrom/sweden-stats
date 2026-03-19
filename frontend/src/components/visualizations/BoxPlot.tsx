@@ -89,6 +89,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
   const svgRef       = useRef<SVGSVGElement>(null);
   const dimensions   = useResizeObserver(containerRef);
   const [hovered, setHovered] = useState<Hovered | null>(null);
+  const hoveredRowRef = useRef<SVGRectElement | null>(null);
 
 
   useEffect(() => {
@@ -118,14 +119,58 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
 
     const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
 
-    // Vertical grid lines.
+    // First pass: row backgrounds (drawn before grid lines so grid lines sit on top).
+    boxes.forEach((b, i) => {
+      const isSelCounty = b.countyCode === selCode?.slice(0, 2);
+      if (i % 2 === 1) {
+        g.append('rect')
+          .attr('x', -MARGIN.left).attr('y', i * ROW_H)
+          .attr('width', innerW + MARGIN.left).attr('height', ROW_H)
+          .attr('fill', '#f9fafb').attr('pointer-events', 'none');
+      }
+      if (isSelCounty) {
+        g.append('rect')
+          .attr('x', -MARGIN.left).attr('y', i * ROW_H)
+          .attr('width', innerW + MARGIN.left).attr('height', ROW_H)
+          .attr('fill', '#eff6ff').attr('pointer-events', 'none');
+      }
+    });
+
+    // Vertical grid lines — on top of row backgrounds.
     g.selectAll('line.vgrid')
       .data(xScale.ticks(5))
       .join('line')
       .attr('class', 'vgrid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#f3f4f6').attr('stroke-width', 1);
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+
+    // Top border.
+    g.append('line')
+      .attr('x1', -MARGIN.left).attr('x2', innerW)
+      .attr('y1', 0).attr('y2', 0)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Horizontal row separators.
+    g.selectAll('line.sep')
+      .data(d3.range(boxes.length - 1))
+      .join('line').attr('class', 'sep')
+      .attr('x1', -MARGIN.left).attr('x2', innerW)
+      .attr('y1', i => (i + 1) * ROW_H - 0.5)
+      .attr('y2', i => (i + 1) * ROW_H - 0.5)
+      .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
+
+    // Bottom border.
+    g.append('line')
+      .attr('x1', -MARGIN.left).attr('x2', innerW)
+      .attr('y1', innerH).attr('y2', innerH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+
+    // Vertical shelf line at label/chart boundary.
+    g.append('line')
+      .attr('x1', 0).attr('x2', 0)
+      .attr('y1', 0).attr('y2', innerH)
+      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
 
     // X axis.
     g.append('g')
@@ -149,22 +194,6 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
       const boxColor    = colorScale ? colorScale(b.median) : '#3b82f6';
 
       const row = g.append('g').attr('class', 'box-row');
-
-      // Alternating row background.
-      if (i % 2 === 1) {
-        row.append('rect')
-          .attr('x', -MARGIN.left).attr('y', i * ROW_H)
-          .attr('width', innerW + MARGIN.left).attr('height', ROW_H)
-          .attr('fill', '#f9fafb').attr('pointer-events', 'none');
-      }
-
-      // Highlight selected county row.
-      if (isSelCounty) {
-        row.append('rect')
-          .attr('x', -MARGIN.left).attr('y', i * ROW_H)
-          .attr('width', innerW + MARGIN.left).attr('height', ROW_H)
-          .attr('fill', '#eff6ff').attr('pointer-events', 'none');
-      }
 
       // County name label.
       row.append('text')
@@ -230,6 +259,13 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
           .attr('pointer-events', 'none');
       }
 
+      // Row hover highlight (initially transparent).
+      const hlRect = row.append('rect')
+        .attr('x', -MARGIN.left).attr('y', i * ROW_H)
+        .attr('width', innerW + MARGIN.left).attr('height', ROW_H)
+        .attr('fill', '#000').attr('fill-opacity', 0)
+        .attr('pointer-events', 'none');
+
       // Invisible hover target.
       row.append('rect')
         .attr('x', 0).attr('y', i * ROW_H)
@@ -237,9 +273,21 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
         .attr('fill', 'none')
         .attr('pointer-events', 'all')
         .on('mousemove', (event: MouseEvent) => {
+          const el = hlRect.node();
+          if (el && hoveredRowRef.current !== el) {
+            if (hoveredRowRef.current) { d3.select(hoveredRowRef.current).attr('fill-opacity', 0); }
+            hoveredRowRef.current = el;
+            d3.select(el).attr('fill-opacity', 0.04);
+          }
           setHovered({ stats: b, clientX: event.clientX, clientY: event.clientY });
         })
-        .on('mouseleave', () => setHovered(null));
+        .on('mouseleave', () => {
+          if (hoveredRowRef.current) {
+            d3.select(hoveredRowRef.current).attr('fill-opacity', 0);
+            hoveredRowRef.current = null;
+          }
+          setHovered(null);
+        });
     });
 
   }, [data, colorScale, selectedFeature, dimensions]);
