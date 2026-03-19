@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { ScalarDatasetResult } from '@/datasets/types';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
+import { CT } from './chartTokens';
 
 interface Props {
   xData: ScalarDatasetResult;
@@ -52,9 +53,7 @@ function fmt(v: number, unit: string): string {
 }
 
 export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dimensions   = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions } = useChartBase();
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
   const onFeatureSelectRef    = useRef(onFeatureSelect);
@@ -147,7 +146,7 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
       .attr('class', 'hgrid')
       .attr('x1', 0).attr('x2', innerW)
       .attr('y1', d => yFn(d)).attr('y2', d => yFn(d))
-      .attr('stroke', '#f3f4f6').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
     g.selectAll('line.vgrid')
       .data(xTickVals)
@@ -155,35 +154,35 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
       .attr('class', 'vgrid')
       .attr('x1', d => xFn(d)).attr('x2', d => xFn(d))
       .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#f3f4f6').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
     // Axes.
     g.append('g')
       .attr('transform', `translate(0,${innerH})`)
       .call(xAxisDef)
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
-        .attr('fill', '#9ca3af').attr('font-size', 11)
+        .attr('fill', CT.tickText).attr('font-size', 11)
         .attr('text-anchor', rotateLabels ? 'end' : 'middle')
         .attr('transform', rotateLabels ? 'rotate(-45) translate(-4, 0)' : null));
 
     g.append('g')
       .call(yAxisDef)
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
       .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
 
     // Axis labels.
     g.append('text')
       .attr('x', innerW / 2).attr('y', innerH + MARGIN.bottom - 10)
-      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#6b7280')
+      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', CT.axisLabel)
       .text(`${xData.label}${xData.unit ? ` (${xData.unit})` : ''}`);
 
     g.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('x', -innerH / 2).attr('y', -50)
-      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#6b7280')
+      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', CT.axisLabel)
       .text(`${yData.label}${yData.unit ? ` (${yData.unit})` : ''}`);
 
     // Dot radius and opacity — smaller dots need higher opacity to stay visible.
@@ -296,7 +295,7 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
         }
       });
 
-  }, [xData, yData, dimensions, selectedFeature, comparisonFeature]);
+  }, [xData, yData, dimensions, selectedFeature, comparisonFeature, svgRef]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">

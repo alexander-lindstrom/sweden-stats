@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { TimeSeriesNode } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { CT } from './chartTokens';
 
 const MARGIN    = { top: 12, right: 100, bottom: 44, left: 62 };
 const parseDate = d3.timeParse('%Y-%m-%d');
@@ -120,7 +121,7 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
       .join('line').attr('class', 'grid')
       .attr('x1', 0).attr('x2', adjW)
       .attr('y1', d => yScale(d)).attr('y2', d => yScale(d))
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
     // ── X axis ────────────────────────────────────────────────────────────────
     g.append('g')
@@ -131,18 +132,18 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
           .tickFormat(d => fmtYear(d as Date))
           .tickSize(4),
       )
-      .call(ax => ax.select('.domain').attr('stroke', '#e5e7eb'))
+      .call(ax => ax.select('.domain').attr('stroke', CT.gridLine))
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
-        .attr('fill', '#9ca3af').attr('font-size', 12))
+        .attr('fill', CT.tickText).attr('font-size', 12))
       .call(ax => ax.selectAll<SVGLineElement, unknown>('.tick line')
-        .attr('stroke', '#e5e7eb'));
+        .attr('stroke', CT.gridLine));
 
     // ── Y axis ────────────────────────────────────────────────────────────────
     g.append('g')
       .call(d3.axisLeft(yScale).ticks(6).tickSize(0))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
-        .attr('fill', '#9ca3af').attr('font-size', 11).attr('dx', '-2'));
+        .attr('fill', CT.tickText).attr('font-size', 11).attr('dx', '-2'));
 
     // ── Lines ─────────────────────────────────────────────────────────────────
     const line = d3.line<{ parsed: Date; value: number }>()

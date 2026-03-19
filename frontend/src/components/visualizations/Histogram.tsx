@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ScalarDatasetResult } from '@/datasets/types';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
+import { CT } from './chartTokens';
 
 interface HistogramProps {
   data: ScalarDatasetResult;
@@ -25,9 +26,7 @@ function formatValue(v: number): string {
 }
 
 export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dimensions   = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions } = useChartBase();
   const hoveredElRef = useRef<SVGRectElement | null>(null);
 
   const [hovered, setHovered] = useState<Hovered | null>(null);
@@ -81,7 +80,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('x2', innerW)
       .attr('y1', d => yScale(d))
       .attr('y2', d => yScale(d))
-      .attr('stroke', '#f3f4f6')
+      .attr('stroke', CT.gridLine)
       .attr('stroke-width', 1);
 
     // Bars.
@@ -95,7 +94,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('height', d => innerH - yScale(d.length))
       .attr('rx', 2)
       .attr('fill', d => {
-        if (!colorScale) {return '#3b82f6';}
+        if (!colorScale) {return CT.defaultFill;}
         const mid = ((d.x0 ?? 0) + (d.x1 ?? 0)) / 2;
         return colorScale(mid);
       })
@@ -144,8 +143,8 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
           .tickFormat(n => formatValue(n.valueOf()))
       )
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
 
     // X axis label.
     g.append('text')
@@ -153,7 +152,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('y', innerH + 30)
       .attr('text-anchor', 'middle')
       .attr('font-size', 11)
-      .attr('fill', '#6b7280')
+      .attr('fill', CT.axisLabel)
       .text(data.label + (data.unit ? ` (${data.unit})` : ''));
 
     // Y axis.
@@ -164,8 +163,8 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
           .tickFormat(n => String(n.valueOf()))
       )
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
 
     // Y axis label.
     g.append('text')
@@ -174,10 +173,10 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .attr('y', -38)
       .attr('text-anchor', 'middle')
       .attr('font-size', 11)
-      .attr('fill', '#6b7280')
+      .attr('fill', CT.axisLabel)
       .text('Antal');
 
-  }, [entries, dimensions, colorScale, data.label, data.unit]);
+  }, [entries, dimensions, colorScale, data.label, data.unit, svgRef]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">

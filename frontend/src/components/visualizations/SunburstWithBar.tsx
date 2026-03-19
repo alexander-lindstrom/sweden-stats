@@ -3,6 +3,8 @@ import * as d3 from 'd3';
 import { AdminLevel, GeoHierarchyNode } from '@/datasets/types';
 import { Tooltip } from '@/components/ui/Tooltip';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { CT } from './chartTokens';
+import { drawChartFrame } from './chartFrame';
 
 interface Props {
   root: GeoHierarchyNode;
@@ -246,36 +248,15 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .join('line').attr('class', 'grid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', vOffset).attr('y2', vOffset + effH)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
-    // Top border.
-    g.append('line')
-      .attr('x1', -BAR_M.left).attr('x2', innerW)
-      .attr('y1', vOffset).attr('y2', vOffset)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Row separators.
-    if (n > 1) {
-      g.selectAll('line.sep')
-        .data(d3.range(n - 1))
-        .join('line').attr('class', 'sep')
-        .attr('x1', -BAR_M.left).attr('x2', innerW)
-        .attr('y1', i => yScale(sorted[i + 1].name)! - 0.5)
-        .attr('y2', i => yScale(sorted[i + 1].name)! - 0.5)
-        .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
-    }
-
-    // Bottom border.
-    g.append('line')
-      .attr('x1', -BAR_M.left).attr('x2', innerW)
-      .attr('y1', vOffset + effH).attr('y2', vOffset + effH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Shelf line at label/chart boundary.
-    g.append('line')
-      .attr('x1', 0).attr('x2', 0)
-      .attr('y1', vOffset).attr('y2', vOffset + effH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+    drawChartFrame(g, innerW, innerH, {
+      yTop: vOffset,
+      yBottom: vOffset + effH,
+      separatorCount: n - 1,
+      separatorY: i => yScale(sorted[i + 1].name)! - 0.5,
+      leftExtend: BAR_M.left,
+    });
 
     // Bars.
     g.selectAll<SVGRectElement, GeoHierarchyNode>('rect.bar')
@@ -351,15 +332,15 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
              : String(v);
       }))
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
 
     // X-axis label.
     g.append('text')
       .attr('x', innerW / 2)
       .attr('y', vOffset + effH + BAR_M.bottom - 10)
       .attr('text-anchor', 'middle')
-      .attr('font-size', 11).attr('fill', '#9ca3af')
+      .attr('font-size', 11).attr('fill', CT.tickText)
       .text(`${label}${unit ? ` (${unit})` : ''}`);
 
   }, [focus, dims, colorScale, unit, label, drillDown, upgradePrimaryToLeaf]);

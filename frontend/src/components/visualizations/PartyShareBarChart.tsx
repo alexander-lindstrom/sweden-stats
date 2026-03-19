@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import * as d3 from 'd3';
 import { ElectionDatasetResult } from '@/datasets/types';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
+import { CT } from './chartTokens';
 
 interface Props {
   data:            ElectionDatasetResult;
@@ -27,9 +28,7 @@ interface TooltipState {
  * Hovering shows a floating breakdown tooltip.
  */
 export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dims         = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions: dims } = useChartBase();
 
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
@@ -141,11 +140,11 @@ export const PartyShareBarChart: React.FC<Props> = ({ data, selectedFeature, onF
       legend.append('rect').attr('x', x).attr('y', 0).attr('width', 10).attr('height', 10)
         .attr('fill', PARTY_COLORS[p]).attr('rx', 2);
       legend.append('text').attr('x', x + 13).attr('y', 5).attr('dy', '0.35em')
-        .attr('font-size', 10).attr('fill', '#64748b')
+        .attr('font-size', 10).attr('fill', CT.axisLabel)
         .text(p === 'ÖVRIGA' ? 'Övr.' : p);
     });
 
-  }, [data, selectedFeature, dims, onFeatureSelect]);
+  }, [data, selectedFeature, dims, onFeatureSelect, containerRef, svgRef]);
 
   // Build tooltip content for the hovered area.
   const tooltipRows = tooltip

@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { ScalarDatasetResult } from '@/datasets/types';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
+import { CT } from './chartTokens';
+import { drawChartFrame } from './chartFrame';
 
 interface Props {
   data: ScalarDatasetResult;
@@ -85,9 +87,7 @@ function fmtVal(v: number, unit: string): string {
 }
 
 export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dimensions   = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions } = useChartBase();
   const [hovered, setHovered] = useState<Hovered | null>(null);
   const hoveredRowRef = useRef<SVGRectElement | null>(null);
 
@@ -143,34 +143,13 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
       .attr('class', 'vgrid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
-    // Top border.
-    g.append('line')
-      .attr('x1', -MARGIN.left).attr('x2', innerW)
-      .attr('y1', 0).attr('y2', 0)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Horizontal row separators.
-    g.selectAll('line.sep')
-      .data(d3.range(boxes.length - 1))
-      .join('line').attr('class', 'sep')
-      .attr('x1', -MARGIN.left).attr('x2', innerW)
-      .attr('y1', i => (i + 1) * ROW_H - 0.5)
-      .attr('y2', i => (i + 1) * ROW_H - 0.5)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
-
-    // Bottom border.
-    g.append('line')
-      .attr('x1', -MARGIN.left).attr('x2', innerW)
-      .attr('y1', innerH).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Vertical shelf line at label/chart boundary.
-    g.append('line')
-      .attr('x1', 0).attr('x2', 0)
-      .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+    drawChartFrame(g, innerW, innerH, {
+      separatorCount: boxes.length - 1,
+      separatorY: i => (i + 1) * ROW_H - 0.5,
+      leftExtend: MARGIN.left,
+    });
 
     // X axis.
     g.append('g')
@@ -178,20 +157,20 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
       .call(d3.axisBottom(xScale).ticks(5)
         .tickFormat(n => fmtVal(n.valueOf(), data.unit).replace(` ${data.unit}`, '')))
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
 
     // X axis label.
     g.append('text')
       .attr('x', innerW / 2).attr('y', innerH + 40)
-      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', '#6b7280')
+      .attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', CT.axisLabel)
       .text(`${data.label}${data.unit ? ` (${data.unit})` : ''}`);
 
     // Per-row rendering.
     boxes.forEach((b, i) => {
       const cy     = i * ROW_H + ROW_H / 2;
       const isSelCounty = b.countyCode === selCode?.slice(0, 2);
-      const boxColor    = colorScale ? colorScale(b.median) : '#3b82f6';
+      const boxColor    = colorScale ? colorScale(b.median) : CT.defaultFill;
 
       const row = g.append('g').attr('class', 'box-row');
 
@@ -201,7 +180,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
         .attr('text-anchor', 'end')
         .attr('font-size', 11)
         .attr('font-weight', isSelCounty ? '700' : '400')
-        .attr('fill', isSelCounty ? '#1d4ed8' : '#374151')
+        .attr('fill', isSelCounty ? CT.selected : CT.labelText)
         .text(b.countyName);
 
       // Whisker line.
@@ -254,7 +233,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
         row.append('line')
           .attr('x1', xScale(b.selectedValue)).attr('x2', xScale(b.selectedValue))
           .attr('y1', cy - BOX_H / 2 - 3).attr('y2', cy + BOX_H / 2 + 3)
-          .attr('stroke', '#1d4ed8')
+          .attr('stroke', CT.selected)
           .attr('stroke-width', 2.5)
           .attr('pointer-events', 'none');
       }
@@ -290,7 +269,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
         });
     });
 
-  }, [data, colorScale, selectedFeature, dimensions]);
+  }, [data, colorScale, selectedFeature, dimensions, svgRef]);
 
   return (
     <div ref={containerRef} className="relative w-full">

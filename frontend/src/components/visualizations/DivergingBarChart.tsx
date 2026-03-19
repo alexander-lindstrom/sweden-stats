@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ScalarDatasetResult } from '@/datasets/types';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 import { findScrollParent } from '@/utils/scrollUtils';
+import { CT } from './chartTokens';
+import { drawChartFrame } from './chartFrame';
 
 interface Hovered { name: string; value: number; x: number; y: number; }
 
@@ -32,9 +34,7 @@ function fmtVal(v: number): string {
 }
 
 export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dimensions   = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions } = useChartBase();
   const hoveredElRef = useRef<SVGRectElement | null>(null);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
@@ -95,36 +95,13 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
     g.append('g')
       .call(d3.axisBottom(xScale).ticks(tickCount).tickSize(innerH).tickFormat(() => ''))
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb').attr('stroke-width', 1));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine).attr('stroke-width', 1));
 
-    // Top border spanning label + chart area.
-    g.append('line')
-      .attr('x1', -margin.left).attr('x2', innerW)
-      .attr('y1', 0).attr('y2', 0)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Horizontal separators between each row.
-    if (n > 1) {
-      g.selectAll('line.sep')
-        .data(d3.range(n - 1))
-        .join('line').attr('class', 'sep')
-        .attr('x1', -margin.left).attr('x2', innerW)
-        .attr('y1', i => yScale(sorted[i + 1].code)! - 0.5)
-        .attr('y2', i => yScale(sorted[i + 1].code)! - 0.5)
-        .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
-    }
-
-    // Bottom border.
-    g.append('line')
-      .attr('x1', -margin.left).attr('x2', innerW)
-      .attr('y1', innerH).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Vertical shelf line at label/chart boundary.
-    g.append('line')
-      .attr('x1', 0).attr('x2', 0)
-      .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+    drawChartFrame(g, innerW, innerH, {
+      separatorCount: n - 1,
+      separatorY: i => yScale(sorted[i + 1].code)! - 0.5,
+      leftExtend: margin.left,
+    });
 
     // Clip bars to the chart area.
     const clipId = 'diverging-bars-clip';
@@ -188,7 +165,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
     g.append('line')
       .attr('x1', center).attr('x2', center)
       .attr('y1', -8).attr('y2', innerH)
-      .attr('stroke', '#374151').attr('stroke-width', 1.5);
+      .attr('stroke', CT.labelText).attr('stroke-width', 1.5);
 
     // "Medel" label above the mean line.
     g.append('text')
@@ -196,7 +173,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .attr('y', -10)
       .attr('text-anchor', 'middle')
       .attr('font-size', 9)
-      .attr('fill', '#6b7280')
+      .attr('fill', CT.axisLabel)
       .text('Medel');
 
     // Y-axis labels — active rows rendered darker and slightly bolder.
@@ -208,7 +185,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .call(ax => ax.selectAll<SVGTextElement, string>('text')
         .attr('font-size', 11)
         .attr('fill', code =>
-          code === selectedFeature?.code || code === comparisonFeature?.code ? '#111827' : '#6b7280'
+          code === selectedFeature?.code || code === comparisonFeature?.code ? '#111827' : CT.axisLabel
         )
         .attr('font-weight', code =>
           code === selectedFeature?.code || code === comparisonFeature?.code ? '500' : '400'
@@ -230,7 +207,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .call(d3.axisBottom(xScale).ticks(tickCount).tickFormat(v => fmtVal(v.valueOf())))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').remove())
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 10));
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 10));
 
     // X-axis label.
     g.append('text')
@@ -238,7 +215,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
       .attr('y', innerH + margin.bottom - 6)
       .attr('text-anchor', 'middle')
       .attr('font-size', 10)
-      .attr('fill', '#9ca3af')
+      .attr('fill', CT.tickText)
       .text(`${data.label}${data.unit ? ` (${data.unit})` : ''}`);
 
     // Scroll selected bar into view — targets the nearest scrollable ancestor.
@@ -255,7 +232,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
         }
       }
     }
-  }, [sorted, mean, needed, n, dimensions, data.label, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect]);
+  }, [sorted, mean, needed, n, dimensions, data.label, data.unit, data.labels, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, containerRef, svgRef]);
 
   const svgH = needed + MARGIN.top + MARGIN.bottom;
 

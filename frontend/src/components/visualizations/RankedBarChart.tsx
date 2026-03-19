@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { ScalarDatasetResult } from '@/datasets/types';
-import useResizeObserver from '@/hooks/useResizeObserver';
+import { useChartBase } from '@/hooks/useChartBase';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 import { findScrollParent } from '@/utils/scrollUtils';
+import { CT } from './chartTokens';
+import { drawChartFrame } from './chartFrame';
 
 interface Hovered { code: string; name: string; value: number; x: number; y: number; }
 
@@ -28,9 +30,7 @@ const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
 export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale, colorFn, rowMeta, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const svgRef       = useRef<SVGSVGElement>(null);
-  const dimensions   = useResizeObserver(containerRef);
+  const { containerRef, svgRef, dimensions } = useChartBase();
   const hoveredElRef = useRef<SVGRectElement | null>(null);
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
@@ -82,36 +82,13 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('class', 'grid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#e5e7eb').attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
 
-    // Top border spanning label + chart area.
-    g.append('line')
-      .attr('x1', -MARGIN.left).attr('x2', innerW)
-      .attr('y1', 0).attr('y2', 0)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Horizontal separators between rows.
-    if (n > 1) {
-      g.selectAll('line.sep')
-        .data(d3.range(n - 1))
-        .join('line').attr('class', 'sep')
-        .attr('x1', -MARGIN.left).attr('x2', innerW)
-        .attr('y1', i => yScale(sorted[i + 1].code)! - 0.5)
-        .attr('y2', i => yScale(sorted[i + 1].code)! - 0.5)
-        .attr('stroke', '#e5e7eb').attr('stroke-width', 0.5);
-    }
-
-    // Bottom border.
-    g.append('line')
-      .attr('x1', -MARGIN.left).attr('x2', innerW)
-      .attr('y1', innerH).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
-
-    // Vertical shelf line at label/chart boundary.
-    g.append('line')
-      .attr('x1', 0).attr('x2', 0)
-      .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', '#d1d5db').attr('stroke-width', 1);
+    drawChartFrame(g, innerW, innerH, {
+      separatorCount: n - 1,
+      separatorY: i => yScale(sorted[i + 1].code)! - 0.5,
+      leftExtend: MARGIN.left,
+    });
 
     // Bars
     g.selectAll('rect.bar')
@@ -124,7 +101,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('height', yScale.bandwidth())
       .attr('rx', BAR_RADIUS)
       .attr('fill', d =>
-        colorFn ? colorFn(d.code) : colorScale ? colorScale(d.value) : '#3b82f6'
+        colorFn ? colorFn(d.code) : colorScale ? colorScale(d.value) : CT.defaultFill
       )
       .attr('fill-opacity', d =>
         matchingAreas && !matchingAreas.has(d.code) ? 0.18 : 1
@@ -183,7 +160,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
       .attr('dy', '0.35em')
       .attr('font-size', 11)
-      .attr('fill', '#6b7280')
+      .attr('fill', CT.axisLabel)
       .text(d => d.value.toLocaleString('sv-SE'));
 
     // Y-axis labels (region names)
@@ -196,7 +173,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('dy', '0.35em')
       .attr('text-anchor', 'end')
       .attr('font-size', 12)
-      .attr('fill', '#374151')
+      .attr('fill', CT.labelText)
       .attr('fill-opacity', d => matchingAreas && !matchingAreas.has(d.code) ? 0.3 : 1)
       .text(d => d.name);
 
@@ -218,8 +195,8 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
           })
       )
       .call(ax => ax.select('.domain').remove())
-      .call(ax => ax.selectAll('line').attr('stroke', '#e5e7eb'))
-      .call(ax => ax.selectAll('text').attr('fill', '#9ca3af').attr('font-size', 11));
+      .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
+      .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
 
     // X-axis label.
     g.append('text')
@@ -227,7 +204,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('y', innerH + MARGIN.bottom - 6)
       .attr('text-anchor', 'middle')
       .attr('font-size', 11)
-      .attr('fill', '#9ca3af')
+      .attr('fill', CT.tickText)
       .text(`${data.label}${data.unit ? ` (${data.unit})` : ''}`);
 
     // Scroll the selected bar into view — targets the nearest scrollable ancestor.
@@ -244,7 +221,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         }
       }
     }
-  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, data.label, data.unit, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas]);
+  }, [sorted, svgWidth, svgHeight, colorScale, colorFn, data.label, data.unit, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect, matchingAreas, containerRef, svgRef]);
 
   return (
     <div ref={containerRef} className="w-full">
