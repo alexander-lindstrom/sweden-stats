@@ -10,6 +10,12 @@ const REGION_CODES = [
   '12', '13', '14', '17', '18', '19', '20', '21', '22', '23', '24', '25',
 ];
 
+// TODO(perf): SelectionPanel sparkline fires 7 separate fetchCached calls
+// (one per SPARKLINE_YEAR) via Promise.all. The SCB v2beta API supports
+// multiple Tid values in a single request body, so this could be a dedicated
+// fetchMultiYear(level, years[]) that makes one call and returns all years at
+// once — eliminating 6 of the 7 SCB round-trips per sparkline render.
+
 const DATA_URL_5444 =
   'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5444/data?outputFormat=json-stat2';
 
