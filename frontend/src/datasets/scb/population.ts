@@ -227,6 +227,17 @@ const multiYearInflight = new Map<string, Promise<Record<number, Record<string, 
  * in a single SCB API call.  Results are session-cached (module-level Map) and
  * in-flight requests are de-duplicated.
  */
+/** Returns the cached municipality code→label map, or null if not yet fetched. */
+export function getMunicipalityLabels(): Record<string, string> | null {
+  return municipalityCodeCache?.labels ?? null;
+}
+
+/** Ensures the municipality label cache is populated and returns the labels. */
+export async function ensureMunicipalityLabels(): Promise<Record<string, string>> {
+  const { labels } = await getMunicipalityCodes();
+  return labels;
+}
+
 export async function fetchPopulationMultiYear(
   level: 'Country' | 'Region' | 'Municipality',
   years: number[],

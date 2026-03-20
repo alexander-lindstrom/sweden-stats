@@ -20,6 +20,7 @@ import {
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
+import { getMunicipalityLabels, ensureMunicipalityLabels } from '@/datasets/scb/population';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
@@ -102,6 +103,31 @@ export default function MapPage() {
   const [filterCriteria,  setFilterCriteria]  = useState<FilterCriterion[]>([]);
 
   const [drillStack, setDrillStack] = useState<DrillStackEntry[]>([]);
+  const [munLabels,  setMunLabels]  = useState<Record<string, string> | null>(() => getMunicipalityLabels());
+
+  useEffect(() => {
+    if (munLabels) { return; }
+    ensureMunicipalityLabels().then(setMunLabels).catch(() => {});
+  }, [munLabels]);
+
+  const breadcrumbAncestors = useMemo(() => {
+    if (!selectedFeature) { return []; }
+    const countyCode = selectedFeature.code.slice(0, 2);
+    const munCode    = selectedFeature.code.slice(0, 4);
+    if (selectedLevel === 'Municipality') {
+      const lbl = COUNTY_NAMES[countyCode];
+      return lbl ? [{ code: countyCode, label: lbl, level: 'Region' as AdminLevel }] : [];
+    }
+    if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
+      const countyLbl = COUNTY_NAMES[countyCode];
+      const munLbl    = munLabels?.[munCode] ?? munCode;
+      const ancestors: Array<{ code: string; label: string; level: AdminLevel }> = [];
+      if (countyLbl) { ancestors.push({ code: countyCode, label: countyLbl, level: 'Region' }); }
+      ancestors.push({ code: munCode, label: munLbl, level: 'Municipality' });
+      return ancestors;
+    }
+    return [];
+  }, [selectedFeature, selectedLevel, munLabels]);
 
   const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
@@ -272,12 +298,14 @@ export default function MapPage() {
     setSelectedLevel(level);
   };
 
-  const handleBreadcrumbNavigate = (index: number) => {
-    if (index < 0) { handleReset(); return; }
-    const target = drillStack[index];
-    setDrillStack(s => s.slice(0, index));
-    pendingSelectionRef.current = { code: target.code, label: target.label };
-    setSelectedLevel(target.level);
+  /**
+   * Navigate to a geographically-derived ancestor from the breadcrumb.
+   * Clears the drill stack since the user is explicitly jumping up the hierarchy.
+   */
+  const handleBreadcrumbGoto = (code: string, label: string, level: AdminLevel) => {
+    setDrillStack([]);
+    pendingSelectionRef.current = { code, label };
+    setSelectedLevel(level);
   };
 
   useEffect(() => {
@@ -903,19 +931,16 @@ export default function MapPage() {
                 />
               )}
               {/* Breadcrumb — overlaid on the map, centred along the top */}
-              {activeView === 'map' && (drillStack.length > 0 || selectedFeature) && (
+              {activeView === 'map' && selectedFeature && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm px-3 py-1.5 text-xs pointer-events-auto select-none">
-                  <button
-                    onClick={() => handleBreadcrumbNavigate(-1)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap"
-                  >
+                  <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
                     Sverige
                   </button>
-                  {drillStack.map((entry, i) => (
+                  {breadcrumbAncestors.map(entry => (
                     <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
                       <span className="text-slate-300 mx-0.5">›</span>
                       <button
-                        onClick={() => handleBreadcrumbNavigate(i)}
+                        onClick={() => handleBreadcrumbGoto(entry.code, entry.label, entry.level)}
                         className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap max-w-[9rem] truncate"
                         title={entry.label}
                       >
@@ -923,14 +948,12 @@ export default function MapPage() {
                       </button>
                     </span>
                   ))}
-                  {selectedFeature && (
-                    <span className="flex items-center gap-1">
-                      <span className="text-slate-300 mx-0.5">›</span>
-                      <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
-                        {selectedFeature.label}
-                      </span>
+                  <span className="flex items-center gap-1">
+                    <span className="text-slate-300 mx-0.5">›</span>
+                    <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
+                      {selectedFeature.label}
                     </span>
-                  )}
+                  </span>
                 </div>
               )}
 
