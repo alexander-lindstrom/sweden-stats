@@ -11,6 +11,8 @@
  */
 
 import { AdminLevel, DatasetDescriptor, DatasetResult, GeoHierarchyNode, TimeSeriesNode } from './types';
+import { idbGet, idbSet } from './idbCache';
+import { recordFetch } from './fetchTiming';
 
 const resultCache      = new Map<string, DatasetResult>();
 const hierarchyCache   = new Map<string, GeoHierarchyNode>();
@@ -34,30 +36,43 @@ function timeSeriesKey(datasetId: string, level: AdminLevel, featureCode?: strin
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/** Fetch a DatasetResult, using cache or deduplicating in-flight requests. */
-export async function fetchCached(
+/** Fetch a DatasetResult, using memory cache → IDB → network. */
+export function fetchCached(
   descriptor: DatasetDescriptor,
   level: AdminLevel,
   year: number,
 ): Promise<DatasetResult> {
   const key = resultKey(descriptor.id, level, year);
+  const t0  = performance.now();
 
   const cached = resultCache.get(key);
-  if (cached) {return cached;}
+  if (cached) {
+    recordFetch({ key, source: 'memory', durationMs: performance.now() - t0 });
+    return Promise.resolve(cached);
+  }
 
   const inflight = resultInFlight.get(key);
-  if (inflight) {return inflight;}
+  if (inflight) { return inflight; }
 
-  const promise = descriptor
-    .fetch(level, year)
-    .then(result => {
+  const promise = idbGet(key)
+    .then(async (idbResult) => {
+      if (idbResult) {
+        resultCache.set(key, idbResult);
+        recordFetch({ key, source: 'idb', durationMs: performance.now() - t0 });
+        return idbResult;
+      }
+
+      const result = await descriptor.fetch(level, year);
       resultCache.set(key, result);
-      resultInFlight.delete(key);
+      idbSet(key, result).catch(() => {});
+      recordFetch({ key, source: 'network', durationMs: performance.now() - t0 });
       return result;
     })
     .catch(err => {
-      resultInFlight.delete(key);
       throw err;
+    })
+    .finally(() => {
+      resultInFlight.delete(key);
     });
 
   resultInFlight.set(key, promise);

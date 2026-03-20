@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { AdminLevel, ElectionDatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
+import { fetchPopulationMultiYear } from '@/datasets/scb/population';
 import { DATASETS } from '@/datasets/registry';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { Spinner } from '@/components/ui/Spinner';
@@ -27,6 +28,7 @@ const STAT_YEAR     = 2024;
 const ELECTION_YEAR = 2022;
 
 const SPARKLINE_YEARS     = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
+const SPARKLINE_LEVELS:   AdminLevel[] = ['Country', 'Region', 'Municipality'];
 const INCOME_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const AGE_LEVELS:         AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const FOREIGN_BG_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
@@ -488,7 +490,6 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     setStats(null);
     setStatsLoading(true);
     setSparkline([]);
-    setSparkLoading(true);
     setElectionVotes(null);
 
     const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
@@ -555,21 +556,23 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
       setStatsLoading(false);
     });
 
-    // Sparkline
-    Promise.all(
-      SPARKLINE_YEARS.map(year =>
-        fetchCached(popDescriptor, adminLevel, year)
-          .then(r => {
-            const v = (r as ScalarDatasetResult).values[code];
-            return Number.isFinite(v) ? { year, value: v } : null;
-          })
-          .catch(() => null),
-      ),
-    ).then(results => {
-      if (id !== fetchIdRef.current) { return; }
-      setSparkline(results.filter((r): r is { year: number; value: number } => r !== null));
-      setSparkLoading(false);
-    });
+    // Sparkline (TAB5444 levels only — RegSO/DeSO hidden by JSX guard)
+    if (SPARKLINE_LEVELS.includes(adminLevel)) {
+      setSparkLoading(true);
+      fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
+        .then(multiYear => {
+          if (id !== fetchIdRef.current) { return; }
+          const points = SPARKLINE_YEARS
+            .map(year => {
+              const v = multiYear[year]?.[code];
+              return Number.isFinite(v) ? { year, value: v as number } : null;
+            })
+            .filter((r): r is { year: number; value: number } => r !== null);
+          setSparkline(points);
+          setSparkLoading(false);
+        })
+        .catch(() => { if (id === fetchIdRef.current) { setSparkLoading(false); } });
+    }
 
     // Election
     if (wantsElection) {
@@ -604,7 +607,6 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     setCompStats(null);
     setCompStatsLoading(true);
     setCompSparkline([]);
-    setCompSparkLoading(true);
     setCompElectionVotes(null);
 
     const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
@@ -668,20 +670,23 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
       setCompStatsLoading(false);
     });
 
-    Promise.all(
-      SPARKLINE_YEARS.map(year =>
-        fetchCached(popDescriptor, adminLevel, year)
-          .then(r => {
-            const v = (r as ScalarDatasetResult).values[code];
-            return Number.isFinite(v) ? { year, value: v } : null;
-          })
-          .catch(() => null),
-      ),
-    ).then(results => {
-      if (id !== compFetchIdRef.current) { return; }
-      setCompSparkline(results.filter((r): r is { year: number; value: number } => r !== null));
-      setCompSparkLoading(false);
-    });
+    // Sparkline (TAB5444 levels only — RegSO/DeSO hidden by JSX guard)
+    if (SPARKLINE_LEVELS.includes(adminLevel)) {
+      setCompSparkLoading(true);
+      fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
+        .then(multiYear => {
+          if (id !== compFetchIdRef.current) { return; }
+          const points = SPARKLINE_YEARS
+            .map(year => {
+              const v = multiYear[year]?.[code];
+              return Number.isFinite(v) ? { year, value: v as number } : null;
+            })
+            .filter((r): r is { year: number; value: number } => r !== null);
+          setCompSparkline(points);
+          setCompSparkLoading(false);
+        })
+        .catch(() => { if (id === compFetchIdRef.current) { setCompSparkLoading(false); } });
+    }
 
     if (wantsElection) {
       setCompElectionLoading(true);

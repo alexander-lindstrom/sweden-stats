@@ -169,6 +169,119 @@ function aggregateByRegion(
 }
 
 /**
+ * Like aggregateByRegion but preserves the Tid dimension instead of summing over it.
+ * Returns `{ year: { regionCode: totalPopulation } }`, summing all other dimensions
+ * (Kon, ContentsCode, …) at each year/region combination.
+ */
+function parseMultiYearByRegion(
+  data: JsonStat2Response,
+  years: number[],
+): Record<number, Record<string, number>> {
+  const dimIds = data.id;
+  const sizes  = data.size;
+
+  const strides = new Array(dimIds.length).fill(1);
+  for (let i = dimIds.length - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * sizes[i + 1];
+  }
+
+  const regionDimIdx = dimIds.indexOf('Region');
+  const tidDimIdx    = dimIds.indexOf('Tid');
+  if (regionDimIdx === -1) { throw new Error('SCB response missing "Region" dimension'); }
+  if (tidDimIdx    === -1) { throw new Error('SCB response missing "Tid" dimension'); }
+
+  const regionDim = data.dimension['Region'];
+  const indexToCode: Record<number, string> = {};
+  for (const [code, idx] of Object.entries(regionDim.category.index)) {
+    indexToCode[idx as number] = code;
+  }
+
+  const result: Record<number, Record<string, number>> = {};
+  for (const year of years) { result[year] = {}; }
+
+  for (let i = 0; i < data.value.length; i++) {
+    const raw = data.value[i];
+    if (raw === null || raw === undefined) { continue; }
+    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
+    if (isNaN(num)) { continue; }
+
+    const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
+    const tidIdx    = Math.floor(i / strides[tidDimIdx])    % sizes[tidDimIdx];
+    const code      = indexToCode[regionIdx];
+    if (code) {
+      const year = years[tidIdx];
+      result[year][code] = (result[year][code] ?? 0) + num;
+    }
+  }
+
+  return result;
+}
+
+// ── Multi-year session cache ──────────────────────────────────────────────────
+
+const multiYearCache    = new Map<string, Record<number, Record<string, number>>>();
+const multiYearInflight = new Map<string, Promise<Record<number, Record<string, number>>>>();
+
+/**
+ * Fetch population for Country, Region, or Municipality across multiple years
+ * in a single SCB API call.  Results are session-cached (module-level Map) and
+ * in-flight requests are de-duplicated.
+ */
+/** Returns the cached municipality code→label map, or null if not yet fetched. */
+export function getMunicipalityLabels(): Record<string, string> | null {
+  return municipalityCodeCache?.labels ?? null;
+}
+
+/** Ensures the municipality label cache is populated and returns the labels. */
+export async function ensureMunicipalityLabels(): Promise<Record<string, string>> {
+  const { labels } = await getMunicipalityCodes();
+  return labels;
+}
+
+export async function fetchPopulationMultiYear(
+  level: 'Country' | 'Region' | 'Municipality',
+  years: number[],
+): Promise<Record<number, Record<string, number>>> {
+  const cacheKey = `${level}:${years.join(',')}`;
+
+  const cached = multiYearCache.get(cacheKey);
+  if (cached) { return cached; }
+
+  const inflight = multiYearInflight.get(cacheKey);
+  if (inflight) { return inflight; }
+
+  const promise = (async () => {
+    const tidCodes = years.map(y => `${y}M12`);
+    let data: JsonStat2Response;
+
+    if (level === 'Municipality') {
+      const { codes } = await getMunicipalityCodes();
+      data = await postDataQuery5444([
+        { variableCode: 'Region',       valueCodes: codes },
+        { variableCode: 'Kon',          valueCodes: ['1', '2'] },
+        { variableCode: 'ContentsCode', valueCodes: ['000003O5'] },
+        { variableCode: 'Tid',          valueCodes: tidCodes },
+      ]);
+    } else {
+      data = await postDataQuery5444([
+        { variableCode: 'Region',       valueCodes: REGION_CODES },
+        { variableCode: 'Kon',          valueCodes: ['1', '2'] },
+        { variableCode: 'ContentsCode', valueCodes: ['000003O5'] },
+        { variableCode: 'Tid',          valueCodes: tidCodes },
+      ]);
+    }
+
+    const result = parseMultiYearByRegion(data, years);
+    multiYearCache.set(cacheKey, result);
+    multiYearInflight.delete(cacheKey);
+    return result;
+  })();
+
+  multiYearInflight.set(cacheKey, promise);
+  return promise;
+}
+
+/**
  * Strip the SCB vintage suffix (_RegSO2025, _DeSO2025, …) from region codes
  * so they match the bare codes stored in GeoServer feature properties.
  */
