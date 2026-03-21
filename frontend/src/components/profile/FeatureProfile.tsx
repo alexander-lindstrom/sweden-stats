@@ -14,12 +14,14 @@ const popDescriptor         = DATASETS.find(d => d.id === 'population')!;
 const incomeDescriptor      = DATASETS.find(d => d.id === 'medianinkomst')!;
 const ageDescriptor         = DATASETS.find(d => d.id === 'medelalder')!;
 const employmentDescriptor  = DATASETS.find(d => d.id === 'sysselsattning')!;
+const utlandskDescriptor    = DATASETS.find(d => d.id === 'utlandsk_bakgrund')!;
 
 const STAT_YEAR     = 2024;
-const PYRAMID_LEVELS: AdminLevel[] = ['RegSO', 'DeSO'];
+const PYRAMID_LEVELS:    AdminLevel[] = ['RegSO', 'DeSO'];
 const INCOME_LEVELS:     AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const AGE_LEVELS:        AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const EMPLOYMENT_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const UTLANDSK_LEVELS:   AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
 interface StatVal { value: number; mean: number | null; }
 
@@ -78,6 +80,8 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
   const [ageUnit,      setAgeUnit]      = useState('');
   const [employment,   setEmployment]   = useState<StatVal | null>(null);
   const [employUnit,   setEmployUnit]   = useState('');
+  const [utlandsk,     setUtlandsk]     = useState<StatVal | null>(null);
+  const [utlandskUnit, setUtlandskUnit] = useState('');
   const [statsLoading, setStatsLoading] = useState(false);
 
   const [pyramid,        setPyramid]        = useState<PyramidRow[]>([]);
@@ -91,6 +95,7 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
       setIncome(null);
       setAge(null);
       setEmployment(null);
+      setUtlandsk(null);
       setPyramid([]);
       return;
     }
@@ -102,6 +107,7 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
     setIncome(null);
     setAge(null);
     setEmployment(null);
+    setUtlandsk(null);
     setStatsLoading(true);
     setPyramid([]);
 
@@ -167,6 +173,21 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
       );
     }
 
+    if (UTLANDSK_LEVELS.includes(adminLevel)) {
+      statFetches.push(
+        fetchCached(utlandskDescriptor, adminLevel, STAT_YEAR)
+          .then(r => {
+            if (r.kind !== 'scalar') { return; }
+            setUtlandskUnit(r.unit);
+            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
+            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+            const v    = r.values[code];
+            setUtlandsk(Number.isFinite(v) ? { value: v, mean } : null);
+          })
+          .catch(() => {}),
+      );
+    }
+
     Promise.all(statFetches).then(() => {
       if (id !== fetchIdRef.current) { return; }
       setStatsLoading(false);
@@ -208,9 +229,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             <StatMini label="Befolkning"     value={population?.value ?? null} mean={population?.mean ?? null} unit={popUnit}    />
-            {income     && <StatMini label="Medianinkomst"  value={income.value}     mean={income.mean}     unit={incomeUnit} />}
-            {age        && <StatMini label="Medelålder"     value={age.value}        mean={age.mean}        unit={ageUnit}    />}
-            {employment && <StatMini label="Sysselsättning" value={employment.value} mean={employment.mean} unit={employUnit} />}
+            {income     && <StatMini label="Medianinkomst"    value={income.value}     mean={income.mean}     unit={incomeUnit}    />}
+            {age        && <StatMini label="Medelålder"       value={age.value}        mean={age.mean}        unit={ageUnit}       />}
+            {employment && <StatMini label="Sysselsättning"   value={employment.value} mean={employment.mean} unit={employUnit}    />}
+            {utlandsk   && <StatMini label="Utländsk bakgrund" value={utlandsk.value}  mean={utlandsk.mean}   unit={utlandskUnit}  />}
           </div>
         )}
         {PYRAMID_LEVELS.includes(adminLevel) && (

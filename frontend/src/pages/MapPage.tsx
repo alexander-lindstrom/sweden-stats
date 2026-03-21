@@ -445,6 +445,37 @@ export default function MapPage() {
     return buildBivariateColorFn(scalarResult.values, bivariateYScalar.values);
   }, [bivariateMode, scalarResult, bivariateYScalar]);
 
+  // ── Profile Lan/Municipality selectors ───────────────────────────────────
+  // Shown in the profile tab at Municipality/RegSO/DeSO to mirror the diagram's cascading
+  // selectors. Source: COUNTY_NAMES (all 21 counties) + munLabels (all municipalities).
+  const profileNeedsLanFilter  = activeView === 'profile' &&
+    (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
+  const profileNeedsMuniFilter = activeView === 'profile' &&
+    (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
+
+  const profileAvailableLans = useMemo(() => {
+    if (!profileNeedsLanFilter) { return []; }
+    return Object.entries(COUNTY_NAMES).sort(([a], [b]) => a.localeCompare(b)).map(([code, name]) => ({ code, name }));
+  }, [profileNeedsLanFilter]);
+
+  const profileEffectiveLan = useMemo(() => {
+    if (profileAvailableLans.length === 0) { return null; }
+    return profileAvailableLans.some(l => l.code === selectedLan) ? selectedLan : profileAvailableLans[0].code;
+  }, [profileAvailableLans, selectedLan]);
+
+  const profileAvailableMunis = useMemo(() => {
+    if (!munLabels || !profileEffectiveLan || !profileNeedsMuniFilter) { return []; }
+    return Object.entries(munLabels)
+      .filter(([code]) => code.startsWith(profileEffectiveLan))
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code, name]) => ({ code, name }));
+  }, [munLabels, profileEffectiveLan, profileNeedsMuniFilter]);
+
+  const profileEffectiveMuni = useMemo(() => {
+    if (profileAvailableMunis.length === 0) { return null; }
+    return profileAvailableMunis.some(m => m.code === selectedMuni) ? selectedMuni : profileAvailableMunis[0].code;
+  }, [profileAvailableMunis, selectedMuni]);
+
   // ── Lan/Municipality filter ────────────────────────────────────────────────
   // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
   const needsLanFilter = (
@@ -875,6 +906,30 @@ export default function MapPage() {
                     value={effectiveMuni ?? ''}
                     onChange={code => setSelectedMuni(code || null)}
                     options={availableMunis.map(({ code, name }) => ({ value: code, label: name }))}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Profile Lan / Kommun selectors */}
+          {profileNeedsLanFilter && profileAvailableLans.length > 0 && (
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
+              <Dropdown
+                inputSize="sm"
+                value={profileEffectiveLan ?? ''}
+                onChange={code => setSelectedLan(code || null)}
+                options={profileAvailableLans.map(({ code, name }) => ({ value: code, label: name }))}
+              />
+              {profileNeedsMuniFilter && (
+                <>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
+                  <Dropdown
+                    inputSize="sm"
+                    value={profileEffectiveMuni ?? ''}
+                    onChange={code => setSelectedMuni(code || null)}
+                    options={profileAvailableMunis.map(({ code, name }) => ({ value: code, label: name }))}
                   />
                 </>
               )}

@@ -8,6 +8,7 @@ export const CT = {
   // Structure
   gridLine:    '#e5e7eb', // grid lines & row separators
   border:      '#d1d5db', // frame borders & shelf line
+  barStroke:   '#b0b8c4', // bar outlines (visible on both light and coloured bars)
 
   // Text
   tickText:    '#9ca3af', // axis tick labels
@@ -20,4 +21,8 @@ export const CT = {
 
   // Default fill when no colour scale is provided
   defaultFill: '#3b82f6',
+
+  // Gender palette (population pyramid)
+  menFill:   '#3b82f6', // blue-500
+  womenFill: '#f43f5e', // rose-500
 } as const;
