@@ -10,6 +10,14 @@ export const LEVEL_LABELS: Record<AdminLevel, string> = {
   DeSO:         'DeSO',
 };
 
+export const LEVEL_BADGE: Record<AdminLevel, string> = {
+  Country:      'bg-gray-100 text-slate-600',
+  Region:       'bg-blue-100 text-blue-700',
+  Municipality: 'bg-teal-100 text-teal-700',
+  RegSO:        'bg-orange-100 text-orange-700',
+  DeSO:         'bg-rose-100 text-rose-700',
+};
+
 // Stable county code → short name mapping (without "län" suffix or genitive "s").
 export const COUNTY_NAMES: Record<string, string> = {
   '01': 'Stockholm',    '03': 'Uppsala',        '04': 'Södermanland',

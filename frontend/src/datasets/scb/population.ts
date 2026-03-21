@@ -26,6 +26,13 @@ const METADATA_URL_6574 =
 
 // ── Shared types ─────────────────────────────────────────────────────────────
 
+export interface PyramidRow {
+  ageCode:  string;  // raw SCB code: '-4', '5-9', ..., '80-'
+  ageLabel: string;  // display: '0–4', '5–9', ..., '80+'
+  men:   number;     // absolute count
+  women: number;
+}
+
 // Subset of JSON-stat2 returned by the /metadata endpoint (no value array).
 interface MetadataResponse {
   dimension: Record<string, {
@@ -222,6 +229,22 @@ function parseMultiYearByRegion(
 const multiYearCache    = new Map<string, Record<number, Record<string, number>>>();
 const multiYearInflight = new Map<string, Promise<Record<number, Record<string, number>>>>();
 
+// ── Pyramid constants & cache ─────────────────────────────────────────────────
+
+const PYRAMID_AGE_CODES = [
+  '-4','5-9','10-14','15-19','20-24','25-29','30-34','35-39',
+  '40-44','45-49','50-54','55-59','60-64','65-69','70-74','75-79','80-',
+];
+
+function pyramidAgeLabel(code: string): string {
+  if (code === '-4')      { return '0–4'; }
+  if (code.endsWith('-')) { return code.slice(0, -1) + '+'; }
+  return code.replace('-', '–');
+}
+
+const pyramidCache    = new Map<string, PyramidRow[]>();
+const pyramidInflight = new Map<string, Promise<PyramidRow[]>>();
+
 /**
  * Fetch population for Country, Region, or Municipality across multiple years
  * in a single SCB API call.  Results are session-cached (module-level Map) and
@@ -329,6 +352,87 @@ async function postDataQuery6574(codes: string[]): Promise<JsonStat2Response> {
     throw new Error(`SCB API error: ${res.status} ${res.statusText}`);
   }
   return res.json();
+}
+
+/**
+ * Fetch a population pyramid (age × gender) for a single RegSO or DeSO area.
+ * Results are session-cached; no IDB persistence.
+ */
+export async function fetchAgeGenderBreakdown(
+  level: 'RegSO' | 'DeSO',
+  areaCode: string,
+  year: number,
+): Promise<PyramidRow[]> {
+  const cacheKey = `${areaCode}:${year}`;
+  const cached   = pyramidCache.get(cacheKey);
+  if (cached) { return cached; }
+  const inflight = pyramidInflight.get(cacheKey);
+  if (inflight) { return inflight; }
+
+  const promise = (async () => {
+    const { regsoCodes, desoCodes } = await getRegsoDeso();
+    const allCodes = level === 'RegSO' ? regsoCodes : desoCodes;
+    const fullCode = allCodes.find(c => c.startsWith(areaCode)) ?? areaCode;
+
+    const res = await fetch(DATA_URL_6574, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selection: [
+          { variableCode: 'Region',       valueCodes: [fullCode] },
+          { variableCode: 'Alder',        valueCodes: PYRAMID_AGE_CODES },
+          { variableCode: 'Kon',          valueCodes: ['1', '2'] },
+          { variableCode: 'ContentsCode', valueCodes: ['000007Y7'] },
+          { variableCode: 'Tid',          valueCodes: [`${year}`] },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(`SCB API error: ${res.status} ${res.statusText}`);
+    }
+    const data: JsonStat2Response = await res.json();
+
+    const dimIds = data.id;
+    const sizes  = data.size;
+    const strides = new Array(dimIds.length).fill(1);
+    for (let i = dimIds.length - 2; i >= 0; i--) {
+      strides[i] = strides[i + 1] * sizes[i + 1];
+    }
+
+    const alderDimIdx = dimIds.indexOf('Alder');
+    const konDimIdx   = dimIds.indexOf('Kon');
+    const konDim      = data.dimension['Kon'];
+    const menKonIdx   = konDim.category.index['1'] ?? 0;
+    const womenKonIdx = konDim.category.index['2'] ?? 1;
+
+    const mensValues:  number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
+    const womenValues: number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
+
+    for (let i = 0; i < data.value.length; i++) {
+      const raw = data.value[i];
+      if (raw === null || raw === undefined) { continue; }
+      const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
+      if (isNaN(num)) { continue; }
+      const ageIdx = Math.floor(i / strides[alderDimIdx]) % sizes[alderDimIdx];
+      const konIdx = Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx];
+      if (konIdx === menKonIdx)   { mensValues[ageIdx]  += num; }
+      else if (konIdx === womenKonIdx) { womenValues[ageIdx] += num; }
+    }
+
+    const rows: PyramidRow[] = PYRAMID_AGE_CODES.map((code, i) => ({
+      ageCode:  code,
+      ageLabel: pyramidAgeLabel(code),
+      men:      mensValues[i]  ?? 0,
+      women:    womenValues[i] ?? 0,
+    }));
+
+    pyramidCache.set(cacheKey, rows);
+    pyramidInflight.delete(cacheKey);
+    return rows;
+  })();
+
+  pyramidInflight.set(cacheKey, promise);
+  return promise;
 }
 
 async function fetchByCounty(year: number): Promise<ScalarDatasetResult> {

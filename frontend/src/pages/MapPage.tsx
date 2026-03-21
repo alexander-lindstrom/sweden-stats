@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
@@ -67,9 +68,10 @@ const FEATURE_PARENT_PROP: Partial<Record<AdminLevel, string>> = {
 };
 
 const ALL_VIEWS: { key: ViewType; label: string }[] = [
-  { key: 'map',   label: 'Karta'   },
-  { key: 'chart', label: 'Diagram' },
-  { key: 'table', label: 'Tabell'  },
+  { key: 'map',     label: 'Karta'   },
+  { key: 'chart',   label: 'Diagram' },
+  { key: 'table',   label: 'Tabell'  },
+  { key: 'profile', label: 'Profil'  },
 ];
 
 export default function MapPage() {
@@ -367,7 +369,7 @@ export default function MapPage() {
   );
 
   useEffect(() => {
-    if (!availableViews.includes(activeView)) {
+    if (activeView !== 'profile' && !availableViews.includes(activeView)) {
       setActiveView(availableViews[0] ?? 'map');
     }
   }, [availableViews, activeView]);
@@ -622,13 +624,13 @@ export default function MapPage() {
   // Charts whose SVG height is data-driven (not container-driven) get a content-sized render area —
   // the bg-slate-50 card shrinks to content height and bg-white shows below as a clean terminus.
   // Only add a chart type here once it has been refactored to be truly content-sized.
-  const isContentSized = activeView === 'chart' && (
+  const isContentSized = activeView === 'profile' || (activeView === 'chart' && (
     activeChartType === 'diverging' ||
     activeChartType === 'bar' ||
     activeChartType === 'party-ranking' ||
     activeChartType === 'boxplot' ||
     activeChartType === 'election-bar'
-  );
+  ));
 
   return (
     <main className="flex h-screen overflow-hidden bg-white">
@@ -700,7 +702,7 @@ export default function MapPage() {
 
           {/* View tabs */}
           {ALL_VIEWS.map(({ key, label }) => {
-            const supported = availableViews.includes(key);
+            const supported = key === 'profile' || availableViews.includes(key);
             return (
               <button
                 key={key}
@@ -1080,6 +1082,10 @@ export default function MapPage() {
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa tabell.
                 </div>
+              )}
+
+              {activeView === 'profile' && (
+                <FeatureProfile selectedFeature={selectedFeature} adminLevel={selectionLevel} />
               )}
             </div>
           </div>

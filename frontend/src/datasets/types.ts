@@ -1,5 +1,5 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
-export type ViewType = 'map' | 'chart' | 'table';
+export type ViewType = 'map' | 'chart' | 'table' | 'profile';
 export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
