@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UI } from '@/theme';
 
 export function ProfileSection({ title, children, defaultOpen = true }: {
   title: string;
@@ -12,7 +13,7 @@ export function ProfileSection({ title, children, defaultOpen = true }: {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-2 mb-4 group"
       >
-        <span className="text-sm font-bold uppercase tracking-[0.10em] text-slate-500 whitespace-nowrap">
+        <span className={UI.sectionTitle}>
           {title}
         </span>
         <div className="flex-1 h-px bg-slate-200 group-hover:bg-slate-300 transition-colors" />

@@ -1,39 +1,64 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AdminLevel, ElectionDatasetResult } from '@/datasets/types';
+import type { AdminLevel } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
 import { DATASETS } from '@/datasets/registry';
 import { fetchCached } from '@/datasets/cache';
 import { fetchAgeGenderBreakdown, type PyramidRow } from '@/datasets/scb/population';
 import { PopulationPyramid } from '@/components/visualizations/PopulationPyramid';
-import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 import { ProfileSection } from './ProfileSection';
 import { ProfileCard } from './ProfileCard';
 import { Spinner } from '@/components/ui/Spinner';
+import { UI } from '@/theme';
 
 const popDescriptor         = DATASETS.find(d => d.id === 'population')!;
 const incomeDescriptor      = DATASETS.find(d => d.id === 'medianinkomst')!;
 const ageDescriptor         = DATASETS.find(d => d.id === 'medelalder')!;
 const employmentDescriptor  = DATASETS.find(d => d.id === 'sysselsattning')!;
-const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
 
 const STAT_YEAR     = 2024;
-const ELECTION_YEAR = 2022;
 const PYRAMID_LEVELS: AdminLevel[] = ['RegSO', 'DeSO'];
 const INCOME_LEVELS:     AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const AGE_LEVELS:        AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 const EMPLOYMENT_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
-function StatMini({ label, value, unit }: { label: string; value: number | null; unit: string }) {
+interface StatVal { value: number; mean: number | null; }
+
+function StatMini({ label, value, mean, unit }: {
+  label: string;
+  value: number | null;
+  mean:  number | null;
+  unit:  string;
+}) {
+  const delta = value !== null && mean !== null ? value - mean : null;
+
+  const fmtDelta = (d: number) =>
+    Math.abs(d) < 100
+      ? Math.abs(d).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : Math.round(Math.abs(d)).toLocaleString('sv-SE');
+
   return (
-    <div className="rounded-lg bg-white border border-slate-200 p-3 shadow-sm">
-      <div className="text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400 mb-1">{label}</div>
+    <div className={UI.card}>
+      <div className={`${UI.statLabel} mb-1`}>{label}</div>
       {value === null ? (
         <div className="text-sm text-slate-300">—</div>
       ) : (
-        <div className="flex items-baseline gap-1">
-          <span className="text-xl font-bold tabular-nums text-slate-900">{value.toLocaleString('sv-SE')}</span>
-          {unit && <span className="text-xs text-slate-500">{unit}</span>}
-        </div>
+        <>
+          <div className="flex items-baseline gap-1">
+            <span className={UI.statValue}>{value.toLocaleString('sv-SE')}</span>
+            {unit && <span className={UI.statUnit}>{unit}</span>}
+          </div>
+          {delta !== null && (
+            <div className={`text-[10px] tabular-nums mt-1 ${
+              delta > 0 ? UI.deltaPositive : delta < 0 ? UI.deltaNegative : UI.deltaNeutral
+            }`}>
+              {delta > 0
+                ? `↑ ${fmtDelta(delta)} ${unit} över snitt`
+                : delta < 0
+                  ? `↓ ${fmtDelta(delta)} ${unit} under snitt`
+                  : '= snitt'}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -45,21 +70,18 @@ interface Props {
 }
 
 export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
-  const [population,   setPopulation]   = useState<number | null>(null);
+  const [population,   setPopulation]   = useState<StatVal | null>(null);
   const [popUnit,      setPopUnit]      = useState('');
-  const [income,       setIncome]       = useState<number | null>(null);
+  const [income,       setIncome]       = useState<StatVal | null>(null);
   const [incomeUnit,   setIncomeUnit]   = useState('');
-  const [age,          setAge]          = useState<number | null>(null);
+  const [age,          setAge]          = useState<StatVal | null>(null);
   const [ageUnit,      setAgeUnit]      = useState('');
-  const [employment,   setEmployment]   = useState<number | null>(null);
+  const [employment,   setEmployment]   = useState<StatVal | null>(null);
   const [employUnit,   setEmployUnit]   = useState('');
   const [statsLoading, setStatsLoading] = useState(false);
 
   const [pyramid,        setPyramid]        = useState<PyramidRow[]>([]);
   const [pyramidLoading, setPyramidLoading] = useState(false);
-
-  const [electionVotes,   setElectionVotes]   = useState<Record<string, number> | null>(null);
-  const [electionLoading, setElectionLoading] = useState(false);
 
   const fetchIdRef = useRef(0);
 
@@ -70,7 +92,6 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
       setAge(null);
       setEmployment(null);
       setPyramid([]);
-      setElectionVotes(null);
       return;
     }
 
@@ -83,7 +104,6 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
     setEmployment(null);
     setStatsLoading(true);
     setPyramid([]);
-    setElectionVotes(null);
 
     const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
     const wantsAge        = AGE_LEVELS.includes(adminLevel);
@@ -94,8 +114,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
         .then(r => {
           if (r.kind !== 'scalar') { return; }
           setPopUnit(r.unit);
-          const v = r.values[code];
-          setPopulation(Number.isFinite(v) ? v : null);
+          const all  = Object.values(r.values).filter(Number.isFinite) as number[];
+          const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+          const v    = r.values[code];
+          setPopulation(Number.isFinite(v) ? { value: v, mean } : null);
         })
         .catch(() => {}),
     ];
@@ -106,8 +128,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
           .then(r => {
             if (r.kind !== 'scalar') { return; }
             setIncomeUnit(r.unit);
-            const v = r.values[code];
-            setIncome(Number.isFinite(v) ? v : null);
+            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
+            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+            const v    = r.values[code];
+            setIncome(Number.isFinite(v) ? { value: v, mean } : null);
           })
           .catch(() => {}),
       );
@@ -119,8 +143,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
           .then(r => {
             if (r.kind !== 'scalar') { return; }
             setAgeUnit(r.unit);
-            const v = r.values[code];
-            setAge(Number.isFinite(v) ? v : null);
+            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
+            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+            const v    = r.values[code];
+            setAge(Number.isFinite(v) ? { value: v, mean } : null);
           })
           .catch(() => {}),
       );
@@ -132,8 +158,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
           .then(r => {
             if (r.kind !== 'scalar') { return; }
             setEmployUnit(r.unit);
-            const v = r.values[code];
-            setEmployment(Number.isFinite(v) ? v : null);
+            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
+            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+            const v    = r.values[code];
+            setEmployment(Number.isFinite(v) ? { value: v, mean } : null);
           })
           .catch(() => {}),
       );
@@ -154,18 +182,6 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
         })
         .catch(() => { if (id === fetchIdRef.current) { setPyramidLoading(false); } });
     }
-
-    setElectionLoading(true);
-    fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
-      .then(r => {
-        if (id !== fetchIdRef.current) { return; }
-        if (r.kind === 'election') {
-          const votes = (r as ElectionDatasetResult).partyVotes[code];
-          setElectionVotes(votes ?? null);
-        }
-        setElectionLoading(false);
-      })
-      .catch(() => { if (id === fetchIdRef.current) { setElectionLoading(false); } });
   }, [selectedFeature, adminLevel]);
 
   if (!selectedFeature) {
@@ -191,10 +207,10 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
           <Spinner />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <StatMini label="Befolkning"     value={population} unit={popUnit}    />
-            {income     !== null && <StatMini label="Medianinkomst"  value={income}     unit={incomeUnit} />}
-            {age        !== null && <StatMini label="Medelålder"     value={age}        unit={ageUnit}    />}
-            {employment !== null && <StatMini label="Sysselsättning" value={employment} unit={employUnit} />}
+            <StatMini label="Befolkning"     value={population?.value ?? null} mean={population?.mean ?? null} unit={popUnit}    />
+            {income     && <StatMini label="Medianinkomst"  value={income.value}     mean={income.mean}     unit={incomeUnit} />}
+            {age        && <StatMini label="Medelålder"     value={age.value}        mean={age.mean}        unit={ageUnit}    />}
+            {employment && <StatMini label="Sysselsättning" value={employment.value} mean={employment.mean} unit={employUnit} />}
           </div>
         )}
         {PYRAMID_LEVELS.includes(adminLevel) && (
@@ -209,20 +225,6 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
               <p className="text-sm text-slate-400">Ingen pyramiddata tillgänglig.</p>
             )
         )}
-      </ProfileSection>
-
-      <ProfileSection title="Val">
-        {electionLoading ? <Spinner /> :
-          electionVotes
-            ? (
-              <ProfileCard title={`Riksdagsval ${ELECTION_YEAR}`}>
-                <ElectionDonut votes={electionVotes} size={72} />
-              </ProfileCard>
-            )
-            : (
-              <p className="text-sm text-slate-400">Ingen valdata tillgänglig.</p>
-            )
-        }
       </ProfileSection>
     </div>
   );

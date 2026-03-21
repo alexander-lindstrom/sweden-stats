@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
-import { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
+import { AdminLevel, ElectionDatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
 import { fetchPopulationMultiYear } from '@/datasets/scb/population';
 import { DATASETS } from '@/datasets/registry';
 import { Spinner } from '@/components/ui/Spinner';
 import { FeatureSearch, FeatureSearchItem } from '@/components/ui/FeatureSearch';
+import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 
 const popDescriptor           = DATASETS.find(d => d.id === 'population')!;
 const incomeDescriptor        = DATASETS.find(d => d.id === 'medianinkomst')!;
 const ageDescriptor           = DATASETS.find(d => d.id === 'medelalder')!;
 const foreignBgDescriptor     = DATASETS.find(d => d.id === 'utlandsk_bakgrund')!;
 const employmentDescriptor    = DATASETS.find(d => d.id === 'sysselsattning')!;
+const riksdagsvalDescriptor   = DATASETS.find(d => d.id === 'riksdagsval')!;
 
-const STAT_YEAR     = 2024;
+const STAT_YEAR      = 2024;
+const ELECTION_YEAR  = 2022;
+const ELECTION_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
 const SPARKLINE_YEARS     = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
 const SPARKLINE_LEVELS:   AdminLevel[] = ['Country', 'Region', 'Municipality'];
@@ -385,6 +389,8 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
   const [statsLoading,        setStatsLoading]        = useState(false);
   const [sparkline,           setSparkline]           = useState<Array<{ year: number; value: number }>>([]);
   const [sparkLoading,        setSparkLoading]        = useState(false);
+  const [electionVotes,       setElectionVotes]       = useState<Record<string, number> | null>(null);
+  const [electionLoading,     setElectionLoading]     = useState(false);
   const fetchIdRef = useRef(0);
 
   // Comparison feature state
@@ -392,12 +398,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
   const [compStatsLoading,        setCompStatsLoading]        = useState(false);
   const [compSparkline,           setCompSparkline]           = useState<Array<{ year: number; value: number }>>([]);
   const [compSparkLoading,        setCompSparkLoading]        = useState(false);
+  const [compElectionVotes,   setCompElectionVotes]   = useState<Record<string, number> | null>(null);
+  const [compElectionLoading, setCompElectionLoading] = useState(false);
   const compFetchIdRef = useRef(0);
 
   useEffect(() => {
     if (!selectedFeature) {
       setStats(null);
       setSparkline([]);
+      setElectionVotes(null);
       return;
     }
 
@@ -407,6 +416,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     setStats(null);
     setStatsLoading(true);
     setSparkline([]);
+    setElectionVotes(null);
 
     const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
     const wantsAge        = AGE_LEVELS.includes(adminLevel);
@@ -488,6 +498,19 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
         })
         .catch(() => { if (id === fetchIdRef.current) { setSparkLoading(false); } });
     }
+
+    if (ELECTION_LEVELS.includes(adminLevel)) {
+      setElectionLoading(true);
+      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
+        .then(r => {
+          if (id !== fetchIdRef.current) { return; }
+          if (r.kind === 'election') {
+            setElectionVotes((r as ElectionDatasetResult).partyVotes[code] ?? null);
+          }
+          setElectionLoading(false);
+        })
+        .catch(() => { if (id === fetchIdRef.current) { setElectionLoading(false); } });
+    }
   }, [selectedFeature, adminLevel]);
 
   // Fetch stats for the comparison feature (same logic, different code).
@@ -495,6 +518,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     if (!comparisonFeature) {
       setCompStats(null);
       setCompSparkline([]);
+      setCompElectionVotes(null);
       return;
     }
 
@@ -504,6 +528,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     setCompStats(null);
     setCompStatsLoading(true);
     setCompSparkline([]);
+    setCompElectionVotes(null);
 
     const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
     const wantsAge        = AGE_LEVELS.includes(adminLevel);
@@ -581,6 +606,19 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           setCompSparkLoading(false);
         })
         .catch(() => { if (id === compFetchIdRef.current) { setCompSparkLoading(false); } });
+    }
+
+    if (ELECTION_LEVELS.includes(adminLevel)) {
+      setCompElectionLoading(true);
+      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
+        .then(r => {
+          if (id !== compFetchIdRef.current) { return; }
+          if (r.kind === 'election') {
+            setCompElectionVotes((r as ElectionDatasetResult).partyVotes[code] ?? null);
+          }
+          setCompElectionLoading(false);
+        })
+        .catch(() => { if (id === compFetchIdRef.current) { setCompElectionLoading(false); } });
     }
   }, [comparisonFeature, adminLevel]);
 
@@ -810,6 +848,39 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                 )}
                 {!sparkLoading && sparkline.length < 2 && (
                   <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                )}
+              </CollapsibleSection>
+            )}
+
+            {/* Election donut */}
+            {ELECTION_LEVELS.includes(adminLevel) && (
+              <CollapsibleSection title={`Riksdagsval ${ELECTION_YEAR}`}>
+                {(electionLoading || (isComparing && compElectionLoading)) && <Spinner />}
+                {!isComparing && (
+                  <>
+                    {!electionLoading && !electionVotes && (
+                      <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
+                    )}
+                    {!electionLoading && electionVotes && (
+                      <ChartCard><ElectionDonut votes={electionVotes} /></ChartCard>
+                    )}
+                  </>
+                )}
+                {isComparing && !electionLoading && !compElectionLoading && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <ChartCard>
+                      <div className="text-[10px] font-semibold text-slate-400 mb-1.5 truncate">{selectedFeature.label}</div>
+                      {electionVotes
+                        ? <ElectionDonut votes={electionVotes} />
+                        : <p className="text-xs text-slate-400">Ingen data</p>}
+                    </ChartCard>
+                    <ChartCard>
+                      <div className="text-[10px] font-semibold text-orange-400 mb-1.5 truncate">{comparisonFeature!.label}</div>
+                      {compElectionVotes
+                        ? <ElectionDonut votes={compElectionVotes} />
+                        : <p className="text-xs text-slate-400">Ingen data</p>}
+                    </ChartCard>
+                  </div>
                 )}
               </CollapsibleSection>
             )}
