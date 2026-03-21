@@ -452,6 +452,11 @@ export default function MapPage() {
   const profileSearchItems = useMemo(() => {
     if (activeView !== 'profile') { return []; }
     if (searchItems.length > 0) { return searchItems; }
+    if (selectedLevel === 'Region') {
+      return Object.entries(COUNTY_NAMES)
+        .map(([code, label]) => ({ code, label }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
+    }
     if (selectedLevel === 'Municipality' && munLabels) {
       return Object.entries(munLabels)
         .map(([code, label]) => ({ code, label }))
@@ -459,23 +464,6 @@ export default function MapPage() {
     }
     return [];
   }, [activeView, selectedLevel, searchItems, munLabels]);
-
-  // Auto-select first area when entering profile view with no feature selected.
-  useEffect(() => {
-    if (activeView !== 'profile' || selectedFeature) { return; }
-    if (selectedLevel === 'Region') {
-      // COUNTY_NAMES is a module-level constant — always synchronously available
-      const first = Object.entries(COUNTY_NAMES).sort(([, a], [, b]) => a.localeCompare(b, 'sv'))[0];
-      if (first) { setSelectedFeature({ code: first[0], label: first[1] }); }
-    } else if (selectedLevel === 'Municipality' && munLabels) {
-      // Use munLabels directly so the effect fires as soon as labels load,
-      // not waiting for profileSearchItems to recompute
-      const first = Object.entries(munLabels).sort(([, a], [, b]) => a.localeCompare(b, 'sv'))[0];
-      if (first) { setSelectedFeature({ code: first[0], label: first[1] }); }
-    } else if ((selectedLevel === 'RegSO' || selectedLevel === 'DeSO') && profileSearchItems.length > 0) {
-      setSelectedFeature(profileSearchItems[0]);
-    }
-  }, [activeView, selectedFeature, selectedLevel, munLabels, profileSearchItems]);
 
   // ── Lan/Municipality filter ────────────────────────────────────────────────
   // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
@@ -915,7 +903,7 @@ export default function MapPage() {
 
           {/* Profile area search */}
           {activeView === 'profile' &&
-           (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO') &&
+           selectedLevel !== 'Country' &&
            profileSearchItems.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
               <div className="w-64">

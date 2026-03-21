@@ -105,7 +105,9 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
   if (!selectedFeature) {
     return (
       <div className="flex items-center justify-center h-full text-slate-400 text-sm italic">
-        Klicka på ett område på kartan för att se profil.
+        {adminLevel === 'Country'
+          ? 'Klicka på kartan för att se profil.'
+          : 'Sök efter ett område ovan eller klicka på kartan.'}
       </div>
     );
   }
