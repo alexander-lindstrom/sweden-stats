@@ -14,6 +14,7 @@ import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
+import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult, FilterCriterion,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
@@ -445,36 +446,36 @@ export default function MapPage() {
     return buildBivariateColorFn(scalarResult.values, bivariateYScalar.values);
   }, [bivariateMode, scalarResult, bivariateYScalar]);
 
-  // ── Profile Lan/Municipality selectors ───────────────────────────────────
-  // Shown in the profile tab at Municipality/RegSO/DeSO to mirror the diagram's cascading
-  // selectors. Source: COUNTY_NAMES (all 21 counties) + munLabels (all municipalities).
-  const profileNeedsLanFilter  = activeView === 'profile' &&
-    (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
-  const profileNeedsMuniFilter = activeView === 'profile' &&
-    (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
+  // ── Profile search items ──────────────────────────────────────────────────
+  // Reuses the existing searchItems (from datasetResult.labels). Falls back to munLabels
+  // at Municipality level so the search box is always populated without needing a dataset.
+  const profileSearchItems = useMemo(() => {
+    if (activeView !== 'profile') { return []; }
+    if (searchItems.length > 0) { return searchItems; }
+    if (selectedLevel === 'Municipality' && munLabels) {
+      return Object.entries(munLabels)
+        .map(([code, label]) => ({ code, label }))
+        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
+    }
+    return [];
+  }, [activeView, selectedLevel, searchItems, munLabels]);
 
-  const profileAvailableLans = useMemo(() => {
-    if (!profileNeedsLanFilter) { return []; }
-    return Object.entries(COUNTY_NAMES).sort(([a], [b]) => a.localeCompare(b)).map(([code, name]) => ({ code, name }));
-  }, [profileNeedsLanFilter]);
-
-  const profileEffectiveLan = useMemo(() => {
-    if (profileAvailableLans.length === 0) { return null; }
-    return profileAvailableLans.some(l => l.code === selectedLan) ? selectedLan : profileAvailableLans[0].code;
-  }, [profileAvailableLans, selectedLan]);
-
-  const profileAvailableMunis = useMemo(() => {
-    if (!munLabels || !profileEffectiveLan || !profileNeedsMuniFilter) { return []; }
-    return Object.entries(munLabels)
-      .filter(([code]) => code.startsWith(profileEffectiveLan))
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([code, name]) => ({ code, name }));
-  }, [munLabels, profileEffectiveLan, profileNeedsMuniFilter]);
-
-  const profileEffectiveMuni = useMemo(() => {
-    if (profileAvailableMunis.length === 0) { return null; }
-    return profileAvailableMunis.some(m => m.code === selectedMuni) ? selectedMuni : profileAvailableMunis[0].code;
-  }, [profileAvailableMunis, selectedMuni]);
+  // Auto-select first area when entering profile view with no feature selected.
+  useEffect(() => {
+    if (activeView !== 'profile' || selectedFeature) { return; }
+    if (selectedLevel === 'Region') {
+      // COUNTY_NAMES is a module-level constant — always synchronously available
+      const first = Object.entries(COUNTY_NAMES).sort(([, a], [, b]) => a.localeCompare(b, 'sv'))[0];
+      if (first) { setSelectedFeature({ code: first[0], label: first[1] }); }
+    } else if (selectedLevel === 'Municipality' && munLabels) {
+      // Use munLabels directly so the effect fires as soon as labels load,
+      // not waiting for profileSearchItems to recompute
+      const first = Object.entries(munLabels).sort(([, a], [, b]) => a.localeCompare(b, 'sv'))[0];
+      if (first) { setSelectedFeature({ code: first[0], label: first[1] }); }
+    } else if ((selectedLevel === 'RegSO' || selectedLevel === 'DeSO') && profileSearchItems.length > 0) {
+      setSelectedFeature(profileSearchItems[0]);
+    }
+  }, [activeView, selectedFeature, selectedLevel, munLabels, profileSearchItems]);
 
   // ── Lan/Municipality filter ────────────────────────────────────────────────
   // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
@@ -912,49 +913,17 @@ export default function MapPage() {
             </div>
           )}
 
-          {/* Profile Lan / Kommun selectors */}
-          {profileNeedsLanFilter && profileAvailableLans.length > 0 && (
+          {/* Profile area search */}
+          {activeView === 'profile' &&
+           (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO') &&
+           profileSearchItems.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
-              <Dropdown
-                inputSize="sm"
-                value={profileEffectiveLan ?? ''}
-                onChange={code => {
-                  setSelectedLan(code || null);
-                  if (!code) { return; }
-                  if (selectedLevel === 'Municipality' && munLabels) {
-                    const first = Object.entries(munLabels)
-                      .filter(([c]) => c.startsWith(code))
-                      .sort(([a], [b]) => a.localeCompare(b))[0];
-                    if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
-                  } else if ((selectedLevel === 'RegSO' || selectedLevel === 'DeSO') && scalarResult) {
-                    setSelectedMuni(null);
-                    const first = Object.entries(scalarResult.labels)
-                      .filter(([c]) => c.startsWith(code))
-                      .sort(([a], [b]) => a.localeCompare(b))[0];
-                    if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
-                  }
-                }}
-                options={profileAvailableLans.map(({ code, name }) => ({ value: code, label: name }))}
-              />
-              {profileNeedsMuniFilter && (
-                <>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
-                  <Dropdown
-                    inputSize="sm"
-                    value={profileEffectiveMuni ?? ''}
-                    onChange={code => {
-                      setSelectedMuni(code || null);
-                      if (!code || !scalarResult) { return; }
-                      const first = Object.entries(scalarResult.labels)
-                        .filter(([c]) => c.startsWith(code))
-                        .sort(([a], [b]) => a.localeCompare(b))[0];
-                      if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
-                    }}
-                    options={profileAvailableMunis.map(({ code, name }) => ({ value: code, label: name }))}
-                  />
-                </>
-              )}
+              <div className="w-64">
+                <FeatureSearch
+                  items={profileSearchItems}
+                  onSelect={handleFeatureSelect}
+                />
+              </div>
             </div>
           )}
 
