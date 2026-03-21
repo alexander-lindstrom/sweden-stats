@@ -133,7 +133,7 @@ export function PopulationPyramid({ data }: PopulationPyramidProps) {
       .join('g').attr('class', 'row');
 
     // Track the currently hovered row group so we can restore it on leave.
-    let hoveredRg: d3.Selection<SVGGElement, MergedRow, SVGGElement, unknown> | null = null;
+    let hoveredRg: d3.Selection<SVGGElement, MergedRow, null, undefined> | null = null;
 
     rowGroups.each(function(row, i) {
       const rg   = d3.select<SVGGElement, MergedRow>(this);
