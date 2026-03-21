@@ -13,6 +13,7 @@ const fmtVal    = d3.format(',.1f');
 interface Props {
   data:            TimeSeriesNode[];
   label?:          string;
+  unit?:           string;
   colorOverrides?: Map<string, string>;
 }
 
@@ -23,7 +24,7 @@ interface ParsedSeries {
   pts:   Array<{ parsed: Date; value: number }>;
 }
 
-export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
+export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef       = useRef<SVGSVGElement>(null);
   const tooltipRef   = useRef<HTMLDivElement>(null);
@@ -145,6 +146,17 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
         .attr('fill', CT.tickText).attr('font-size', 11).attr('dx', '-2'));
 
+    if (label) {
+      g.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -adjH / 2)
+        .attr('y', -MARGIN.left + 13)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 11)
+        .attr('fill', CT.tickText)
+        .text(label);
+    }
+
     // ── Lines ─────────────────────────────────────────────────────────────────
     const line = d3.line<{ parsed: Date; value: number }>()
       .x(p => xScale(p.parsed))
@@ -259,7 +271,7 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
           `<div style="display:flex;align-items:center;gap:6px;padding:1px 0;">` +
             `<span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></span>` +
             `<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">${r.label}</span>` +
-            `<span style="font-variant-numeric:tabular-nums;margin-left:8px;">${fmtVal(r.value)}</span>` +
+            `<span style="font-variant-numeric:tabular-nums;margin-left:8px;">${fmtVal(r.value)}${unit ? ` ${unit}` : ''}</span>` +
           `</div>`,
         ).join('');
 
@@ -289,7 +301,7 @@ export function MultiLineChart({ data, label: _label, colorOverrides }: Props) {
         lineEls.forEach(el => d3.select(el).attr('stroke-opacity', 1));
       });
 
-  }, [parsedSeries, dims]);
+  }, [parsedSeries, dims, label, unit]);
 
   return (
     <div className="relative w-full h-full flex flex-col">

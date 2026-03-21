@@ -1054,6 +1054,7 @@ export default function MapPage() {
                     label={timeSeriesFeatureCode
                       ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
                       : activeDescriptor?.label}
+                    unit={activeDescriptor?.timeSeriesUnit}
                     colorOverrides={partyColorOverrides}
                   />
                 </div>

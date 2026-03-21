@@ -28,11 +28,13 @@ Ideas for integrating Swedish education statistics, with a focus on the gender d
 
 **Gender angle:** Two lines on a `MultiLineChart` — one per gender. Could optionally break down by municipality to show where the gap is largest (ranked bar view).
 
-**Data source:** SCB, gymnasieskolan — betyg (UF0543 / UF0501A).
+**Data source:** SCB TAB5311 — "Betygspoäng för elever på gymnasieskolan med slutbetyg", 2013/14–2023/24.
 
-**Implementation:** MultiLineChart pattern already exists. Need to check how SCB v2beta exposes this table and whether gender is a available dimension. May also make sense alongside the population pyramid in a profile/area view.
+**Implementation:** Done. Uses `fetchTimeSeries`, returns two `TimeSeriesNode`s (Pojkar / Flickor). `timeSeriesUnit: 'poäng'` drives the y-axis label and tooltip in `MultiLineChart`.
 
-**Priority:** Medium — clean fit with existing patterns, interesting trend story.
+**Regional limitation:** No county/municipality breakdown exists in SCB v2beta for actual grade points with gender. TAB6425 has region + gender but measures *continuation to higher education* (not the grades themselves) — a different question, potentially a future separate dataset.
+
+**Priority:** Done.
 
 ---
 

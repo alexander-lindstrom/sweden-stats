@@ -67,6 +67,8 @@ export interface DatasetDescriptor {
   /** Display name for the group header. Only needed on one descriptor in the group. */
   groupLabel?: string;
   source: string;
+  /** Unit label shown on time series charts (e.g. 'poäng', '%'). */
+  timeSeriesUnit?: string;
   availableYears: number[];
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];

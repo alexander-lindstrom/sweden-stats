@@ -8,10 +8,11 @@ import { stateExpenses } from './esv/stateExpenses';
 import { kpi } from './scb/kpi';
 import { riksdagsval, regionval, kommunval } from './scb/elections';
 import { utbildningsniva } from './scb/utbildningsniva';
+import { gymnasiebetyg } from './scb/gymnasiebetyg';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
-  utbildningsniva,
+  utbildningsniva, gymnasiebetyg,
   stateExpenses, kpi,
   riksdagsval, regionval, kommunval,
 ];
