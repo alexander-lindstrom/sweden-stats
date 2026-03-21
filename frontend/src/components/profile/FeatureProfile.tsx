@@ -39,24 +39,22 @@ function StatMini({ label, value, mean, unit }: {
       : Math.round(Math.abs(d)).toLocaleString('sv-SE');
 
   return (
-    <div className={UI.card}>
-      <div className={`${UI.statLabel} mb-1`}>{label}</div>
+    <div className={`${UI.card} min-w-0`}>
+      <div className={`${UI.statLabel} mb-1 truncate`}>{label}</div>
       {value === null ? (
         <div className="text-sm text-slate-300">—</div>
       ) : (
         <>
-          <div className="flex items-baseline gap-1">
-            <span className={UI.statValue}>{value.toLocaleString('sv-SE')}</span>
-            {unit && <span className={UI.statUnit}>{unit}</span>}
-          </div>
+          <div className={`${UI.statValue} truncate`}>{value.toLocaleString('sv-SE')}</div>
+          {unit && <div className={UI.statUnit}>{unit}</div>}
           {delta !== null && (
-            <div className={`text-[10px] tabular-nums mt-1 ${
+            <div className={`text-[10px] tabular-nums mt-1 leading-tight ${
               delta > 0 ? UI.deltaPositive : delta < 0 ? UI.deltaNegative : UI.deltaNeutral
             }`}>
               {delta > 0
-                ? `↑ ${fmtDelta(delta)} ${unit} över snitt`
+                ? `↑ ${fmtDelta(delta)} över snitt`
                 : delta < 0
-                  ? `↓ ${fmtDelta(delta)} ${unit} under snitt`
+                  ? `↓ ${fmtDelta(delta)} under snitt`
                   : '= snitt'}
             </div>
           )}
