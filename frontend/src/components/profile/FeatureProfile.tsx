@@ -227,7 +227,7 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
         {statsLoading ? (
           <Spinner />
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
             <StatMini label="Befolkning"     value={population?.value ?? null} mean={population?.mean ?? null} unit={popUnit}    />
             {income     && <StatMini label="Medianinkomst"    value={income.value}     mean={income.mean}     unit={incomeUnit}    />}
             {age        && <StatMini label="Medelålder"       value={age.value}        mean={age.mean}        unit={ageUnit}       />}

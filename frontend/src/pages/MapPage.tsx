@@ -919,7 +919,22 @@ export default function MapPage() {
               <Dropdown
                 inputSize="sm"
                 value={profileEffectiveLan ?? ''}
-                onChange={code => setSelectedLan(code || null)}
+                onChange={code => {
+                  setSelectedLan(code || null);
+                  if (!code) { return; }
+                  if (selectedLevel === 'Municipality' && munLabels) {
+                    const first = Object.entries(munLabels)
+                      .filter(([c]) => c.startsWith(code))
+                      .sort(([a], [b]) => a.localeCompare(b))[0];
+                    if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
+                  } else if ((selectedLevel === 'RegSO' || selectedLevel === 'DeSO') && scalarResult) {
+                    setSelectedMuni(null);
+                    const first = Object.entries(scalarResult.labels)
+                      .filter(([c]) => c.startsWith(code))
+                      .sort(([a], [b]) => a.localeCompare(b))[0];
+                    if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
+                  }
+                }}
                 options={profileAvailableLans.map(({ code, name }) => ({ value: code, label: name }))}
               />
               {profileNeedsMuniFilter && (
@@ -928,7 +943,14 @@ export default function MapPage() {
                   <Dropdown
                     inputSize="sm"
                     value={profileEffectiveMuni ?? ''}
-                    onChange={code => setSelectedMuni(code || null)}
+                    onChange={code => {
+                      setSelectedMuni(code || null);
+                      if (!code || !scalarResult) { return; }
+                      const first = Object.entries(scalarResult.labels)
+                        .filter(([c]) => c.startsWith(code))
+                        .sort(([a], [b]) => a.localeCompare(b))[0];
+                      if (first) { handleFeatureSelect({ code: first[0], label: first[1] }); }
+                    }}
                     options={profileAvailableMunis.map(({ code, name }) => ({ value: code, label: name }))}
                   />
                 </>
