@@ -7,9 +7,11 @@ import { sysselsattning } from './scb/sysselsattning';
 import { stateExpenses } from './esv/stateExpenses';
 import { kpi } from './scb/kpi';
 import { riksdagsval, regionval, kommunval } from './scb/elections';
+import { utbildningsniva } from './scb/utbildningsniva';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
+  utbildningsniva,
   stateExpenses, kpi,
   riksdagsval, regionval, kommunval,
 ];
