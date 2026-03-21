@@ -1,29 +1,27 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AdminLevel } from '@/datasets/types';
+import type { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
-import { DATASETS } from '@/datasets/registry';
-import { fetchCached } from '@/datasets/cache';
 import { fetchAgeGenderBreakdown, type PyramidRow } from '@/datasets/scb/population';
 import { PopulationPyramid } from '@/components/visualizations/PopulationPyramid';
 import { ProfileSection } from './ProfileSection';
 import { ProfileCard } from './ProfileCard';
 import { Spinner } from '@/components/ui/Spinner';
 import { UI } from '@/theme';
+import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
 
-const popDescriptor         = DATASETS.find(d => d.id === 'population')!;
-const incomeDescriptor      = DATASETS.find(d => d.id === 'medianinkomst')!;
-const ageDescriptor         = DATASETS.find(d => d.id === 'medelalder')!;
-const employmentDescriptor  = DATASETS.find(d => d.id === 'sysselsattning')!;
-const utlandskDescriptor    = DATASETS.find(d => d.id === 'utlandsk_bakgrund')!;
-
-const STAT_YEAR     = 2024;
-const PYRAMID_LEVELS:    AdminLevel[] = ['RegSO', 'DeSO'];
-const INCOME_LEVELS:     AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const AGE_LEVELS:        AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const EMPLOYMENT_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const UTLANDSK_LEVELS:   AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const STAT_YEAR     = AREA_STATS_YEAR;
+const PYRAMID_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
 interface StatVal { value: number; mean: number | null; }
+
+function toStatVal(result: ScalarDatasetResult | null, code: string): StatVal | null {
+  if (!result) { return null; }
+  const v = result.values[code];
+  if (!Number.isFinite(v)) { return null; }
+  const all  = Object.values(result.values).filter(Number.isFinite) as number[];
+  const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
+  return { value: v as number, mean };
+}
 
 function StatMini({ label, value, mean, unit }: {
   label: string;
@@ -70,30 +68,21 @@ interface Props {
 }
 
 export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
-  const [population,   setPopulation]   = useState<StatVal | null>(null);
-  const [popUnit,      setPopUnit]      = useState('');
-  const [income,       setIncome]       = useState<StatVal | null>(null);
-  const [incomeUnit,   setIncomeUnit]   = useState('');
-  const [age,          setAge]          = useState<StatVal | null>(null);
-  const [ageUnit,      setAgeUnit]      = useState('');
-  const [employment,   setEmployment]   = useState<StatVal | null>(null);
-  const [employUnit,   setEmployUnit]   = useState('');
-  const [utlandsk,     setUtlandsk]     = useState<StatVal | null>(null);
-  const [utlandskUnit, setUtlandskUnit] = useState('');
-  const [statsLoading, setStatsLoading] = useState(false);
+  const {
+    population: popResult,
+    income:     incomeResult,
+    age:        ageResult,
+    foreignBg:  utlandskResult,
+    employment: employResult,
+    loading:    statsLoading,
+  } = useAreaStats(selectedFeature, adminLevel, STAT_YEAR);
 
   const [pyramid,        setPyramid]        = useState<PyramidRow[]>([]);
   const [pyramidLoading, setPyramidLoading] = useState(false);
-
   const fetchIdRef = useRef(0);
 
   useEffect(() => {
-    if (!selectedFeature) {
-      setPopulation(null);
-      setIncome(null);
-      setAge(null);
-      setEmployment(null);
-      setUtlandsk(null);
+    if (!selectedFeature || !PYRAMID_LEVELS.includes(adminLevel)) {
       setPyramid([]);
       return;
     }
@@ -101,106 +90,16 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
     const id   = ++fetchIdRef.current;
     const code = selectedFeature.code;
 
-    setPopulation(null);
-    setIncome(null);
-    setAge(null);
-    setEmployment(null);
-    setUtlandsk(null);
-    setStatsLoading(true);
     setPyramid([]);
+    setPyramidLoading(true);
 
-    const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
-    const wantsAge        = AGE_LEVELS.includes(adminLevel);
-    const wantsEmployment = EMPLOYMENT_LEVELS.includes(adminLevel);
-
-    const statFetches: Promise<void>[] = [
-      fetchCached(popDescriptor, adminLevel, STAT_YEAR)
-        .then(r => {
-          if (r.kind !== 'scalar') { return; }
-          setPopUnit(r.unit);
-          const all  = Object.values(r.values).filter(Number.isFinite) as number[];
-          const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
-          const v    = r.values[code];
-          setPopulation(Number.isFinite(v) ? { value: v, mean } : null);
-        })
-        .catch(() => {}),
-    ];
-
-    if (wantsIncome) {
-      statFetches.push(
-        fetchCached(incomeDescriptor, adminLevel, STAT_YEAR)
-          .then(r => {
-            if (r.kind !== 'scalar') { return; }
-            setIncomeUnit(r.unit);
-            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
-            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
-            const v    = r.values[code];
-            setIncome(Number.isFinite(v) ? { value: v, mean } : null);
-          })
-          .catch(() => {}),
-      );
-    }
-
-    if (wantsAge) {
-      statFetches.push(
-        fetchCached(ageDescriptor, adminLevel, STAT_YEAR)
-          .then(r => {
-            if (r.kind !== 'scalar') { return; }
-            setAgeUnit(r.unit);
-            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
-            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
-            const v    = r.values[code];
-            setAge(Number.isFinite(v) ? { value: v, mean } : null);
-          })
-          .catch(() => {}),
-      );
-    }
-
-    if (wantsEmployment) {
-      statFetches.push(
-        fetchCached(employmentDescriptor, adminLevel, STAT_YEAR)
-          .then(r => {
-            if (r.kind !== 'scalar') { return; }
-            setEmployUnit(r.unit);
-            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
-            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
-            const v    = r.values[code];
-            setEmployment(Number.isFinite(v) ? { value: v, mean } : null);
-          })
-          .catch(() => {}),
-      );
-    }
-
-    if (UTLANDSK_LEVELS.includes(adminLevel)) {
-      statFetches.push(
-        fetchCached(utlandskDescriptor, adminLevel, STAT_YEAR)
-          .then(r => {
-            if (r.kind !== 'scalar') { return; }
-            setUtlandskUnit(r.unit);
-            const all  = Object.values(r.values).filter(Number.isFinite) as number[];
-            const mean = all.length > 0 ? all.reduce((a, b) => a + b, 0) / all.length : null;
-            const v    = r.values[code];
-            setUtlandsk(Number.isFinite(v) ? { value: v, mean } : null);
-          })
-          .catch(() => {}),
-      );
-    }
-
-    Promise.all(statFetches).then(() => {
-      if (id !== fetchIdRef.current) { return; }
-      setStatsLoading(false);
-    });
-
-    if (PYRAMID_LEVELS.includes(adminLevel)) {
-      setPyramidLoading(true);
-      fetchAgeGenderBreakdown(adminLevel as 'RegSO' | 'DeSO', code, STAT_YEAR)
-        .then(rows => {
-          if (id !== fetchIdRef.current) { return; }
-          setPyramid(rows);
-          setPyramidLoading(false);
-        })
-        .catch(() => { if (id === fetchIdRef.current) { setPyramidLoading(false); } });
-    }
+    fetchAgeGenderBreakdown(adminLevel, code, STAT_YEAR)
+      .then(rows => {
+        if (id !== fetchIdRef.current) { return; }
+        setPyramid(rows);
+        setPyramidLoading(false);
+      })
+      .catch(() => { if (id === fetchIdRef.current) { setPyramidLoading(false); } });
   }, [selectedFeature, adminLevel]);
 
   if (!selectedFeature) {
@@ -210,6 +109,18 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
       </div>
     );
   }
+
+  const code        = selectedFeature.code;
+  const population  = toStatVal(popResult, code);
+  const popUnit     = popResult?.unit    ?? '';
+  const income      = toStatVal(incomeResult, code);
+  const incomeUnit  = incomeResult?.unit ?? '';
+  const age         = toStatVal(ageResult, code);
+  const ageUnit     = ageResult?.unit    ?? '';
+  const employment  = toStatVal(employResult, code);
+  const employUnit  = employResult?.unit ?? '';
+  const utlandsk    = toStatVal(utlandskResult, code);
+  const utlandskUnit = utlandskResult?.unit ?? '';
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-8">
@@ -226,11 +137,11 @@ export function FeatureProfile({ selectedFeature, adminLevel }: Props) {
           <Spinner />
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-4">
-            <StatMini label="Befolkning"     value={population?.value ?? null} mean={population?.mean ?? null} unit={popUnit}    />
-            {income     && <StatMini label="Medianinkomst"    value={income.value}     mean={income.mean}     unit={incomeUnit}    />}
-            {age        && <StatMini label="Medelålder"       value={age.value}        mean={age.mean}        unit={ageUnit}       />}
-            {employment && <StatMini label="Sysselsättning"   value={employment.value} mean={employment.mean} unit={employUnit}    />}
-            {utlandsk   && <StatMini label="Utländsk bakgrund" value={utlandsk.value}  mean={utlandsk.mean}   unit={utlandskUnit}  />}
+            <StatMini label="Befolkning"      value={population?.value ?? null} mean={population?.mean ?? null} unit={popUnit}     />
+            {income    && <StatMini label="Medianinkomst"   value={income.value}    mean={income.mean}    unit={incomeUnit}  />}
+            {age       && <StatMini label="Medelålder"      value={age.value}       mean={age.mean}       unit={ageUnit}     />}
+            {employment && <StatMini label="Sysselsättning" value={employment.value} mean={employment.mean} unit={employUnit} />}
+            {utlandsk  && <StatMini label="Utländsk bakgrund" value={utlandsk.value} mean={utlandsk.mean}  unit={utlandskUnit} />}
           </div>
         )}
         {PYRAMID_LEVELS.includes(adminLevel) && (

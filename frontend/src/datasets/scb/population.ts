@@ -242,6 +242,33 @@ function pyramidAgeLabel(code: string): string {
   return code.replace('-', '–');
 }
 
+// TAB5444 uses single-year age codes; this maps each 5-year pyramid band to its
+// constituent single-year codes so we can query TAB5444 and reaggregate.
+const AGE_BAND_CODES: Record<string, string[]> = {
+  '-4':   ['0','1','2','3','4'],
+  '5-9':  ['5','6','7','8','9'],
+  '10-14': ['10','11','12','13','14'],
+  '15-19': ['15','16','17','18','19'],
+  '20-24': ['20','21','22','23','24'],
+  '25-29': ['25','26','27','28','29'],
+  '30-34': ['30','31','32','33','34'],
+  '35-39': ['35','36','37','38','39'],
+  '40-44': ['40','41','42','43','44'],
+  '45-49': ['45','46','47','48','49'],
+  '50-54': ['50','51','52','53','54'],
+  '55-59': ['55','56','57','58','59'],
+  '60-64': ['60','61','62','63','64'],
+  '65-69': ['65','66','67','68','69'],
+  '70-74': ['70','71','72','73','74'],
+  '75-79': ['75','76','77','78','79'],
+  '80-':   [
+    '80','81','82','83','84','85','86','87','88','89',
+    '90','91','92','93','94','95','96','97','98','99','100+',
+  ],
+};
+
+const ALL_PYRAMID_AGE_CODES_5444 = PYRAMID_AGE_CODES.flatMap(b => AGE_BAND_CODES[b]);
+
 const pyramidCache    = new Map<string, PyramidRow[]>();
 const pyramidInflight = new Map<string, Promise<PyramidRow[]>>();
 
@@ -355,77 +382,142 @@ async function postDataQuery6574(codes: string[]): Promise<JsonStat2Response> {
 }
 
 /**
- * Fetch a population pyramid (age × gender) for a single RegSO or DeSO area.
- * Results are session-cached; no IDB persistence.
+ * Parse a JSON-stat2 response into PyramidRows, aggregating by 5-year bands.
+ * `bandForResponseIdx` maps each response age-dimension index to a band index
+ * in PYRAMID_AGE_CODES (or -1 if the code is not part of any band).
  */
-export async function fetchAgeGenderBreakdown(
+function parsePyramidResponse(
+  data: JsonStat2Response,
+  bandForResponseIdx: number[],
+): PyramidRow[] {
+  const dimIds  = data.id;
+  const sizes   = data.size;
+  const strides = new Array(dimIds.length).fill(1);
+  for (let i = dimIds.length - 2; i >= 0; i--) {
+    strides[i] = strides[i + 1] * sizes[i + 1];
+  }
+
+  const alderDimIdx = dimIds.indexOf('Alder');
+  const konDimIdx   = dimIds.indexOf('Kon');
+  const konDim      = data.dimension['Kon'];
+  const menKonIdx   = konDim.category.index['1'] ?? 0;
+  const womenKonIdx = konDim.category.index['2'] ?? 1;
+
+  const mensValues:  number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
+  const womenValues: number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
+
+  for (let i = 0; i < data.value.length; i++) {
+    const raw = data.value[i];
+    if (raw === null || raw === undefined) { continue; }
+    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
+    if (isNaN(num)) { continue; }
+    const ageIdx  = Math.floor(i / strides[alderDimIdx]) % sizes[alderDimIdx];
+    const konIdx  = Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx];
+    const bandIdx = bandForResponseIdx[ageIdx];
+    if (bandIdx === -1) { continue; }
+    if (konIdx === menKonIdx)        { mensValues[bandIdx]  += num; }
+    else if (konIdx === womenKonIdx) { womenValues[bandIdx] += num; }
+  }
+
+  return PYRAMID_AGE_CODES.map((code, i) => ({
+    ageCode:  code,
+    ageLabel: pyramidAgeLabel(code),
+    men:      mensValues[i]  ?? 0,
+    women:    womenValues[i] ?? 0,
+  }));
+}
+
+/**
+ * Fetch a population pyramid from TAB6574 (RegSO / DeSO).
+ */
+async function fetchPyramidFromTab6574(
   level: 'RegSO' | 'DeSO',
   areaCode: string,
   year: number,
 ): Promise<PyramidRow[]> {
-  const cacheKey = `${areaCode}:${year}`;
+  const { regsoCodes, desoCodes } = await getRegsoDeso();
+  const allCodes = level === 'RegSO' ? regsoCodes : desoCodes;
+  const fullCode = allCodes.find(c => c.startsWith(areaCode)) ?? areaCode;
+
+  const res = await fetch(DATA_URL_6574, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      selection: [
+        { variableCode: 'Region',       valueCodes: [fullCode] },
+        { variableCode: 'Alder',        valueCodes: PYRAMID_AGE_CODES },
+        { variableCode: 'Kon',          valueCodes: ['1', '2'] },
+        { variableCode: 'ContentsCode', valueCodes: ['000007Y7'] },
+        { variableCode: 'Tid',          valueCodes: [`${year}`] },
+      ],
+    }),
+  });
+  if (!res.ok) { throw new Error(`SCB API error: ${res.status} ${res.statusText}`); }
+  const data: JsonStat2Response = await res.json();
+
+  // TAB6574 already uses 5-year codes → each response age index maps 1:1 to a band.
+  const bandForResponseIdx = PYRAMID_AGE_CODES.map((_, i) => i);
+  return parsePyramidResponse(data, bandForResponseIdx);
+}
+
+/**
+ * Fetch a population pyramid from TAB5444 (Region / Municipality).
+ * TAB5444 uses single-year ages (0–100+); we reaggregate into 5-year bands.
+ */
+async function fetchPyramidFromTab5444(
+  areaCode: string,
+  year: number,
+): Promise<PyramidRow[]> {
+  const data: JsonStat2Response = await postDataQuery5444([
+    { variableCode: 'Region',       valueCodes: [areaCode] },
+    { variableCode: 'Alder',        valueCodes: ALL_PYRAMID_AGE_CODES_5444 },
+    { variableCode: 'Kon',          valueCodes: ['1', '2'] },
+    { variableCode: 'ContentsCode', valueCodes: ['000003O5'] },
+    { variableCode: 'Tid',          valueCodes: [`${year}M12`] },
+  ]);
+
+  // Build a mapping: response age-dim index → 5-year band index.
+  const alderDim = data.dimension['Alder'];
+  const nAgeResponse = data.size[data.id.indexOf('Alder')];
+  const bandForResponseIdx: number[] = new Array(nAgeResponse).fill(-1);
+  for (let bandIdx = 0; bandIdx < PYRAMID_AGE_CODES.length; bandIdx++) {
+    for (const singleCode of AGE_BAND_CODES[PYRAMID_AGE_CODES[bandIdx]]) {
+      const responseIdx = alderDim.category.index[singleCode];
+      if (responseIdx !== undefined) {
+        bandForResponseIdx[responseIdx] = bandIdx;
+      }
+    }
+  }
+
+  return parsePyramidResponse(data, bandForResponseIdx);
+}
+
+/**
+ * Fetch a population pyramid (age × gender) for any admin level.
+ * Region and Municipality use TAB5444 (single-year ages reaggregated to 5-year bands).
+ * RegSO and DeSO use TAB6574 (already 5-year bands).
+ * Results are session-cached; no IDB persistence.
+ */
+export async function fetchAgeGenderBreakdown(
+  level: AdminLevel,
+  areaCode: string,
+  year: number,
+): Promise<PyramidRow[]> {
+  const cacheKey = `${level}:${areaCode}:${year}`;
   const cached   = pyramidCache.get(cacheKey);
   if (cached) { return cached; }
   const inflight = pyramidInflight.get(cacheKey);
   if (inflight) { return inflight; }
 
   const promise = (async () => {
-    const { regsoCodes, desoCodes } = await getRegsoDeso();
-    const allCodes = level === 'RegSO' ? regsoCodes : desoCodes;
-    const fullCode = allCodes.find(c => c.startsWith(areaCode)) ?? areaCode;
-
-    const res = await fetch(DATA_URL_6574, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        selection: [
-          { variableCode: 'Region',       valueCodes: [fullCode] },
-          { variableCode: 'Alder',        valueCodes: PYRAMID_AGE_CODES },
-          { variableCode: 'Kon',          valueCodes: ['1', '2'] },
-          { variableCode: 'ContentsCode', valueCodes: ['000007Y7'] },
-          { variableCode: 'Tid',          valueCodes: [`${year}`] },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      throw new Error(`SCB API error: ${res.status} ${res.statusText}`);
+    let rows: PyramidRow[];
+    if (level === 'Region' || level === 'Municipality') {
+      rows = await fetchPyramidFromTab5444(areaCode, year);
+    } else if (level === 'RegSO' || level === 'DeSO') {
+      rows = await fetchPyramidFromTab6574(level, areaCode, year);
+    } else {
+      return [];
     }
-    const data: JsonStat2Response = await res.json();
-
-    const dimIds = data.id;
-    const sizes  = data.size;
-    const strides = new Array(dimIds.length).fill(1);
-    for (let i = dimIds.length - 2; i >= 0; i--) {
-      strides[i] = strides[i + 1] * sizes[i + 1];
-    }
-
-    const alderDimIdx = dimIds.indexOf('Alder');
-    const konDimIdx   = dimIds.indexOf('Kon');
-    const konDim      = data.dimension['Kon'];
-    const menKonIdx   = konDim.category.index['1'] ?? 0;
-    const womenKonIdx = konDim.category.index['2'] ?? 1;
-
-    const mensValues:  number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
-    const womenValues: number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
-
-    for (let i = 0; i < data.value.length; i++) {
-      const raw = data.value[i];
-      if (raw === null || raw === undefined) { continue; }
-      const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-      if (isNaN(num)) { continue; }
-      const ageIdx = Math.floor(i / strides[alderDimIdx]) % sizes[alderDimIdx];
-      const konIdx = Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx];
-      if (konIdx === menKonIdx)   { mensValues[ageIdx]  += num; }
-      else if (konIdx === womenKonIdx) { womenValues[ageIdx] += num; }
-    }
-
-    const rows: PyramidRow[] = PYRAMID_AGE_CODES.map((code, i) => ({
-      ageCode:  code,
-      ageLabel: pyramidAgeLabel(code),
-      men:      mensValues[i]  ?? 0,
-      women:    womenValues[i] ?? 0,
-    }));
-
     pyramidCache.set(cacheKey, rows);
     pyramidInflight.delete(cacheKey);
     return rows;

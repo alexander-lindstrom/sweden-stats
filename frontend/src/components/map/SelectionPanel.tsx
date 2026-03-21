@@ -7,24 +7,18 @@ import { DATASETS } from '@/datasets/registry';
 import { Spinner } from '@/components/ui/Spinner';
 import { FeatureSearch, FeatureSearchItem } from '@/components/ui/FeatureSearch';
 import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
+import { ProfileSection } from '@/components/profile/ProfileSection';
+import { UI } from '@/theme';
+import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
 
-const popDescriptor           = DATASETS.find(d => d.id === 'population')!;
-const incomeDescriptor        = DATASETS.find(d => d.id === 'medianinkomst')!;
-const ageDescriptor           = DATASETS.find(d => d.id === 'medelalder')!;
-const foreignBgDescriptor     = DATASETS.find(d => d.id === 'utlandsk_bakgrund')!;
-const employmentDescriptor    = DATASETS.find(d => d.id === 'sysselsattning')!;
-const riksdagsvalDescriptor   = DATASETS.find(d => d.id === 'riksdagsval')!;
+const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
 
-const STAT_YEAR      = 2024;
-const ELECTION_YEAR  = 2022;
+const STAT_YEAR     = AREA_STATS_YEAR;
+const ELECTION_YEAR = 2022;
 const ELECTION_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
 
-const SPARKLINE_YEARS     = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
-const SPARKLINE_LEVELS:   AdminLevel[] = ['Country', 'Region', 'Municipality'];
-const INCOME_LEVELS:      AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const AGE_LEVELS:         AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const FOREIGN_BG_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-const EMPLOYMENT_LEVELS:  AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const SPARKLINE_YEARS  = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
+const SPARKLINE_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality'];
 
 interface StatData {
   value:      number | null;
@@ -46,43 +40,21 @@ function toStat(result: ScalarDatasetResult, code: string): StatData {
   return { value, unit: result.unit, rank, total: all.length, percentile };
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-
-function CollapsibleSection({ title, children, defaultOpen = true }: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section>
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 mb-3 group"
-      >
-        <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 whitespace-nowrap">
-          {title}
-        </span>
-        <div className="flex-1 h-px bg-slate-200 group-hover:bg-slate-300 transition-colors" />
-        <svg
-          className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
-          viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5}
-        >
-          <path d="M2 4.5l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open && children}
-    </section>
-  );
+function toPanelStats(results: { population: ScalarDatasetResult | null; income: ScalarDatasetResult | null; age: ScalarDatasetResult | null; foreignBg: ScalarDatasetResult | null; employment: ScalarDatasetResult | null }, code: string): PanelStats | null {
+  if (!results.population) { return null; }
+  return {
+    population: toStat(results.population, code),
+    income:     results.income     ? toStat(results.income, code)     : null,
+    age:        results.age        ? toStat(results.age, code)        : null,
+    foreignBg:  results.foreignBg  ? toStat(results.foreignBg, code)  : null,
+    employment: results.employment ? toStat(results.employment, code) : null,
+  };
 }
 
+// ── Sub-components ────────────────────────────────────────────────────────────
+
 function ChartCard({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 shadow-sm">
-      {children}
-    </div>
-  );
+  return <div className={UI.cardCompact}>{children}</div>;
 }
 
 /**
@@ -385,26 +357,31 @@ interface PanelStats {
 }
 
 export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect }: SelectionPanelProps) {
-  const [stats,               setStats]               = useState<PanelStats | null>(null);
-  const [statsLoading,        setStatsLoading]        = useState(false);
-  const [sparkline,           setSparkline]           = useState<Array<{ year: number; value: number }>>([]);
-  const [sparkLoading,        setSparkLoading]        = useState(false);
+  // ── Stats (via shared hook) ───────────────────────────────────────────────
+  const primaryAreaStats = useAreaStats(selectedFeature,         adminLevel, STAT_YEAR);
+  const compAreaStats    = useAreaStats(comparisonFeature ?? null, adminLevel, STAT_YEAR);
+
+  const stats     = selectedFeature   ? toPanelStats(primaryAreaStats, selectedFeature.code)   : null;
+  const compStats = comparisonFeature ? toPanelStats(compAreaStats,    comparisonFeature.code)  : null;
+
+  // ── Sparkline state ───────────────────────────────────────────────────────
+  const [sparkline,     setSparkline]     = useState<Array<{ year: number; value: number }>>([]);
+  const [sparkLoading,  setSparkLoading]  = useState(false);
+  const [compSparkline, setCompSparkline] = useState<Array<{ year: number; value: number }>>([]);
+  const [compSparkLoading, setCompSparkLoading] = useState(false);
+
+  // ── Election state ────────────────────────────────────────────────────────
   const [electionVotes,       setElectionVotes]       = useState<Record<string, number> | null>(null);
   const [electionLoading,     setElectionLoading]     = useState(false);
-  const fetchIdRef = useRef(0);
-
-  // Comparison feature state
-  const [compStats,               setCompStats]               = useState<PanelStats | null>(null);
-  const [compStatsLoading,        setCompStatsLoading]        = useState(false);
-  const [compSparkline,           setCompSparkline]           = useState<Array<{ year: number; value: number }>>([]);
-  const [compSparkLoading,        setCompSparkLoading]        = useState(false);
   const [compElectionVotes,   setCompElectionVotes]   = useState<Record<string, number> | null>(null);
   const [compElectionLoading, setCompElectionLoading] = useState(false);
+
+  const fetchIdRef     = useRef(0);
   const compFetchIdRef = useRef(0);
 
+  // ── Sparkline + election for primary feature ──────────────────────────────
   useEffect(() => {
     if (!selectedFeature) {
-      setStats(null);
       setSparkline([]);
       setElectionVotes(null);
       return;
@@ -413,75 +390,9 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     const id   = ++fetchIdRef.current;
     const code = selectedFeature.code;
 
-    setStats(null);
-    setStatsLoading(true);
     setSparkline([]);
     setElectionVotes(null);
 
-    const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
-    const wantsAge        = AGE_LEVELS.includes(adminLevel);
-    const wantsForeignBg  = FOREIGN_BG_LEVELS.includes(adminLevel);
-    const wantsEmployment = EMPLOYMENT_LEVELS.includes(adminLevel);
-
-    let popStat:        StatData | null = null;
-    let incomeStat:     StatData | null = null;
-    let ageStat:        StatData | null = null;
-    let foreignBgStat:  StatData | null = null;
-    let employmentStat: StatData | null = null;
-
-    const statFetches: Promise<void>[] = [
-      fetchCached(popDescriptor, adminLevel, STAT_YEAR)
-        .then(r => { popStat = toStat(r as ScalarDatasetResult, code); })
-        .catch(() => {}),
-    ];
-
-    if (wantsIncome) {
-      statFetches.push(
-        fetchCached(incomeDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { incomeStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-
-    if (wantsAge) {
-      statFetches.push(
-        fetchCached(ageDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { ageStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-
-    if (wantsForeignBg) {
-      statFetches.push(
-        fetchCached(foreignBgDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { foreignBgStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-
-    if (wantsEmployment) {
-      statFetches.push(
-        fetchCached(employmentDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { employmentStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-
-    Promise.all(statFetches).then(() => {
-      if (id !== fetchIdRef.current) { return; }
-      if (popStat !== null) {
-        setStats({
-          population:  popStat,
-          income:      wantsIncome     ? incomeStat     : null,
-          age:         wantsAge        ? ageStat        : null,
-          foreignBg:   wantsForeignBg  ? foreignBgStat  : null,
-          employment:  wantsEmployment ? employmentStat : null,
-        });
-      }
-      setStatsLoading(false);
-    });
-
-    // Sparkline (TAB5444 levels only — RegSO/DeSO hidden by JSX guard)
     if (SPARKLINE_LEVELS.includes(adminLevel)) {
       setSparkLoading(true);
       fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
@@ -513,10 +424,9 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     }
   }, [selectedFeature, adminLevel]);
 
-  // Fetch stats for the comparison feature (same logic, different code).
+  // ── Sparkline + election for comparison feature ───────────────────────────
   useEffect(() => {
     if (!comparisonFeature) {
-      setCompStats(null);
       setCompSparkline([]);
       setCompElectionVotes(null);
       return;
@@ -525,72 +435,9 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     const id   = ++compFetchIdRef.current;
     const code = comparisonFeature.code;
 
-    setCompStats(null);
-    setCompStatsLoading(true);
     setCompSparkline([]);
     setCompElectionVotes(null);
 
-    const wantsIncome     = INCOME_LEVELS.includes(adminLevel);
-    const wantsAge        = AGE_LEVELS.includes(adminLevel);
-    const wantsForeignBg  = FOREIGN_BG_LEVELS.includes(adminLevel);
-    const wantsEmployment = EMPLOYMENT_LEVELS.includes(adminLevel);
-
-    let popStat:        StatData | null = null;
-    let incomeStat:     StatData | null = null;
-    let ageStat:        StatData | null = null;
-    let foreignBgStat:  StatData | null = null;
-    let employmentStat: StatData | null = null;
-
-    const statFetches: Promise<void>[] = [
-      fetchCached(popDescriptor, adminLevel, STAT_YEAR)
-        .then(r => { popStat = toStat(r as ScalarDatasetResult, code); })
-        .catch(() => {}),
-    ];
-
-    if (wantsIncome) {
-      statFetches.push(
-        fetchCached(incomeDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { incomeStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-    if (wantsAge) {
-      statFetches.push(
-        fetchCached(ageDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { ageStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-    if (wantsForeignBg) {
-      statFetches.push(
-        fetchCached(foreignBgDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { foreignBgStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-    if (wantsEmployment) {
-      statFetches.push(
-        fetchCached(employmentDescriptor, adminLevel, STAT_YEAR)
-          .then(r => { employmentStat = toStat(r as ScalarDatasetResult, code); })
-          .catch(() => {}),
-      );
-    }
-
-    Promise.all(statFetches).then(() => {
-      if (id !== compFetchIdRef.current) { return; }
-      if (popStat !== null) {
-        setCompStats({
-          population:  popStat,
-          income:      wantsIncome     ? incomeStat     : null,
-          age:         wantsAge        ? ageStat        : null,
-          foreignBg:   wantsForeignBg  ? foreignBgStat  : null,
-          employment:  wantsEmployment ? employmentStat : null,
-        });
-      }
-      setCompStatsLoading(false);
-    });
-
-    // Sparkline (TAB5444 levels only — RegSO/DeSO hidden by JSX guard)
     if (SPARKLINE_LEVELS.includes(adminLevel)) {
       setCompSparkLoading(true);
       fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
@@ -781,8 +628,8 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
         {selectedFeature && (
           <>
             {/* Radar profile */}
-            {!statsLoading && radarAxes.length >= 3 && (
-              <CollapsibleSection title="Profil">
+            {!primaryAreaStats.loading && radarAxes.length >= 3 && (
+              <ProfileSection title="Profil">
                 <ChartCard>
                   <RadarChart
                     axes={radarAxes}
@@ -803,16 +650,16 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                     </div>
                   )}
                 </ChartCard>
-              </CollapsibleSection>
+              </ProfileSection>
             )}
 
             {/* Key stats */}
-            <CollapsibleSection title={`Nyckeltal ${STAT_YEAR}`}>
-              {(statsLoading || (isComparing && compStatsLoading)) && <Spinner />}
-              {!statsLoading && !stats && (
+            <ProfileSection title={`Nyckeltal ${STAT_YEAR}`}>
+              {(primaryAreaStats.loading || (isComparing && compAreaStats.loading)) && <Spinner />}
+              {!primaryAreaStats.loading && !stats && (
                 <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
-              {!statsLoading && stats && !isComparing && (
+              {!primaryAreaStats.loading && stats && !isComparing && (
                 <div className="space-y-3">
                   <StatRow label="Befolkning"       stat={stats.population} />
                   {stats.income     && <StatRow label="Medianinkomst"    stat={stats.income}     />}
@@ -821,18 +668,18 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                   {stats.employment && <StatRow label="Sysselsättning"   stat={stats.employment} />}
                 </div>
               )}
-              {!statsLoading && stats && isComparing && (
+              {!primaryAreaStats.loading && stats && isComparing && (
                 <ComparisonStatsTable
                   primary={stats}
                   comparison={compStats}
-                  compLoading={compStatsLoading}
+                  compLoading={compAreaStats.loading}
                 />
               )}
-            </CollapsibleSection>
+            </ProfileSection>
 
             {/* Population sparkline */}
             {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
-              <CollapsibleSection title="Befolkningstrend">
+              <ProfileSection title="Befolkningstrend">
                 {(sparkLoading || (isComparing && compSparkLoading)) && <Spinner />}
                 {!sparkLoading && sparkline.length >= 2 && (
                   <ChartCard>
@@ -849,12 +696,12 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                 {!sparkLoading && sparkline.length < 2 && (
                   <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
                 )}
-              </CollapsibleSection>
+              </ProfileSection>
             )}
 
             {/* Election donut */}
             {ELECTION_LEVELS.includes(adminLevel) && (
-              <CollapsibleSection title={`Riksdagsval ${ELECTION_YEAR}`}>
+              <ProfileSection title={`Riksdagsval ${ELECTION_YEAR}`}>
                 {(electionLoading || (isComparing && compElectionLoading)) && <Spinner />}
                 {!isComparing && (
                   <>
@@ -882,7 +729,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                     </ChartCard>
                   </div>
                 )}
-              </CollapsibleSection>
+              </ProfileSection>
             )}
 
             {/* Comparison hint — shown only when a single area is selected */}

@@ -4,8 +4,7 @@ import { UI } from '@/theme';
 import type { PyramidRow } from '@/datasets/scb/population';
 
 export interface PopulationPyramidProps {
-  data:            PyramidRow[];
-  comparisonData?: PyramidRow[];
+  data: PyramidRow[];
 }
 
 // ── Layout constants ──────────────────────────────────────────────────────────
@@ -35,31 +34,22 @@ interface TooltipState {
 
 interface HoveredBar { ageCode: string; side: 'men' | 'women'; }
 
-export function PopulationPyramid({ data, comparisonData }: PopulationPyramidProps) {
+export function PopulationPyramid({ data }: PopulationPyramidProps) {
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [hovered, setHovered] = useState<HoveredBar | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (data.length === 0) { return null; }
 
-  const totalPrimary = data.reduce((s, r) => s + r.men + r.women, 0) || 1;
-  const totalComp    = comparisonData
-    ? (comparisonData.reduce((s, r) => s + r.men + r.women, 0) || 1)
-    : 1;
+  const total = data.reduce((s, r) => s + r.men + r.women, 0) || 1;
 
-  // Compute a common max percentage so both datasets share the same x-axis scale.
-  const maxPct = Math.max(
-    ...data.map(r => Math.max(r.men, r.women) / totalPrimary),
-    ...(comparisonData ? comparisonData.map(r => Math.max(r.men, r.women) / totalComp) : [0]),
-  );
-  const scale = maxPct > 0 ? BAR_COL_W / maxPct : BAR_COL_W;
+  const maxPct = Math.max(...data.map(r => Math.max(r.men, r.women) / total));
+  const scale  = maxPct > 0 ? BAR_COL_W / maxPct : BAR_COL_W;
 
   const N      = data.length;
   const chartH = TOP_PAD + N * (ROW_H + ROW_GAP) + BOTTOM_PAD;
 
   const rowY = (i: number) => TOP_PAD + i * (ROW_H + ROW_GAP);
-
-  const hasComp = !!comparisonData && comparisonData.length > 0;
 
   const clearTooltip = () => { setTooltip(null); setHovered(null); };
 
@@ -97,41 +87,15 @@ export function PopulationPyramid({ data, comparisonData }: PopulationPyramidPro
 
         {/* Rows */}
         {data.map((row, i) => {
-          const y         = rowY(i);
-          const menW      = (row.men   / totalPrimary) * scale;
-          const womenW    = (row.women / totalPrimary) * scale;
-          const comp      = comparisonData?.[i];
-          const compMenW  = comp ? (comp.men   / totalComp) * scale : 0;
-          const compWomW  = comp ? (comp.women / totalComp) * scale : 0;
+          const y      = rowY(i);
+          const menW   = (row.men   / total) * scale;
+          const womenW = (row.women / total) * scale;
 
           const menHov   = hovered?.ageCode === row.ageCode && hovered.side === 'men';
           const womenHov = hovered?.ageCode === row.ageCode && hovered.side === 'women';
 
           return (
             <g key={row.ageCode}>
-              {/* Comparison bars (outlined, drawn behind primary) */}
-              {comp && (
-                <>
-                  <rect
-                    x={MEN_END_X - compMenW} y={y}
-                    width={compMenW} height={ROW_H}
-                    rx={BAR_RADIUS}
-                    fill="none"
-                    stroke={CT.comparison}
-                    strokeOpacity={0.65}
-                    strokeWidth={0.75}
-                  />
-                  <rect
-                    x={WOMEN_X} y={y}
-                    width={compWomW} height={ROW_H}
-                    rx={BAR_RADIUS}
-                    fill="none"
-                    stroke={CT.comparison}
-                    strokeOpacity={0.65}
-                    strokeWidth={0.75}
-                  />
-                </>
-              )}
 
               {/* Primary men bar */}
               <rect
@@ -150,7 +114,7 @@ export function PopulationPyramid({ data, comparisonData }: PopulationPyramidPro
                     clientY:  e.clientY,
                     ageLabel: row.ageLabel,
                     value:    row.men,
-                    pct:      row.men / totalPrimary * 100,
+                    pct:      row.men / total * 100,
                   });
                 }}
               />
@@ -172,7 +136,7 @@ export function PopulationPyramid({ data, comparisonData }: PopulationPyramidPro
                     clientY:  e.clientY,
                     ageLabel: row.ageLabel,
                     value:    row.women,
-                    pct:      row.women / totalPrimary * 100,
+                    pct:      row.women / total * 100,
                   });
                 }}
               />
@@ -190,20 +154,6 @@ export function PopulationPyramid({ data, comparisonData }: PopulationPyramidPro
           );
         })}
 
-        {/* Legend (only shown when comparison data is present) */}
-        {hasComp && (() => {
-          const legendY = TOP_PAD + N * (ROW_H + ROW_GAP) + 4;
-          return (
-            <g>
-              <rect x={34} y={legendY + 1} width={8} height={7}
-                rx={1} fill={CT.menFill} fillOpacity={BAR_OPACITY} />
-              <text x={45} y={legendY + 7.5} fontSize={7} fill={CT.tickText}>Primärt</text>
-              <rect x={94} y={legendY + 1} width={8} height={7}
-                rx={1} fill="none" stroke={CT.comparison} strokeOpacity={0.65} strokeWidth={0.75} />
-              <text x={105} y={legendY + 7.5} fontSize={7} fill={CT.tickText}>Jämförelse</text>
-            </g>
-          );
-        })()}
       </svg>
 
       {/* Hover tooltip — dark style matching other charts */}
