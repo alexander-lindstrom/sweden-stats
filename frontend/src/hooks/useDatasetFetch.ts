@@ -83,14 +83,28 @@ export function useDatasetFetch(
             setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#c8bfb2');
           }
         } else {
-          // Scalar: sequential color scale.
+          // Scalar: sequential or diverging color scale.
           const vals = Object.values((result as ScalarDatasetResult).values).filter(Number.isFinite);
           setMapColorFn(null);
           if (vals.length > 0) {
-            const scale = d3
-              .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
-              .domain([Math.min(...vals), Math.max(...vals)])
-              .clamp(true);
+            let scale: d3.ScaleSequential<string>;
+            if (descriptor.colorScaleType === 'diverging' && descriptor.divergingCenter !== undefined) {
+              const center = descriptor.divergingCenter;
+              const extent = Math.max(center - Math.min(...vals), Math.max(...vals) - center);
+              scale = d3
+                .scaleSequential((t: number) =>
+                  t <= 0.5
+                    ? d3.interpolateRgb('#3b82f6', '#f5f5f0')(t * 2)
+                    : d3.interpolateRgb('#f5f5f0', '#e05c5c')((t - 0.5) * 2),
+                )
+                .domain([center - extent, center + extent])
+                .clamp(true);
+            } else {
+              scale = d3
+                .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
+                .domain([Math.min(...vals), Math.max(...vals)])
+                .clamp(true);
+            }
             setColorScale(() => scale);
           } else {
             setColorScale(null);

@@ -103,6 +103,9 @@ export interface DatasetDescriptor {
   timeSeriesLabel?: string;
   /** Color overrides for time series lines (id → hex color). */
   lineColors?: Record<string, string>;
+  /** When set, builds a diverging colour scale centred on divergingCenter instead of the default sequential scale. */
+  colorScaleType?:  'diverging';
+  divergingCenter?: number;
   availableYears: number[];
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];
