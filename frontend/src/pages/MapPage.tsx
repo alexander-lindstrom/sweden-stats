@@ -1091,6 +1091,9 @@ export default function MapPage() {
                       <DonutChart
                         items={donutResult.items}
                         size={160}
+                        holeRatio={22 / 48}
+                        legendColumns={2}
+                        showCount
                         centerLabel={centerLabel}
                         centerSub="studenter"
                       />

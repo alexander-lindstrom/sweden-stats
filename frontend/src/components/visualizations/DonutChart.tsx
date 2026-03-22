@@ -16,13 +16,24 @@ interface TooltipState {
 }
 
 interface Props {
-  items:        DonutItem[];
-  centerLabel?: string;
-  centerSub?:   string;
+  items:          DonutItem[];
+  centerLabel?:   string;
+  centerSub?:     string;
   /** Outer radius in px. Default 48 (matches panel usage). */
-  size?:        number;
+  size?:          number;
+  /** Ratio of inner hole to outer radius. Default 27/48 ≈ 0.56. */
+  holeRatio?:     number;
   /** Limit legend rows to top N items by value. */
-  topN?:        number;
+  topN?:          number;
+  /**
+   * When true, `value` is itself a share/percentage — tooltip shows only `share%`
+   * instead of `count (share%)`. Use for election donuts where value is already a %.
+   */
+  valueIsShare?:  boolean;
+  /** Number of legend columns. Default 1. */
+  legendColumns?: number;
+  /** When true, show formatted absolute value alongside % in legend rows. */
+  showCount?:     boolean;
 }
 
 /**
@@ -30,13 +41,23 @@ interface Props {
  * Used directly for visualisation-area charts (large size) and as the
  * rendering core of ElectionDonut (small, panel size).
  */
-export function DonutChart({ items, centerLabel, centerSub, size = 48, topN }: Props) {
+export function DonutChart({
+  items,
+  centerLabel,
+  centerSub,
+  size         = 48,
+  holeRatio    = 27 / 48,
+  topN,
+  valueIsShare = false,
+  legendColumns = 1,
+  showCount    = false,
+}: Props) {
   const svgRef       = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   const DONUT_R    = size;
-  const DONUT_HOLE = Math.round(DONUT_R * (27 / 48));
+  const DONUT_HOLE = Math.round(DONUT_R * holeRatio);
   const DONUT_SIZE = DONUT_R * 2 + 4;
 
   useEffect(() => {
@@ -95,17 +116,24 @@ export function DonutChart({ items, centerLabel, centerSub, size = 48, topN }: P
   const visible     = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
   const legendItems = topN !== undefined ? visible.slice(0, topN) : visible;
 
+  const gridClass = legendColumns === 2 ? 'grid grid-cols-2 gap-x-4 gap-y-1' : 'space-y-1';
+
   return (
     <div ref={containerRef} className="relative flex flex-col items-center gap-3">
       <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} className="flex-shrink-0" />
 
-      <div className="w-full space-y-1">
+      <div className={`w-full ${gridClass}`}>
         {legendItems.map(item => {
           const share = total > 0 ? item.value / total * 100 : 0;
           return (
             <div key={item.code} className="flex items-center gap-1.5 text-xs min-w-0">
               <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
               <span className="text-slate-500 truncate flex-1 min-w-0">{item.label}</span>
+              {showCount && (
+                <span className="tabular-nums text-slate-400 flex-shrink-0">
+                  {item.value.toLocaleString('sv-SE')}
+                </span>
+              )}
               <span className="tabular-nums text-slate-700 flex-shrink-0">{share.toFixed(1)}%</span>
             </div>
           );
@@ -119,7 +147,10 @@ export function DonutChart({ items, centerLabel, centerSub, size = 48, topN }: P
         >
           <div className="font-semibold text-slate-100">{tooltip.item.label}</div>
           <div className="text-slate-300 mt-0.5">
-            {tooltip.item.value.toLocaleString('sv-SE')} ({tooltip.share.toFixed(1)}%)
+            {valueIsShare
+              ? `${tooltip.share.toFixed(1)}%`
+              : `${tooltip.item.value.toLocaleString('sv-SE')} (${tooltip.share.toFixed(1)}%)`
+            }
           </div>
         </div>
       )}

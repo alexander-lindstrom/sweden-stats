@@ -24,6 +24,7 @@ export function ElectionDonut({ votes, size = 48, topN }: ElectionDonutProps) {
       items={items}
       size={size}
       topN={topN}
+      valueIsShare
       centerLabel={winner ? (winner.code === 'ÖVRIGA' ? 'Övr.' : winner.code) : undefined}
       centerSub={winner ? `${winner.value.toFixed(0)}%` : undefined}
     />
