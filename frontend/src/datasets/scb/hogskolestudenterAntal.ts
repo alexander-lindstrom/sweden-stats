@@ -19,15 +19,16 @@ const FIELD_LABELS: Record<string, string> = {
   '999': 'Övrigt',
 };
 
+// d3.schemeTableau10 — cohesive, accessible categorical palette.
 export const FIELD_COLORS: Record<string, string> = {
-  '10':  '#f59e0b', // amber   — Humaniora & teologi
-  '20':  '#8b5cf6', // violet  — Juridik & samhällsvet.
-  '40':  '#10b981', // emerald — Naturvetenskap
-  '45':  '#3b82f6', // blue    — Teknik
-  '60':  '#ef4444', // red     — Medicin & odontologi
-  '70':  '#f97316', // orange  — Vård & omsorg
-  '80':  '#ec4899', // pink    — Konstnärligt
-  '999': '#94a3b8', // slate   — Övrigt
+  '10':  '#f28e2b', // orange  — Humaniora & teologi
+  '20':  '#4e79a7', // blue    — Juridik & samhällsvet.
+  '40':  '#76b7b2', // teal    — Naturvetenskap
+  '45':  '#e15759', // red     — Teknik
+  '60':  '#edc948', // yellow  — Medicin & odontologi
+  '70':  '#59a14f', // green   — Vård & omsorg
+  '80':  '#b07aa1', // purple  — Konstnärligt
+  '999': '#bab0ac', // grey    — Övrigt (neutral "other")
 };
 
 const SCHOOL_YEARS = [
@@ -110,8 +111,14 @@ async function fetchAntalSnapshot(year: number): Promise<DonutDatasetResult> {
       code:  fc,
       label: FIELD_LABELS[fc] ?? fc,
       value: totals[fc],
-      color: FIELD_COLORS[fc] ?? '#94a3b8',
-    }));
+      color: FIELD_COLORS[fc] ?? '#bab0ac',
+    }))
+    // Largest first; Övrigt ('999') always last regardless of size.
+    .sort((a, b) => {
+      if (a.code === '999') { return 1; }
+      if (b.code === '999') { return -1; }
+      return b.value - a.value;
+    });
 
   return { kind: 'donut', items, label: 'Högskolestudenter per område', unit: 'studenter' };
 }

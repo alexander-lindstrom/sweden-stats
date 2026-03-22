@@ -16,24 +16,24 @@ interface TooltipState {
 }
 
 interface Props {
-  items:          DonutItem[];
-  centerLabel?:   string;
-  centerSub?:     string;
+  items:           DonutItem[];
+  centerLabel?:    string;
+  centerSub?:      string;
   /** Outer radius in px. Default 48 (matches panel usage). */
-  size?:          number;
+  size?:           number;
   /** Ratio of inner hole to outer radius. Default 27/48 ≈ 0.56. */
-  holeRatio?:     number;
+  holeRatio?:      number;
   /** Limit legend rows to top N items by value. */
-  topN?:          number;
+  topN?:           number;
   /**
    * When true, `value` is itself a share/percentage — tooltip shows only `share%`
    * instead of `count (share%)`. Use for election donuts where value is already a %.
    */
-  valueIsShare?:  boolean;
-  /** Number of legend columns. Default 1. */
-  legendColumns?: number;
+  valueIsShare?:   boolean;
+  /** Where to place the legend. Default 'below'. */
+  legendPosition?: 'below' | 'right';
   /** When true, show formatted absolute value alongside % in legend rows. */
-  showCount?:     boolean;
+  showCount?:      boolean;
 }
 
 /**
@@ -45,12 +45,12 @@ export function DonutChart({
   items,
   centerLabel,
   centerSub,
-  size         = 48,
-  holeRatio    = 27 / 48,
+  size            = 48,
+  holeRatio       = 27 / 48,
   topN,
-  valueIsShare = false,
-  legendColumns = 1,
-  showCount    = false,
+  valueIsShare    = false,
+  legendPosition  = 'below',
+  showCount       = false,
 }: Props) {
   const svgRef       = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +64,8 @@ export function DonutChart({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const visible = items.filter(i => i.value > 0);
+    // Sort largest first so the dominant slice starts at 12 o'clock.
+    const visible = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
     if (visible.length === 0) { return; }
 
     const total = visible.reduce((s, i) => s + i.value, 0);
@@ -94,10 +95,11 @@ export function DonutChart({
       })
       .on('mouseleave', () => setTooltip(null));
 
+    // Center text.
     if (centerLabel) {
       g.append('text')
         .attr('text-anchor', 'middle')
-        .attr('dy', centerSub ? '-0.2em' : '0.35em')
+        .attr('dy', centerSub ? '-0.3em' : '0.35em')
         .attr('font-size', Math.round(size * 13 / 48))
         .attr('font-weight', 700)
         .attr('fill', '#1e293b')
@@ -105,40 +107,52 @@ export function DonutChart({
     }
     if (centerSub) {
       g.append('text')
-        .attr('text-anchor', 'middle').attr('dy', '1em')
-        .attr('font-size', Math.round(size * 10 / 48))
-        .attr('fill', '#64748b')
+        .attr('text-anchor', 'middle').attr('dy', '1.1em')
+        .attr('font-size', Math.round(size * 8 / 48))
+        .attr('font-weight', 400)
+        .attr('fill', '#94a3b8')
         .text(centerSub);
     }
   }, [items, size, centerLabel, centerSub, DONUT_HOLE, DONUT_R, DONUT_SIZE]);
 
   const total       = items.reduce((s, i) => s + i.value, 0);
-  const visible     = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
-  const legendItems = topN !== undefined ? visible.slice(0, topN) : visible;
+  const sortedItems = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
+  const legendItems = topN !== undefined ? sortedItems.slice(0, topN) : sortedItems;
 
-  const gridClass = legendColumns === 2 ? 'grid grid-cols-2 gap-x-4 gap-y-1' : 'space-y-1';
+  const legendEl = (
+    <div className={legendPosition === 'right' ? 'flex flex-col justify-center space-y-1.5' : 'w-full space-y-1'}>
+      {legendItems.map(item => {
+        const share = total > 0 ? item.value / total * 100 : 0;
+        return (
+          <div key={item.code} className="flex items-baseline gap-1.5 text-xs min-w-0">
+            <span className="w-2 h-2 rounded-sm flex-shrink-0 self-center" style={{ backgroundColor: item.color }} />
+            <span className={legendPosition === 'right' ? 'text-slate-600 flex-shrink-0' : 'text-slate-500 truncate flex-1 min-w-0'}>
+              {item.label}
+            </span>
+            {legendPosition === 'right' && (
+              <span className="flex-1 border-b border-dotted border-slate-300 min-w-[16px]" />
+            )}
+            {showCount && (
+              <span className="tabular-nums text-slate-400 flex-shrink-0">
+                {item.value.toLocaleString('sv-SE')}
+              </span>
+            )}
+            <span className={`tabular-nums text-slate-700 flex-shrink-0 ${legendPosition !== 'right' && !showCount ? 'ml-auto' : ''}`}>
+              {share.toFixed(1)}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div ref={containerRef} className="relative flex flex-col items-center gap-3">
+    <div
+      ref={containerRef}
+      className={`relative ${legendPosition === 'right' ? 'flex flex-row items-center gap-8' : 'flex flex-col items-center gap-3'}`}
+    >
       <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} className="flex-shrink-0" />
-
-      <div className={`w-full ${gridClass}`}>
-        {legendItems.map(item => {
-          const share = total > 0 ? item.value / total * 100 : 0;
-          return (
-            <div key={item.code} className="flex items-center gap-1.5 text-xs min-w-0">
-              <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: item.color }} />
-              <span className="text-slate-500 truncate flex-1 min-w-0">{item.label}</span>
-              {showCount && (
-                <span className="tabular-nums text-slate-400 flex-shrink-0">
-                  {item.value.toLocaleString('sv-SE')}
-                </span>
-              )}
-              <span className="tabular-nums text-slate-700 flex-shrink-0">{share.toFixed(1)}%</span>
-            </div>
-          );
-        })}
-      </div>
+      {legendEl}
 
       {tooltip && (
         <div

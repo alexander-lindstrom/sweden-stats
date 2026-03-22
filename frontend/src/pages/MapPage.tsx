@@ -1080,27 +1080,17 @@ export default function MapPage() {
                   <ShareBarChart data={categoricalResult} />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'donut' && donutResult && (() => {
-                const total = donutResult.items.reduce((s, i) => s + i.value, 0);
-                const centerLabel = total >= 10000
-                  ? `${Math.round(total / 1000)}k`
-                  : total.toLocaleString('sv-SE');
-                return (
-                  <div className="w-full p-8 flex justify-center">
-                    <div className="w-80">
-                      <DonutChart
-                        items={donutResult.items}
-                        size={160}
-                        holeRatio={22 / 48}
-                        legendColumns={2}
-                        showCount
-                        centerLabel={centerLabel}
-                        centerSub="studenter"
-                      />
-                    </div>
-                  </div>
-                );
-              })()}
+              {activeView === 'chart' && activeChartType === 'donut' && donutResult && (
+                <div className="w-full p-8 flex justify-center">
+                  <DonutChart
+                    items={donutResult.items}
+                    size={160}
+                    holeRatio={22 / 48}
+                    legendPosition="right"
+                    showCount
+                  />
+                </div>
+              )}
               {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
                 <div className="w-full h-full p-4">
                   <SunburstWithBar
