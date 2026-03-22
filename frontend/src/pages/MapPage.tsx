@@ -145,6 +145,7 @@ export default function MapPage() {
   const electionResult      = datasetResult?.kind === 'election'          ? datasetResult : null;
   const categoricalResult   = datasetResult?.kind === 'categorical-share' ? datasetResult : null;
   const donutResult         = datasetResult?.kind === 'donut'             ? datasetResult : null;
+  const resultLabels        = scalarResult?.labels ?? electionResult?.labels;
 
   // Sub-level fetch so hovering sub-boundaries shows their own values.
   const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
@@ -193,7 +194,7 @@ export default function MapPage() {
 
   const searchItems = useMemo(() => {
     if (selectionLevel === selectedLevel || !hierarchyData || !activeDescriptor?.sunburstDepthToLevel) {
-      return Object.entries(datasetResult?.labels ?? {}).map(([code, label]) => ({ code, label: stripLanSuffix(label) }));
+      return Object.entries(resultLabels ?? {}).map(([code, label]) => ({ code, label: stripLanSuffix(label) }));
     }
     // Sunburst drill mode — extract labels from the hierarchy at the target depth.
     const targetDepth = activeDescriptor.sunburstDepthToLevel.indexOf(selectionLevel);
@@ -374,7 +375,7 @@ export default function MapPage() {
   );
 
   useEffect(() => {
-    if (activeView !== 'profile' && !availableViews.includes(activeView)) {
+    if ((activeView === 'profile' && selectedLevel === 'Country') || (activeView !== 'profile' && !availableViews.includes(activeView))) {
       setActiveView(availableViews[0] ?? 'map');
     }
   }, [availableViews, activeView]);
@@ -765,7 +766,7 @@ export default function MapPage() {
 
           {/* View tabs */}
           {ALL_VIEWS.map(({ key, label }) => {
-            const supported = key === 'profile' || availableViews.includes(key);
+            const supported = (key === 'profile' && selectedLevel !== 'Country') || availableViews.includes(key);
             return (
               <button
                 key={key}
@@ -993,7 +994,7 @@ export default function MapPage() {
                   colorScale={bivariateFn ? null : colorScale}
                   mapColorFn={bivariateFn ?? mapColorFn}
                   tooltipData={tooltipData}
-                  featureLabels={datasetResult?.labels}
+                  featureLabels={resultLabels}
                   featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                   featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
