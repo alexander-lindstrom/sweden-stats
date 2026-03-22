@@ -12,6 +12,7 @@ import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
+import { ShareBarChart } from '@/components/visualizations/ShareBarChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
@@ -139,8 +140,9 @@ export default function MapPage() {
     selectedDatasetId, selectedLevel, selectedYear, activeParty,
   );
 
-  const scalarResult   = datasetResult?.kind === 'scalar'   ? datasetResult as ScalarDatasetResult : null;
-  const electionResult = datasetResult?.kind === 'election' ? datasetResult : null;
+  const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
+  const electionResult      = datasetResult?.kind === 'election'          ? datasetResult : null;
+  const categoricalResult   = datasetResult?.kind === 'categorical-share' ? datasetResult : null;
 
   // Sub-level fetch so hovering sub-boundaries shows their own values.
   const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
@@ -1029,6 +1031,11 @@ export default function MapPage() {
                     selectedFeature={selectedFeature}
                     onFeatureSelect={handleFeatureSelect}
                   />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'share-bar' && categoricalResult && (
+                <div className="w-full p-6 overflow-y-auto">
+                  <ShareBarChart data={categoricalResult} />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (

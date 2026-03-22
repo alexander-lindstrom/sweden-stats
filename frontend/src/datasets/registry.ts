@@ -9,10 +9,11 @@ import { kpi } from './scb/kpi';
 import { riksdagsval, regionval, kommunval } from './scb/elections';
 import { utbildningsniva } from './scb/utbildningsniva';
 import { gymnasiebetyg } from './scb/gymnasiebetyg';
+import { hogskolestudenter } from './scb/hogskolestudenter';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
-  utbildningsniva, gymnasiebetyg,
+  utbildningsniva, gymnasiebetyg, hogskolestudenter,
   stateExpenses, kpi,
   riksdagsval, regionval, kommunval,
 ];

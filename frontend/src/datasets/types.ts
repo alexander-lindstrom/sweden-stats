@@ -1,6 +1,6 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table' | 'profile';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot' | 'share-bar';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar:             'Rankningslista',
@@ -12,6 +12,7 @@ export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   'party-ranking': 'Rankningslista',
   scatter:         'Spridningsdiagram',
   boxplot:         'Lådagram',
+  'share-bar':     'Könsfördelning',
 };
 
 export interface TimeSeriesPoint {
@@ -23,6 +24,26 @@ export interface TimeSeriesNode {
   id: string;
   label: string;
   points: TimeSeriesPoint[];
+}
+
+export interface CategoryShare {
+  code:  string;
+  label: string;
+  color: string;
+}
+
+export interface CategoricalShareResult {
+  kind:       'categorical-share';
+  /** Ordered segment definitions — one per stacked column (e.g. [{men}, {women}]). */
+  categories: CategoryShare[];
+  /** One row per item (e.g. field of study). shares values should sum to ~100 per row. */
+  rows: Array<{
+    code:   string;
+    label:  string;
+    shares: Record<string, number>; // categoryCode → share %
+  }>;
+  label: string;
+  unit:  string;
 }
 
 export interface ScalarDatasetResult {
@@ -48,7 +69,7 @@ export interface ElectionDatasetResult {
   electionType: 'riksdag' | 'region' | 'municipality';
 }
 
-export type DatasetResult = ScalarDatasetResult | ElectionDatasetResult;
+export type DatasetResult = ScalarDatasetResult | ElectionDatasetResult | CategoricalShareResult;
 
 export interface GeoHierarchyNode {
   code: string;
