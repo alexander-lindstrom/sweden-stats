@@ -203,7 +203,9 @@ async function fetchGenderTimeSeries(): Promise<TimeSeriesNode[]> {
 
 export const hogskolestudenter: DatasetDescriptor = {
   id:             'hogskolestudenter',
-  label:          'Högskolestudenter',
+  label:          'Högskolestudenter – kön',
+  shortLabel:     'Kön',
+  group:          'hogskolestudenter',
   source:         'SCB',
   timeSeriesUnit:  '%',
   timeSeriesLabel: 'Andel kvinnor',

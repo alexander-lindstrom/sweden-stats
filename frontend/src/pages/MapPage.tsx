@@ -12,6 +12,7 @@ import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 import { ShareBarChart } from '@/components/visualizations/ShareBarChart';
+import { DonutChart } from '@/components/visualizations/DonutChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
@@ -143,6 +144,7 @@ export default function MapPage() {
   const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
   const electionResult      = datasetResult?.kind === 'election'          ? datasetResult : null;
   const categoricalResult   = datasetResult?.kind === 'categorical-share' ? datasetResult : null;
+  const donutResult         = datasetResult?.kind === 'donut'             ? datasetResult : null;
 
   // Sub-level fetch so hovering sub-boundaries shows their own values.
   const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
@@ -668,13 +670,16 @@ export default function MapPage() {
     );
   }, [subElectionResult, activeParty]);
 
-  // Color overrides for MultiLineChart when showing election time series.
-  const partyColorOverrides = useMemo(
-    () => electionResult || activeDescriptor?.group === 'val'
-      ? new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]))
-      : undefined,
-    [electionResult, activeDescriptor],
-  );
+  // Color overrides for MultiLineChart: election party colors or descriptor lineColors.
+  const partyColorOverrides = useMemo(() => {
+    if (electionResult || activeDescriptor?.group === 'val') {
+      return new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]));
+    }
+    if (activeDescriptor?.lineColors) {
+      return new Map(Object.entries(activeDescriptor.lineColors));
+    }
+    return undefined;
+  }, [electionResult, activeDescriptor]);
 
   // Content-sized charts should shrink the render area to content height instead of filling.
   // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.
@@ -686,7 +691,8 @@ export default function MapPage() {
     activeChartType === 'bar' ||
     activeChartType === 'party-ranking' ||
     activeChartType === 'boxplot' ||
-    activeChartType === 'election-bar'
+    activeChartType === 'election-bar' ||
+    activeChartType === 'donut'
   ));
 
   return (
@@ -1074,6 +1080,24 @@ export default function MapPage() {
                   <ShareBarChart data={categoricalResult} />
                 </div>
               )}
+              {activeView === 'chart' && activeChartType === 'donut' && donutResult && (() => {
+                const total = donutResult.items.reduce((s, i) => s + i.value, 0);
+                const centerLabel = total >= 10000
+                  ? `${Math.round(total / 1000)}k`
+                  : total.toLocaleString('sv-SE');
+                return (
+                  <div className="w-full p-8 flex justify-center">
+                    <div className="w-80">
+                      <DonutChart
+                        items={donutResult.items}
+                        size={160}
+                        centerLabel={centerLabel}
+                        centerSub="studenter"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
               {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
                 <div className="w-full h-full p-4">
                   <SunburstWithBar
@@ -1140,7 +1164,7 @@ export default function MapPage() {
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && activeChartType !== 'donut' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>
