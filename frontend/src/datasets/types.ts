@@ -1,6 +1,6 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
 export type ViewType = 'map' | 'chart' | 'table' | 'profile';
-export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot';
+export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot' | 'share-bar' | 'donut';
 
 export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   bar:             'Rankningslista',
@@ -12,6 +12,8 @@ export const CHART_TYPE_LABELS: Record<ChartType, string> = {
   'party-ranking': 'Rankningslista',
   scatter:         'Spridningsdiagram',
   boxplot:         'Lådagram',
+  'share-bar':     'Könsfördelning',
+  donut:           'Cirkeldiagram',
 };
 
 export interface TimeSeriesPoint {
@@ -23,6 +25,27 @@ export interface TimeSeriesNode {
   id: string;
   label: string;
   points: TimeSeriesPoint[];
+}
+
+export interface CategoryShare {
+  code:         string;
+  label:        string;        // shown in legend
+  tooltipLabel?: string;       // shown in hover tooltip; falls back to label
+  color:        string;
+}
+
+export interface CategoricalShareResult {
+  kind:       'categorical-share';
+  /** Ordered segment definitions — one per stacked column (e.g. [{men}, {women}]). */
+  categories: CategoryShare[];
+  /** One row per item (e.g. field of study). shares values should sum to ~100 per row. */
+  rows: Array<{
+    code:   string;
+    label:  string;
+    shares: Record<string, number>; // categoryCode → share %
+  }>;
+  label: string;
+  unit:  string;
 }
 
 export interface ScalarDatasetResult {
@@ -48,7 +71,14 @@ export interface ElectionDatasetResult {
   electionType: 'riksdag' | 'region' | 'municipality';
 }
 
-export type DatasetResult = ScalarDatasetResult | ElectionDatasetResult;
+export interface DonutDatasetResult {
+  kind:  'donut';
+  items: { code: string; label: string; value: number; color: string }[];
+  label: string;
+  unit:  string;
+}
+
+export type DatasetResult = ScalarDatasetResult | ElectionDatasetResult | CategoricalShareResult | DonutDatasetResult;
 
 export interface GeoHierarchyNode {
   code: string;
@@ -67,6 +97,12 @@ export interface DatasetDescriptor {
   /** Display name for the group header. Only needed on one descriptor in the group. */
   groupLabel?: string;
   source: string;
+  /** Unit label shown on time series charts (e.g. 'poäng', '%'). */
+  timeSeriesUnit?: string;
+  /** Y-axis label for time series charts. Defaults to descriptor label when absent. */
+  timeSeriesLabel?: string;
+  /** Color overrides for time series lines (id → hex color). */
+  lineColors?: Record<string, string>;
   availableYears: number[];
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];

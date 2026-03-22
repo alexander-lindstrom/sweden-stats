@@ -11,13 +11,15 @@ import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
-import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
+import { ShareBarChart } from '@/components/visualizations/ShareBarChart';
+import { DonutChart } from '@/components/visualizations/DonutChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult, FilterCriterion,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
+  CategoryShare, CategoricalShareResult,
 } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
@@ -139,8 +141,11 @@ export default function MapPage() {
     selectedDatasetId, selectedLevel, selectedYear, activeParty,
   );
 
-  const scalarResult   = datasetResult?.kind === 'scalar'   ? datasetResult as ScalarDatasetResult : null;
-  const electionResult = datasetResult?.kind === 'election' ? datasetResult : null;
+  const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
+  const electionResult      = datasetResult?.kind === 'election'          ? datasetResult : null;
+  const categoricalResult   = datasetResult?.kind === 'categorical-share' ? datasetResult : null;
+  const donutResult         = datasetResult?.kind === 'donut'             ? datasetResult : null;
+  const resultLabels        = scalarResult?.labels ?? electionResult?.labels;
 
   // Sub-level fetch so hovering sub-boundaries shows their own values.
   const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
@@ -189,7 +194,7 @@ export default function MapPage() {
 
   const searchItems = useMemo(() => {
     if (selectionLevel === selectedLevel || !hierarchyData || !activeDescriptor?.sunburstDepthToLevel) {
-      return Object.entries(datasetResult?.labels ?? {}).map(([code, label]) => ({ code, label: stripLanSuffix(label) }));
+      return Object.entries(resultLabels ?? {}).map(([code, label]) => ({ code, label: stripLanSuffix(label) }));
     }
     // Sunburst drill mode — extract labels from the hierarchy at the target depth.
     const targetDepth = activeDescriptor.sunburstDepthToLevel.indexOf(selectionLevel);
@@ -370,7 +375,7 @@ export default function MapPage() {
   );
 
   useEffect(() => {
-    if (activeView !== 'profile' && !availableViews.includes(activeView)) {
+    if ((activeView === 'profile' && selectedLevel === 'Country') || (activeView !== 'profile' && !availableViews.includes(activeView))) {
       setActiveView(availableViews[0] ?? 'map');
     }
   }, [availableViews, activeView]);
@@ -529,6 +534,41 @@ export default function MapPage() {
     };
   }, [electionResult, activeChartType, selectedLevel, effectiveLan]);
 
+  // Convert election result → CategoricalShareResult for the generic ShareBarChart.
+  const partyShareData = useMemo((): CategoricalShareResult | null => {
+    if (!filteredElectionResult) { return null; }
+    const codes = Object.keys(filteredElectionResult.partyVotes);
+    if (codes.length === 0) { return null; }
+
+    const partyOrder = Object.fromEntries(PARTY_CODES.map((p, i) => [p, i]));
+    const sortedCodes = codes.slice().sort((a, b) => {
+      const wa = filteredElectionResult.winnerByGeo[a] ?? 'ÖVRIGA';
+      const wb = filteredElectionResult.winnerByGeo[b] ?? 'ÖVRIGA';
+      const orderDiff = (partyOrder[wa] ?? 99) - (partyOrder[wb] ?? 99);
+      if (orderDiff !== 0) { return orderDiff; }
+      return (filteredElectionResult.partyVotes[b][wb] ?? 0) - (filteredElectionResult.partyVotes[a][wa] ?? 0);
+    });
+
+    const presentParties = PARTY_CODES.filter(p =>
+      codes.some(c => (filteredElectionResult.partyVotes[c][p] ?? 0) > 0),
+    );
+
+    const categories: CategoryShare[] = presentParties.map(p => ({
+      code:         p,
+      label:        p === 'ÖVRIGA' ? 'Övr.' : p,
+      tooltipLabel: PARTY_LABELS[p] ?? p,
+      color:        PARTY_COLORS[p] ?? '#ccc',
+    }));
+
+    const rows = sortedCodes.map(code => ({
+      code,
+      label:  filteredElectionResult.labels[code] ?? code,
+      shares: filteredElectionResult.partyVotes[code],
+    }));
+
+    return { kind: 'categorical-share', categories, rows, label: filteredElectionResult.label, unit: filteredElectionResult.unit };
+  }, [filteredElectionResult]);
+
   // ── Party choropleth ───────────────────────────────────────────────────────
   // Derived scalar values (geoCode → party share %) for the party choropleth map.
   const partyChoroplethValues = useMemo(() => {
@@ -631,13 +671,16 @@ export default function MapPage() {
     );
   }, [subElectionResult, activeParty]);
 
-  // Color overrides for MultiLineChart when showing election time series.
-  const partyColorOverrides = useMemo(
-    () => electionResult || activeDescriptor?.group === 'val'
-      ? new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]))
-      : undefined,
-    [electionResult, activeDescriptor],
-  );
+  // Color overrides for MultiLineChart: election party colors or descriptor lineColors.
+  const partyColorOverrides = useMemo(() => {
+    if (electionResult || activeDescriptor?.group === 'val') {
+      return new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]));
+    }
+    if (activeDescriptor?.lineColors) {
+      return new Map(Object.entries(activeDescriptor.lineColors));
+    }
+    return undefined;
+  }, [electionResult, activeDescriptor]);
 
   // Content-sized charts should shrink the render area to content height instead of filling.
   // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.
@@ -649,7 +692,8 @@ export default function MapPage() {
     activeChartType === 'bar' ||
     activeChartType === 'party-ranking' ||
     activeChartType === 'boxplot' ||
-    activeChartType === 'election-bar'
+    activeChartType === 'election-bar' ||
+    activeChartType === 'donut'
   ));
 
   return (
@@ -722,7 +766,7 @@ export default function MapPage() {
 
           {/* View tabs */}
           {ALL_VIEWS.map(({ key, label }) => {
-            const supported = key === 'profile' || availableViews.includes(key);
+            const supported = (key === 'profile' && selectedLevel !== 'Country') || availableViews.includes(key);
             return (
               <button
                 key={key}
@@ -950,7 +994,7 @@ export default function MapPage() {
                   colorScale={bivariateFn ? null : colorScale}
                   mapColorFn={bivariateFn ?? mapColorFn}
                   tooltipData={tooltipData}
-                  featureLabels={datasetResult?.labels}
+                  featureLabels={resultLabels}
                   featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
                   featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
                   featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
@@ -1022,12 +1066,29 @@ export default function MapPage() {
                   <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'election-bar' && filteredElectionResult && (
+              {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
                 <div className="w-full p-6">
-                  <PartyShareBarChart
-                    data={filteredElectionResult}
-                    selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
+                  <ShareBarChart
+                    data={partyShareData}
+                    sort="none"
+                    selectedCode={selectedFeature?.code ?? null}
+                    onSelect={handleFeatureSelect}
+                  />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'share-bar' && categoricalResult && (
+                <div className="w-full p-6">
+                  <ShareBarChart data={categoricalResult} />
+                </div>
+              )}
+              {activeView === 'chart' && activeChartType === 'donut' && donutResult && (
+                <div className="w-full p-8 flex justify-center">
+                  <DonutChart
+                    items={donutResult.items}
+                    size={160}
+                    holeRatio={22 / 48}
+                    legendPosition="right"
+                    showCount
                   />
                 </div>
               )}
@@ -1053,7 +1114,8 @@ export default function MapPage() {
                     data={timeSeriesData}
                     label={timeSeriesFeatureCode
                       ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
-                      : activeDescriptor?.label}
+                      : (activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
+                    unit={activeDescriptor?.timeSeriesUnit}
                     colorOverrides={partyColorOverrides}
                   />
                 </div>
@@ -1096,7 +1158,7 @@ export default function MapPage() {
               {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
                 <Spinner />
               )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && !datasetResult && (
+              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && activeChartType !== 'donut' && !datasetResult && (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">
                   Välj ett dataset för att visa diagram.
                 </div>

@@ -115,4 +115,4 @@ Valmyndigheten publishes boundaries and results at the valdistrikt (polling dist
 - **"Find areas like this"** — given a selected area, surface the N most similar areas nationally (by statistical profile). Useful and unusual.
 - **Percentile bands** — instead of raw choropleth values, show which quintile each area falls into, making cross-metric comparison more intuitive
 - **Mobile** — the map works on mobile but the UI isn't optimized for it
-- **Gender dimension** - Education/median income/Election results/whatever. Started but more that can be done here.
+- **Gender dimension** - Education/median income/Election results/whatever. Also pure diff (or maybe more likely %men) as a chloropleth.
