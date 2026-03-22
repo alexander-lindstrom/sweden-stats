@@ -27,9 +27,10 @@ export interface TimeSeriesNode {
 }
 
 export interface CategoryShare {
-  code:  string;
-  label: string;
-  color: string;
+  code:         string;
+  label:        string;        // shown in legend
+  tooltipLabel?: string;       // shown in hover tooltip; falls back to label
+  color:        string;
 }
 
 export interface CategoricalShareResult {
@@ -90,6 +91,8 @@ export interface DatasetDescriptor {
   source: string;
   /** Unit label shown on time series charts (e.g. 'poäng', '%'). */
   timeSeriesUnit?: string;
+  /** Y-axis label for time series charts. Defaults to descriptor label when absent. */
+  timeSeriesLabel?: string;
   availableYears: number[];
   supportedLevels: AdminLevel[];
   supportedViews: ViewType[];

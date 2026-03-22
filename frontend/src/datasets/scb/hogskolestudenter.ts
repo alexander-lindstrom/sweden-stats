@@ -205,7 +205,8 @@ export const hogskolestudenter: DatasetDescriptor = {
   id:             'hogskolestudenter',
   label:          'Högskolestudenter',
   source:         'SCB',
-  timeSeriesUnit: '%',
+  timeSeriesUnit:  '%',
+  timeSeriesLabel: 'Andel kvinnor',
   availableYears: Array.from({ length: 18 }, (_, i) => 2008 + i), // 2008–2025
   supportedLevels: ['Country'],
   supportedViews:  ['chart'],

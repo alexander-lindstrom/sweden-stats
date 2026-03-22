@@ -11,7 +11,6 @@ import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
 import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
-import { PartyShareBarChart } from '@/components/visualizations/PartyShareBarChart';
 import { ShareBarChart } from '@/components/visualizations/ShareBarChart';
 import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
@@ -19,6 +18,7 @@ import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import {
   AdminLevel, ChartType, ViewType, ScalarDatasetResult, FilterCriterion,
   viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
+  CategoryShare, CategoricalShareResult,
 } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
@@ -531,6 +531,41 @@ export default function MapPage() {
     };
   }, [electionResult, activeChartType, selectedLevel, effectiveLan]);
 
+  // Convert election result → CategoricalShareResult for the generic ShareBarChart.
+  const partyShareData = useMemo((): CategoricalShareResult | null => {
+    if (!filteredElectionResult) { return null; }
+    const codes = Object.keys(filteredElectionResult.partyVotes);
+    if (codes.length === 0) { return null; }
+
+    const partyOrder = Object.fromEntries(PARTY_CODES.map((p, i) => [p, i]));
+    const sortedCodes = codes.slice().sort((a, b) => {
+      const wa = filteredElectionResult.winnerByGeo[a] ?? 'ÖVRIGA';
+      const wb = filteredElectionResult.winnerByGeo[b] ?? 'ÖVRIGA';
+      const orderDiff = (partyOrder[wa] ?? 99) - (partyOrder[wb] ?? 99);
+      if (orderDiff !== 0) { return orderDiff; }
+      return (filteredElectionResult.partyVotes[b][wb] ?? 0) - (filteredElectionResult.partyVotes[a][wa] ?? 0);
+    });
+
+    const presentParties = PARTY_CODES.filter(p =>
+      codes.some(c => (filteredElectionResult.partyVotes[c][p] ?? 0) > 0),
+    );
+
+    const categories: CategoryShare[] = presentParties.map(p => ({
+      code:         p,
+      label:        p === 'ÖVRIGA' ? 'Övr.' : p,
+      tooltipLabel: PARTY_LABELS[p] ?? p,
+      color:        PARTY_COLORS[p] ?? '#ccc',
+    }));
+
+    const rows = sortedCodes.map(code => ({
+      code,
+      label:  filteredElectionResult.labels[code] ?? code,
+      shares: filteredElectionResult.partyVotes[code],
+    }));
+
+    return { kind: 'categorical-share', categories, rows, label: filteredElectionResult.label, unit: filteredElectionResult.unit };
+  }, [filteredElectionResult]);
+
   // ── Party choropleth ───────────────────────────────────────────────────────
   // Derived scalar values (geoCode → party share %) for the party choropleth map.
   const partyChoroplethValues = useMemo(() => {
@@ -1024,17 +1059,18 @@ export default function MapPage() {
                   <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                 </div>
               )}
-              {activeView === 'chart' && activeChartType === 'election-bar' && filteredElectionResult && (
+              {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
                 <div className="w-full p-6">
-                  <PartyShareBarChart
-                    data={filteredElectionResult}
-                    selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
+                  <ShareBarChart
+                    data={partyShareData}
+                    sort="none"
+                    selectedCode={selectedFeature?.code ?? null}
+                    onSelect={handleFeatureSelect}
                   />
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'share-bar' && categoricalResult && (
-                <div className="w-full p-6 overflow-y-auto">
+                <div className="w-full p-6">
                   <ShareBarChart data={categoricalResult} />
                 </div>
               )}
@@ -1060,7 +1096,7 @@ export default function MapPage() {
                     data={timeSeriesData}
                     label={timeSeriesFeatureCode
                       ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
-                      : activeDescriptor?.label}
+                      : (activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
                     unit={activeDescriptor?.timeSeriesUnit}
                     colorOverrides={partyColorOverrides}
                   />
