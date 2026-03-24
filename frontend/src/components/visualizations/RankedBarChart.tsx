@@ -50,7 +50,9 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       return;
     }
 
-    const innerW = svgWidth  - MARGIN.left - MARGIN.right;
+    const left  = svgWidth < 480 ? 90  : MARGIN.left;
+    const right = svgWidth < 480 ? 62  : MARGIN.right;
+    const innerW = svgWidth  - left - right;
     const innerH = svgHeight - MARGIN.top  - MARGIN.bottom;
 
     const svg = d3.select(svgRef.current);
@@ -61,7 +63,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('height', svgHeight)
       .attr('font-family', 'system-ui, sans-serif')
       .append('g')
-      .attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+      .attr('transform', `translate(${left},${MARGIN.top})`);
 
     const xScale = d3.scaleLinear()
       .domain([0, d3.max(sorted, d => d.value) ?? 1])
@@ -87,7 +89,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
     drawChartFrame(g, innerW, innerH, {
       separatorCount: n - 1,
       separatorY: i => yScale(sorted[i + 1].code)! - 0.5,
-      leftExtend: MARGIN.left,
+      leftExtend: left,
     });
 
     // Bars
@@ -182,7 +184,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('transform', `translate(0,${innerH})`)
       .call(
         d3.axisBottom(xScale)
-          .ticks(4)
+          .ticks(Math.max(2, Math.floor(innerW / 55)))
           .tickFormat(n => {
             const v = n.valueOf();
             if (v >= 1_000_000) {

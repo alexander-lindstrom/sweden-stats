@@ -28,7 +28,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale, year, source 
     const presentParties = new Set(Object.values(data.winnerByGeo));
     const parties = PARTY_CODES.filter(p => presentParties.has(p));
     return (
-      <div className="flex flex-col gap-1.5 w-24">
+      <div className="flex flex-col gap-1.5">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</p>
         <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           {parties.map(p => (
