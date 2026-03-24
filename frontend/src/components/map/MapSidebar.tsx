@@ -198,14 +198,14 @@ export function MapSidebar({
       desktopOpen
         ? 'md:relative md:inset-auto md:z-auto md:translate-x-0 md:w-52 md:flex-shrink-0 md:border-r md:border-slate-200 md:bg-white md:flex md:flex-col md:overflow-y-auto md:[box-shadow:4px_0_12px_rgba(0,0,0,0.06)]'
         : 'md:hidden',
-      // <md: fixed full-height overlay sliding in from the left
-      'fixed inset-y-0 left-0 z-30 w-72 border-r border-slate-200 bg-white flex flex-col overflow-y-auto',
+      // <md: fixed overlay sliding in from the left, starts below the top bar
+      'fixed top-11 bottom-0 left-0 z-30 w-1/2 border-r border-slate-200 bg-white flex flex-col overflow-y-auto',
       'transition-transform duration-300 ease-out shadow-xl',
       mobileOpen ? 'translate-x-0' : '-translate-x-full',
     ].join(' ')}>
 
-      {/* Wordmark */}
-      <div className="h-11 flex items-center px-4 border-b border-slate-200 flex-shrink-0">
+      {/* Wordmark — desktop only; on mobile the top bar stays visible above the sidebar */}
+      <div className="h-11 hidden md:flex items-center px-4 border-b border-slate-200 flex-shrink-0">
         <button
           onClick={onReset}
           className="flex items-center gap-0 flex-1 hover:opacity-80 transition-opacity"

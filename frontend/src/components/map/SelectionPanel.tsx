@@ -539,7 +539,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
         'transition-[transform,width] duration-300 ease-out',
         // Mobile (<sm): fixed bottom sheet
         'fixed bottom-0 left-0 right-0 z-30',
-        'max-h-[65vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
+        'max-h-[50vh] rounded-t-2xl shadow-2xl border-t border-slate-200',
         // sm–lg: absolute right-side overlay drawer within the positioned map container
         'sm:absolute sm:left-auto sm:right-0 sm:top-0 sm:bottom-auto',
         'sm:h-full sm:max-h-none sm:z-20',
