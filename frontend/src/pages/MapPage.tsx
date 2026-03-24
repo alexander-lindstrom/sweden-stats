@@ -1075,7 +1075,7 @@ export default function MapPage() {
                 </div>
               )}
               {activeView === 'chart' && activeChartType === 'donut' && donutResult && (
-                <div className="w-full p-8 flex justify-center">
+                <div className="w-full p-4 flex justify-center">
                   <DonutChart
                     items={donutResult.items}
                     size={160}
