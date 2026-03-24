@@ -116,8 +116,10 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
   useEffect(() => {
     if (!sunRef.current || !dims) {return;}
 
-    const w      = Math.floor(dims.width / 2);
-    const h      = dims.height;
+    const isNarrow = dims.width < 480;
+    const SUN_H    = 220;
+    const w      = isNarrow ? dims.width : Math.floor(dims.width / 2);
+    const h      = isNarrow ? SUN_H      : dims.height;
     const radius = Math.min(w, h) / 2 * 0.88;
 
     const svg = d3.select(sunRef.current);
@@ -208,8 +210,10 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
   useEffect(() => {
     if (!barRef.current || !dims) {return;}
 
-    const w      = dims.width - Math.floor(dims.width / 2);
-    const h      = dims.height;
+    const isNarrow = dims.width < 480;
+    const SUN_H    = 220;
+    const w      = isNarrow ? dims.width                            : dims.width - Math.floor(dims.width / 2);
+    const h      = isNarrow ? Math.max(0, dims.height - SUN_H - 1) : dims.height;
     const innerW = w - BAR_M.left - BAR_M.right;
     const innerH = h - BAR_M.top  - BAR_M.bottom;
     if (innerW <= 0 || innerH <= 0) {return;}
@@ -325,7 +329,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     // X-axis.
     g.append('g')
       .attr('transform', `translate(0,${vOffset + effH})`)
-      .call(d3.axisBottom(xScale).ticks(4).tickFormat(n => {
+      .call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(innerW / 55))).tickFormat(n => {
         const v = n.valueOf();
         return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
              : v >= 1_000     ? `${(v / 1_000).toFixed(0)}k`
@@ -345,10 +349,12 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
   }, [focus, dims, colorScale, unit, label, drillDown, upgradePrimaryToLeaf]);
 
+  const isNarrow = !!dims && dims.width < 480;
+
   return (
-    <div ref={containerRef} className="relative w-full h-full flex">
+    <div ref={containerRef} className={['relative w-full h-full flex', isNarrow ? 'flex-col' : ''].join(' ')}>
       <svg ref={sunRef} className="flex-shrink-0" />
-      <div className="w-px bg-gray-100 self-stretch flex-shrink-0" />
+      <div className={isNarrow ? 'h-px w-full bg-gray-100 flex-shrink-0' : 'w-px bg-gray-100 self-stretch flex-shrink-0'} />
       <svg ref={barRef} className="flex-1 min-w-0" />
       <Tooltip ref={tooltipRef} visible={tt.visible}>
         <div className="font-medium">{tt.name}</div>

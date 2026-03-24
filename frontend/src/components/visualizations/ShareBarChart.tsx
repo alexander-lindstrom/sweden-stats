@@ -53,12 +53,17 @@ export const ShareBarChart: React.FC<Props> = ({
         })
       : data.rows;
 
-    const innerW = dims.width - MARGIN.left - MARGIN.right;
-    const innerH = sorted.length * (BAR_H + BAR_GAP);
-    const totalH = innerH + MARGIN.top + MARGIN.bottom;
+    const leftMargin  = dims.width < 480 ? 110 : MARGIN.left;
+    const innerW      = dims.width - leftMargin - MARGIN.right;
+    const innerH      = sorted.length * (BAR_H + BAR_GAP);
+    const itemW       = dims.width < 480 ? 55 : 90;
+    const itemsPerRow = Math.max(1, Math.floor(innerW / itemW));
+    const legendRows  = Math.ceil(categories.length / itemsPerRow);
+    const ROW_H       = 16;
+    const totalH      = innerH + MARGIN.top + 14 + legendRows * ROW_H + 14;
 
     svg.attr('width', dims.width).attr('height', totalH);
-    const g = svg.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`);
+    const g = svg.append('g').attr('transform', `translate(${leftMargin},${MARGIN.top})`);
 
     sorted.forEach((row, i) => {
       const y          = i * (BAR_H + BAR_GAP);
@@ -124,6 +129,7 @@ export const ShareBarChart: React.FC<Props> = ({
         .on('mouseleave', () => setTooltip(null));
 
       // Row label (left).
+      const maxLabelW = leftMargin - 16;
       g.append('text')
         .attr('x', -8).attr('y', y + BAR_H / 2)
         .attr('dy', '0.35em').attr('text-anchor', 'end')
@@ -131,20 +137,30 @@ export const ShareBarChart: React.FC<Props> = ({
         .attr('fill', isSelected ? '#1e40af' : '#475569')
         .attr('font-weight', isSelected ? 600 : 400)
         .attr('pointer-events', 'none')
-        .text(row.label);
+        .text(row.label)
+        .each(function() {
+          const el = this as SVGTextElement;
+          if (el.getComputedTextLength() <= maxLabelW) { return; }
+          let t = el.textContent ?? '';
+          while (t.length > 2 && el.getComputedTextLength() > maxLabelW) {
+            t = t.slice(0, -1);
+            el.textContent = t + '…';
+          }
+        });
     });
 
-    // Legend at bottom.
-    const ITEM_W  = 90;
-    const legendW = categories.length * ITEM_W;
-    const legendX = Math.max(0, (innerW - legendW) / 2);
+    // Legend at bottom — wraps to multiple rows when items don't fit.
+    const legendX = Math.max(0, (innerW - Math.min(categories.length, itemsPerRow) * itemW) / 2);
     const legend  = g.append('g').attr('transform', `translate(${legendX},${innerH + 14})`);
 
     categories.forEach((cat, i) => {
-      const x = i * ITEM_W;
-      legend.append('rect').attr('x', x).attr('y', 0).attr('width', 12).attr('height', 12)
+      const col = i % itemsPerRow;
+      const row = Math.floor(i / itemsPerRow);
+      const x   = col * itemW;
+      const y   = row * ROW_H;
+      legend.append('rect').attr('x', x).attr('y', y).attr('width', 12).attr('height', 12)
         .attr('fill', cat.color).attr('rx', 2);
-      legend.append('text').attr('x', x + 16).attr('y', 6).attr('dy', '0.35em')
+      legend.append('text').attr('x', x + 16).attr('y', y + 6).attr('dy', '0.35em')
         .attr('font-size', 11).attr('fill', CT.axisLabel)
         .text(cat.label);
     });

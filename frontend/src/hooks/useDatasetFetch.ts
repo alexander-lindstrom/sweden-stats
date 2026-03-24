@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
-import type { AdminLevel, DatasetResult, ScalarDatasetResult } from '@/datasets/types';
+import type { AdminLevel, DatasetResult } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 import { fetchCached, isCached, preload } from '@/datasets/cache';
 import { ADMIN_LEVELS } from '@/datasets/adminLevels';
@@ -82,9 +82,9 @@ export function useDatasetFetch(
             // and all party colors, so areas with no election data are clearly "no data".
             setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#c8bfb2');
           }
-        } else {
+        } else if (result.kind === 'scalar') {
           // Scalar: sequential or diverging color scale.
-          const vals = Object.values((result as ScalarDatasetResult).values).filter(Number.isFinite);
+          const vals = Object.values(result.values).filter(Number.isFinite);
           setMapColorFn(null);
           if (vals.length > 0) {
             let scale: d3.ScaleSequential<string>;
@@ -109,6 +109,10 @@ export function useDatasetFetch(
           } else {
             setColorScale(null);
           }
+        } else {
+          // Non-scalar, non-election (donut, categorical-share): no map color scale needed.
+          setColorScale(null);
+          setMapColorFn(null);
         }
 
         setLoading(false);

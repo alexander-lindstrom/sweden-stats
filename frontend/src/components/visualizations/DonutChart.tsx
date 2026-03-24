@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
+import useResizeObserver from '@/hooks/useResizeObserver';
 
 export interface DonutItem {
   code:  string;
@@ -55,6 +56,7 @@ export function DonutChart({
   const svgRef       = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const dims = useResizeObserver(containerRef);
 
   const DONUT_R    = size;
   const DONUT_HOLE = Math.round(DONUT_R * holeRatio);
@@ -115,21 +117,25 @@ export function DonutChart({
     }
   }, [items, size, centerLabel, centerSub, DONUT_HOLE, DONUT_R, DONUT_SIZE]);
 
+  const effectiveLegendPos = legendPosition === 'right' && dims && dims.width < DONUT_SIZE + 80
+    ? 'below'
+    : legendPosition;
+
   const total       = items.reduce((s, i) => s + i.value, 0);
   const sortedItems = items.filter(i => i.value > 0).sort((a, b) => b.value - a.value);
   const legendItems = topN !== undefined ? sortedItems.slice(0, topN) : sortedItems;
 
   const legendEl = (
-    <div className={legendPosition === 'right' ? 'flex flex-col justify-center space-y-1.5' : 'w-full space-y-1'}>
+    <div className={effectiveLegendPos === 'right' ? 'flex flex-col justify-center space-y-1.5' : 'w-full space-y-1'}>
       {legendItems.map(item => {
         const share = total > 0 ? item.value / total * 100 : 0;
         return (
           <div key={item.code} className="flex items-baseline gap-1.5 text-xs min-w-0">
             <span className="w-2 h-2 rounded-sm flex-shrink-0 self-center" style={{ backgroundColor: item.color }} />
-            <span className={legendPosition === 'right' ? 'text-slate-600 flex-shrink-0' : 'text-slate-500 truncate flex-1 min-w-0'}>
+            <span className={effectiveLegendPos === 'right' ? 'text-slate-600 flex-shrink-0' : 'text-slate-500 truncate flex-1 min-w-0'}>
               {item.label}
             </span>
-            {legendPosition === 'right' && (
+            {effectiveLegendPos === 'right' && (
               <span className="flex-1 border-b border-dotted border-slate-300 min-w-[16px]" />
             )}
             {showCount && (
@@ -137,7 +143,7 @@ export function DonutChart({
                 {item.value.toLocaleString('sv-SE')}
               </span>
             )}
-            <span className={`tabular-nums text-slate-700 flex-shrink-0 ${legendPosition !== 'right' && !showCount ? 'ml-auto' : ''}`}>
+            <span className={`tabular-nums text-slate-700 flex-shrink-0 ${effectiveLegendPos !== 'right' && !showCount ? 'ml-auto' : ''}`}>
               {share.toFixed(1)}%
             </span>
           </div>
@@ -147,12 +153,13 @@ export function DonutChart({
   );
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative ${legendPosition === 'right' ? 'flex flex-row items-center gap-8' : 'flex flex-col items-center gap-3'}`}
-    >
-      <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} className="flex-shrink-0" />
-      {legendEl}
+    <div ref={containerRef} className="w-full relative">
+      <div
+        className={effectiveLegendPos === 'right' ? 'flex flex-row items-center justify-center gap-8' : 'flex flex-col items-center gap-3'}
+      >
+        <svg ref={svgRef} width={DONUT_SIZE} height={DONUT_SIZE} className="flex-shrink-0" />
+        {legendEl}
+      </div>
 
       {tooltip && (
         <div
