@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
@@ -765,40 +765,32 @@ export default function MapPage() {
           </button>
 
           {/* View tabs */}
-          {ALL_VIEWS.map(({ key, label }) => {
+          {ALL_VIEWS.map(({ key, label }, index) => {
             const supported = (key === 'profile' && selectedLevel !== 'Country') || availableViews.includes(key);
             return (
-              <button
-                key={key}
-                onClick={() => { if (supported) { setActiveView(key); } }}
-                disabled={!supported}
-                className={[
-                  'px-3 text-sm font-medium transition-colors -mb-px border-b-2 whitespace-nowrap',
-                  !supported
-                    ? 'text-slate-300 border-transparent cursor-not-allowed'
-                    : activeView === key
-                      ? 'text-blue-600 border-blue-500'
-                      : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300',
-                ].join(' ')}
-              >
-                {label}
-              </button>
+              <Fragment key={key}>
+                {index > 0 && <span className="h-4 w-px bg-slate-200 self-center flex-shrink-0" />}
+                <button
+                  onClick={() => { if (supported) { setActiveView(key); } }}
+                  disabled={!supported}
+                  className={[
+                    'px-3 text-sm font-medium transition-colors -mb-px border-b-2 whitespace-nowrap',
+                    !supported
+                      ? 'text-slate-300 border-transparent cursor-not-allowed'
+                      : activeView === key
+                        ? 'text-blue-600 border-blue-500'
+                        : 'text-slate-500 border-transparent hover:text-slate-800 hover:border-slate-300',
+                  ].join(' ')}
+                >
+                  {label}
+                </button>
+              </Fragment>
             );
           })}
 
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Dataset info pill — hidden on mobile */}
-          {activeDescriptor && (
-            <div className="hidden sm:flex items-center gap-1.5 self-center mr-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-0.5">
-              <span className="text-xs font-semibold text-slate-600 max-w-[10rem] truncate">{activeDescriptor.label}</span>
-              <span className="text-slate-300 text-xs select-none">·</span>
-              <span className="text-xs text-slate-400">{activeDescriptor.source}</span>
-              <span className="text-slate-300 text-xs select-none">·</span>
-              <span className="text-xs text-slate-400 tabular-nums">{selectedYear}</span>
-            </div>
-          )}
 
           {/* Party selector */}
           {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
@@ -818,7 +810,7 @@ export default function MapPage() {
 
           {/* Bivariate toggle */}
           {activeView === 'map' && scalarResult && !electionResult && (
-            <div className="flex items-center self-center pl-3 border-l border-slate-200">
+            <div className="hidden md:flex items-center self-center pl-3 border-l border-slate-200">
               <button
                 onClick={() => setBivariateMode(m => !m)}
                 title={bivariateMode ? 'Stäng 2D-läge' : 'Visa två variabler på kartan (bivariat)'}
@@ -864,6 +856,33 @@ export default function MapPage() {
             </span>
           </button>
         </div>
+
+        {/* Context strip — breadcrumb navigation, only when a feature is selected on the map */}
+        {activeView === 'map' && selectedFeature && (
+          <div className="h-8 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-1 overflow-x-auto">
+            <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
+              Sverige
+            </button>
+            {breadcrumbAncestors.map(entry => (
+              <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
+                <span className="text-slate-300 mx-0.5">›</span>
+                <button
+                  onClick={() => handleBreadcrumbGoto(entry.code, entry.label, entry.level)}
+                  className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap max-w-[9rem] truncate"
+                  title={entry.label}
+                >
+                  {entry.label}
+                </button>
+              </span>
+            ))}
+            <span className="flex items-center gap-1">
+              <span className="text-slate-300 mx-0.5">›</span>
+              <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
+                {selectedFeature.label}
+              </span>
+            </span>
+          </div>
+        )}
 
         {/* Main view area */}
         <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
@@ -1010,32 +1029,6 @@ export default function MapPage() {
                   matchingAreas={matchingAreas}
                 />
               )}
-              {/* Breadcrumb — overlaid on the map, centred along the top */}
-              {activeView === 'map' && selectedFeature && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm px-3 py-1.5 text-xs pointer-events-auto select-none">
-                  <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
-                    Sverige
-                  </button>
-                  {breadcrumbAncestors.map(entry => (
-                    <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
-                      <span className="text-slate-300 mx-0.5">›</span>
-                      <button
-                        onClick={() => handleBreadcrumbGoto(entry.code, entry.label, entry.level)}
-                        className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap max-w-[9rem] truncate"
-                        title={entry.label}
-                      >
-                        {entry.label}
-                      </button>
-                    </span>
-                  ))}
-                  <span className="flex items-center gap-1">
-                    <span className="text-slate-300 mx-0.5">›</span>
-                    <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
-                      {selectedFeature.label}
-                    </span>
-                  </span>
-                </div>
-              )}
 
               {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
@@ -1047,7 +1040,7 @@ export default function MapPage() {
               )}
               {activeView === 'map' && !bivariateFn && legendData && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
-                  <MapLegend data={legendData} scale={colorScale} />
+                  <MapLegend data={legendData} scale={colorScale} year={selectedYear} source={activeDescriptor?.source} />
                 </div>
               )}
 

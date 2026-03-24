@@ -655,25 +655,9 @@ const MapView: React.FC<MapViewProps> = ({
     map.addLayer(baseLayerRef.current);
   }, [selectedBase]);
 
-  const handleZoomIn  = () => { const v = mapInstanceRef.current?.getView(); if (v) { v.animate({ zoom: (v.getZoom() ?? 5) + 1, duration: 200 }); } };
-  const handleZoomOut = () => { const v = mapInstanceRef.current?.getView(); if (v) { v.animate({ zoom: (v.getZoom() ?? 5) - 1, duration: 200 }); } };
-
   return (
     <div className="relative w-full h-full" style={{ backgroundColor: '#b8d4e4' }}>
       <div ref={mapRef} className="w-full h-full" />
-
-      {/* Custom zoom controls */}
-      <div className="absolute top-3 left-3 z-10 flex flex-col gap-1">
-        {[{ label: '+', onClick: handleZoomIn }, { label: '−', onClick: handleZoomOut }].map(({ label, onClick }) => (
-          <button
-            key={label}
-            onClick={onClick}
-            className="w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-sm rounded-lg border border-slate-200 shadow-sm text-slate-600 hover:bg-white hover:text-slate-900 hover:border-slate-300 transition-colors text-base font-medium leading-none"
-          >
-            {label}
-          </button>
-        ))}
-      </div>
 
       <Tooltip ref={tooltipRef} visible={hoveredFeature !== null}>
         {hoveredFeature && (
