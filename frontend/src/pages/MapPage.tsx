@@ -703,7 +703,7 @@ export default function MapPage() {
       {/* Sidebar backdrop — visible below lg where sidebar is an overlay */}
       {mobileSidebarOpen && (
         <div
-          className="md:hidden fixed inset-0 z-20 bg-black/30"
+          className="md:hidden fixed top-11 inset-x-0 bottom-0 z-20 bg-black/30"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
