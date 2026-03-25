@@ -134,6 +134,11 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
 
     type PN = d3.HierarchyRectangularNode<GeoHierarchyNode>;
     const nodes = hier.descendants() as PN[];
+    // Radius of the center grey disc — used to scale text so it fits on narrow screens.
+    const centerR = (hier as unknown as PN).y1;
+    const nameFontSize = Math.max(7,  Math.min(11, centerR * 0.30));
+    const valFontSize  = Math.max(6,  Math.min(9,  centerR * 0.22));
+    const backFontSize = Math.max(5,  Math.min(8,  centerR * 0.17));
 
     function nodeColor(d: PN): string {
       if (d.depth === 0) {return '#e0e0e0';}
@@ -189,18 +194,18 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     const drilled = historyRef.current.length > 0;
     g.append('text')
       .attr('text-anchor', 'middle').attr('dy', drilled ? '-0.9em' : '-0.3em')
-      .attr('font-size', 13).attr('font-weight', '600').attr('fill', '#1f2937')
+      .attr('font-size', nameFontSize).attr('font-weight', '600').attr('fill', '#1f2937')
       .attr('pointer-events', 'none')
       .text(focus.name);
     g.append('text')
       .attr('text-anchor', 'middle').attr('dy', drilled ? '0.6em' : '1em')
-      .attr('font-size', 11).attr('fill', '#6b7280')
+      .attr('font-size', valFontSize).attr('fill', '#6b7280')
       .attr('pointer-events', 'none')
       .text(`${fmtShort(focus.value)} ${unit}`);
     if (drilled) {
       g.append('text')
         .attr('text-anchor', 'middle').attr('dy', '2.2em')
-        .attr('font-size', 10).attr('fill', '#3b82f6')
+        .attr('font-size', backFontSize).attr('fill', '#3b82f6')
         .attr('pointer-events', 'none')
         .text('↑ tillbaka');
     }

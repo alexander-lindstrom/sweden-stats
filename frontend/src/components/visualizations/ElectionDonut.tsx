@@ -17,16 +17,13 @@ export function ElectionDonut({ votes, size = 48, topN }: ElectionDonutProps) {
     }))
     .filter(d => d.value > 0);
 
-  const winner = items.length > 0 ? items.reduce((a, b) => a.value > b.value ? a : b) : null;
-
   return (
     <DonutChart
       items={items}
       size={size}
       topN={topN}
       valueIsShare
-      centerLabel={winner ? (winner.code === 'ÖVRIGA' ? 'Övr.' : winner.code) : undefined}
-      centerSub={winner ? `${winner.value.toFixed(0)}%` : undefined}
+      holeRatio={0.35}
     />
   );
 }
