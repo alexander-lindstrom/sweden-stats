@@ -14,10 +14,11 @@ import { BaseMapKey, baseMaps } from "./BaseMaps";
 import {
   adminVectorTileLayers,
   adminWfsLayers,
-  baseVectorStyle,
+  baseFillStyle,
   buildCategoricalStyle,
   buildChoroplethStyle,
   buildFilteredChoroplethStyle,
+  createBoundaryLayer,
   createComparisonSelectionLayer,
   createHighlightLayer,
   createSelectionLayer,
@@ -84,6 +85,8 @@ export interface MapViewProps {
   matchingAreas?: Set<string> | null;
   /** Increment to trigger an animated reset of the map view to the initial Sweden overview. */
   resetToken?: number;
+  /** Opacity of the data fill layer (0–1). The boundary layer is always fully opaque. */
+  fillOpacity?: number;
 }
 
 // Module-level helper — fit the OL view to a WFS feature's extent.
@@ -147,18 +150,21 @@ const MapView: React.FC<MapViewProps> = ({
   onComparisonSelect,
   matchingAreas,
   resetToken,
+  fillOpacity = 1,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<Map | null>(null);
   const baseLayerRef     = useRef<TileLayer<XYZ>>(
     new TileLayer({ visible: false })
   );
-  const overlayLayerRef  = useRef<VectorTileLayer | null>(null);
-  // Holds the previous overlay layer during a level transition — kept visible
-  // until the incoming layer's first tile fires, then discarded.
-  const outgoingLayerRef = useRef<VectorTileLayer | null>(null);
+  const fillLayerRef     = useRef<VectorTileLayer | null>(null);
+  const boundaryLayerRef = useRef<VectorTileLayer | null>(null);
+  // Outgoing layers are kept visible during level transitions until the first
+  // tile from the incoming source fires, then discarded.
+  const outgoingFillLayerRef     = useRef<VectorTileLayer | null>(null);
+  const outgoingBoundaryLayerRef = useRef<VectorTileLayer | null>(null);
   // Separate lightweight layer for hover highlight — shares the same source as
-  // overlayLayerRef so no extra tile fetches. Only re-renders this layer on
+  // fillLayerRef so no extra tile fetches. Only re-renders this layer on
   // hover changes instead of the full (expensive) choropleth layer.
   const highlightLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredCodeRef    = useRef<string | null>(null);
@@ -171,12 +177,14 @@ const MapView: React.FC<MapViewProps> = ({
   const comparisonSelectionLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef          = useRef<string | null>(null);
 
-  // Keep latest sub-data refs so the pointer-move handler always sees current values
-  // without needing them in the useCallback dep array.
+  // Keep latest prop refs so effects/callbacks always see current values
+  // without needing them in dependency arrays.
   const subChoroplethDataRef = useRef(subChoroplethData);
   subChoroplethDataRef.current = subChoroplethData;
   const subTooltipDataRef = useRef(subTooltipData);
   subTooltipDataRef.current = subTooltipData;
+  const fillOpacityRef = useRef(fillOpacity);
+  fillOpacityRef.current = fillOpacity;
 
   // Hit-test throttle refs (50 ms ≈ 20/s)
   const throttleRef  = useRef<number | null>(null);
@@ -240,7 +248,7 @@ const MapView: React.FC<MapViewProps> = ({
         }
         return true;
       },
-      { layerFilter: (layer) => layer === overlayLayerRef.current, hitTolerance: 5 },
+      { layerFilter: (layer) => layer === fillLayerRef.current, hitTolerance: 5 },
     );
 
     const isShift = (evt.originalEvent as MouseEvent).shiftKey;
@@ -401,7 +409,7 @@ const MapView: React.FC<MapViewProps> = ({
           result = { code, label, value: tooltip !== null ? null : value, tooltip };
           return true;
         },
-        { layerFilter: (l) => l === overlayLayerRef.current, hitTolerance: 3 },
+        { layerFilter: (l) => l === fillLayerRef.current, hitTolerance: 3 },
       );
 
       if (result !== null) {
@@ -477,30 +485,37 @@ const MapView: React.FC<MapViewProps> = ({
     };
   }, [handlePointerMove]);
 
-  // --- Swap boundary layer when admin level changes -----------------------
-  // The outgoing layer is kept alive until the incoming source fires its first
-  // tileloadend, hiding the blank-tile flash during drill-down transitions.
+  // --- Swap fill + boundary layers when admin level changes ----------------
+  // Both outgoing layers are kept alive until the incoming source fires its
+  // first tileloadend, hiding the blank-tile flash during drill-down transitions.
+  // Layer z-index stack: fill(1) sub(2) sub-hl(3) boundary(4) sel(5) cmp(6) hl(7)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) { return; }
 
-    // Drop any previous outgoing layer that is still waiting (rapid level changes).
-    if (outgoingLayerRef.current) {
-      map.removeLayer(outgoingLayerRef.current);
-      outgoingLayerRef.current = null;
+    // Drop any previous outgoing layers still waiting (rapid level changes).
+    if (outgoingFillLayerRef.current) {
+      map.removeLayer(outgoingFillLayerRef.current);
+      outgoingFillLayerRef.current = null;
+    }
+    if (outgoingBoundaryLayerRef.current) {
+      map.removeLayer(outgoingBoundaryLayerRef.current);
+      outgoingBoundaryLayerRef.current = null;
     }
 
-    // Demote the current overlay to "outgoing" — keep it in the map so the old
-    // level's tiles remain visible while the new source is loading.
-    if (overlayLayerRef.current) {
-      outgoingLayerRef.current = overlayLayerRef.current;
-      overlayLayerRef.current  = null;
-      // outgoing layer stays in the map; removed once new tiles arrive (below)
+    // Demote current fill + boundary to "outgoing" — keep them visible while
+    // the new source loads.
+    if (fillLayerRef.current) {
+      outgoingFillLayerRef.current = fillLayerRef.current;
+      fillLayerRef.current = null;
+    }
+    if (boundaryLayerRef.current) {
+      outgoingBoundaryLayerRef.current = boundaryLayerRef.current;
+      boundaryLayerRef.current = null;
     }
 
-    // Highlight layer is source-coupled — always recreated, remove immediately.
+    // Highlight + comparison layers are source-coupled — recreate immediately.
     if (highlightLayerRef.current) { map.removeLayer(highlightLayerRef.current); highlightLayerRef.current = null; }
-    // Comparison outline is source-coupled too — remove and let the comparison effect recreate it.
     if (comparisonSelectionLayerRef.current) { map.removeLayer(comparisonSelectionLayerRef.current); comparisonSelectionLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
@@ -509,25 +524,33 @@ const MapView: React.FC<MapViewProps> = ({
     const source = createVectorTileSource(url);
     sourceRef.current = source;
 
-    const mainLayer      = createVectorTileLayer(source);
+    const fillLayer      = createVectorTileLayer(source);
+    const boundaryLayer  = createBoundaryLayer(source);
     const highlightLayer = createHighlightLayer(source, featureCodeProperty, hoveredCodeRef);
 
-    mainLayer.setZIndex(1);
-    highlightLayer.setZIndex(5);
-    map.addLayer(mainLayer);
+    fillLayer.setZIndex(1);
+    fillLayer.setOpacity(fillOpacityRef.current);
+    boundaryLayer.setZIndex(4);
+    highlightLayer.setZIndex(7);
+    map.addLayer(fillLayer);
+    map.addLayer(boundaryLayer);
     map.addLayer(highlightLayer);
-    overlayLayerRef.current   = mainLayer;
+    fillLayerRef.current      = fillLayer;
+    boundaryLayerRef.current  = boundaryLayer;
     highlightLayerRef.current = highlightLayer;
 
-    // Remove the outgoing layer as soon as the first tile from the new source
-    // has painted — at that point there is something to show in its place.
+    // Remove outgoing layers once the first tile from the new source has painted.
     let settled = false;
     const onTileLoad = () => {
       if (settled) { return; }
       settled = true;
-      if (outgoingLayerRef.current) {
-        map.removeLayer(outgoingLayerRef.current);
-        outgoingLayerRef.current = null;
+      if (outgoingFillLayerRef.current) {
+        map.removeLayer(outgoingFillLayerRef.current);
+        outgoingFillLayerRef.current = null;
+      }
+      if (outgoingBoundaryLayerRef.current) {
+        map.removeLayer(outgoingBoundaryLayerRef.current);
+        outgoingBoundaryLayerRef.current = null;
       }
       source.un('tileloadend', onTileLoad);
     };
@@ -535,10 +558,16 @@ const MapView: React.FC<MapViewProps> = ({
 
     return () => {
       source.un('tileloadend', onTileLoad);
-      // Effect re-ran before tiles arrived — remove outgoing layer now.
-      if (!settled && outgoingLayerRef.current) {
-        map.removeLayer(outgoingLayerRef.current);
-        outgoingLayerRef.current = null;
+      // Effect re-ran before tiles arrived — remove outgoing layers now.
+      if (!settled) {
+        if (outgoingFillLayerRef.current) {
+          map.removeLayer(outgoingFillLayerRef.current);
+          outgoingFillLayerRef.current = null;
+        }
+        if (outgoingBoundaryLayerRef.current) {
+          map.removeLayer(outgoingBoundaryLayerRef.current);
+          outgoingBoundaryLayerRef.current = null;
+        }
       }
     };
   }, [adminLevel, featureCodeProperty]);
@@ -565,9 +594,9 @@ const MapView: React.FC<MapViewProps> = ({
     const view       = map.getView();
     zoomToWfsFeature(view, map, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_MAX_ZOOM[adminLevel], controller.signal);
 
-    // Selection outline (z=4) — shares source with main layer, no extra tile fetches
+    // Selection outline (z=5) — shares source with main layer, no extra tile fetches
     const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
-    selLayer.setZIndex(4);
+    selLayer.setZIndex(5);
     map.addLayer(selLayer);
     selectionLayerRef.current = selLayer;
 
@@ -605,7 +634,7 @@ const MapView: React.FC<MapViewProps> = ({
     if (!comparisonFeature || !sourceRef.current) { return; }
 
     const compLayer = createComparisonSelectionLayer(sourceRef.current, featureCodeProperty, comparisonCodeRef);
-    compLayer.setZIndex(4);
+    compLayer.setZIndex(6);
     map.addLayer(compLayer);
     comparisonSelectionLayerRef.current = compLayer;
   }, [comparisonFeature, featureCodeProperty]);
@@ -618,20 +647,20 @@ const MapView: React.FC<MapViewProps> = ({
 
   // --- Update choropleth style in place when data changes -----------------
   useEffect(() => {
-    const layer = overlayLayerRef.current;
+    const layer = fillLayerRef.current;
     if (!layer) { return; }
 
     if (matchingAreas) {
       if (choroplethData && colorScale) {
-        layer.setStyle(buildFilteredChoroplethStyle(choroplethData, colorScale, featureCodeProperty, matchingAreas));
+        layer.setStyle(buildFilteredChoroplethStyle(choroplethData, colorScale, featureCodeProperty, matchingAreas, true));
       }
       // else: choropleth not yet loaded — keep current style rather than flashing blue
     } else if (mapColorFn) {
-      layer.setStyle(buildCategoricalStyle(mapColorFn, featureCodeProperty));
+      layer.setStyle(buildCategoricalStyle(mapColorFn, featureCodeProperty, true));
     } else if (choroplethData && colorScale) {
-      layer.setStyle(buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty));
+      layer.setStyle(buildChoroplethStyle(choroplethData, colorScale, featureCodeProperty, true));
     } else {
-      layer.setStyle(baseVectorStyle);
+      layer.setStyle(baseFillStyle);
     }
     // Probably bad for performance but fewer visual issues.
     // Bump the source revision so OL's hybrid-mode renderer knows to regenerate
@@ -639,6 +668,11 @@ const MapView: React.FC<MapViewProps> = ({
     // breadcrumb/Escape navigation returns to a previously-rendered level.
     sourceRef.current?.changed();
   }, [choroplethData, colorScale, mapColorFn, matchingAreas, featureCodeProperty]);
+
+  // --- Update fill layer opacity when prop changes ------------------------
+  useEffect(() => {
+    fillLayerRef.current?.setOpacity(fillOpacity);
+  }, [fillOpacity]);
 
   // --- Swap base map layer -------------------------------------------------
   useEffect(() => {

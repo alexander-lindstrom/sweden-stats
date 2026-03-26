@@ -106,6 +106,7 @@ export default function MapPage() {
   /** Whether threshold filter mode is active. */
   const [filterEnabled,   setFilterEnabled]   = useState(false);
   const [filterCriteria,  setFilterCriteria]  = useState<FilterCriterion[]>([]);
+  const [fillOpacity,     setFillOpacity]     = useState(1.0);
 
   const [drillStack, setDrillStack] = useState<DrillStackEntry[]>([]);
   const [munLabels,  setMunLabels]  = useState<Record<string, string> | null>(() => getMunicipalityLabels());
@@ -729,6 +730,8 @@ export default function MapPage() {
         filterSortedValues={filterSortedValues}
         filterMatchingCount={filterMatchingCount}
         filterLoading={filterLoading}
+        fillOpacity={fillOpacity}
+        onFillOpacityChange={setFillOpacity}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
@@ -1027,6 +1030,7 @@ export default function MapPage() {
                   comparisonFeature={comparisonFeature}
                   onComparisonSelect={handleComparisonSelect}
                   matchingAreas={matchingAreas}
+                  fillOpacity={fillOpacity}
                 />
               )}
 
