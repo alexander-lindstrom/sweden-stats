@@ -11,17 +11,7 @@ import type { AdminLevel } from "@/datasets/types";
 // Bounding box for Sweden in Web Mercator — tiles outside this are never requested.
 const SWEDEN_EXTENT = transformExtent([10.0, 55.0, 25.0, 70.5], 'EPSG:4326', 'EPSG:3857');
 
-export const baseVectorStyle = new Style({
-  fill: new Fill({
-    color: 'rgba(225, 218, 205, 0.8)',
-  }),
-  stroke: new Stroke({
-    color: '#7898a8',
-    width: 1.2,
-  }),
-});
-
-// Fill-only counterpart of baseVectorStyle — used by the fill layer when no dataset is loaded.
+// Used by the fill layer when no dataset is loaded.
 export const baseFillStyle = new Style({
   fill: new Fill({ color: 'rgba(225, 218, 205, 0.8)' }),
 });
@@ -71,6 +61,7 @@ export function createBoundaryLayer(source: VectorTileSource): VectorTileLayer {
   return new VectorTileLayer({
     source,
     extent: SWEDEN_EXTENT,
+    declutter: true,
     style: boundaryOnlyStyle,
   });
 }
@@ -116,7 +107,7 @@ export function createHighlightLayer(
 export function buildCategoricalStyle(
   colorFn: (code: string) => string,
   codeProperty: string,
-  noStroke = false,
+  noStroke = true,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
@@ -138,7 +129,7 @@ export function buildChoroplethStyle(
   data: Record<string, number>,
   colorScale: (value: number) => string,
   codeProperty: string,
-  noStroke = false,
+  noStroke = true,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
@@ -202,7 +193,7 @@ export function buildFilteredChoroplethStyle(
   colorScale: (value: number) => string,
   codeProperty: string,
   matchingAreas: Set<string>,
-  noStroke = false,
+  noStroke = true,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 

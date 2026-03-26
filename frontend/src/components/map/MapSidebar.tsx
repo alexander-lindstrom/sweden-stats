@@ -305,7 +305,7 @@ export function MapSidebar({
             {selectedBase !== 'None' && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-500">Datatäckning</span>
+                  <span className="text-xs text-slate-500">Datafyllnad</span>
                   <span className="text-xs font-medium text-slate-700 tabular-nums">
                     {Math.round(fillOpacity * 100)}%
                   </span>
