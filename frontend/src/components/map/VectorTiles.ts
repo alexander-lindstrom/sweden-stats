@@ -21,6 +21,16 @@ export const baseVectorStyle = new Style({
   }),
 });
 
+// Fill-only counterpart of baseVectorStyle — used by the fill layer when no dataset is loaded.
+export const baseFillStyle = new Style({
+  fill: new Fill({ color: 'rgba(225, 218, 205, 0.8)' }),
+});
+
+// Stroke-only style — always rendered by the dedicated boundary layer.
+export const boundaryOnlyStyle = new Style({
+  stroke: new Stroke({ color: '#7898a8', width: 1.2 }),
+});
+
 // Highlight is a separate layer on top — just a bright border, no fill change needed.
 const hoverHighlightStyle = new Style({
   fill: new Fill({ color: 'rgba(255, 255, 255, 0.12)' }),
@@ -31,6 +41,9 @@ const choroplethStroke = new Stroke({ color: '#8a9ea8', width: 0.7 });
 const noDataStyle = new Style({
   fill: new Fill({ color: 'rgba(200, 193, 182, 0.9)' }),
   stroke: choroplethStroke,
+});
+const noDataFillStyle = new Style({
+  fill: new Fill({ color: 'rgba(200, 193, 182, 0.9)' }),
 });
 
 export function createVectorTileSource(urlTemplate: string): VectorTileSource {
@@ -49,7 +62,16 @@ export function createVectorTileLayer(
     extent: SWEDEN_EXTENT,
     declutter: true,
     visible: true,
-    style: baseVectorStyle,
+    style: baseFillStyle,
+  });
+}
+
+/** Always-visible stroke-only layer. Shares the source with the fill layer — no extra tile fetches. */
+export function createBoundaryLayer(source: VectorTileSource): VectorTileLayer {
+  return new VectorTileLayer({
+    source,
+    extent: SWEDEN_EXTENT,
+    style: boundaryOnlyStyle,
   });
 }
 
@@ -94,6 +116,7 @@ export function createHighlightLayer(
 export function buildCategoricalStyle(
   colorFn: (code: string) => string,
   codeProperty: string,
+  noStroke = false,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
@@ -103,10 +126,9 @@ export function buildCategoricalStyle(
     if (cached) { return cached; }
 
     const color = colorFn(code);
-    const style = new Style({
-      fill: new Fill({ color }),
-      stroke: choroplethStroke,
-    });
+    const style = noStroke
+      ? new Style({ fill: new Fill({ color }) })
+      : new Style({ fill: new Fill({ color }), stroke: choroplethStroke });
     styleCache.set(code, style);
     return style;
   };
@@ -116,6 +138,7 @@ export function buildChoroplethStyle(
   data: Record<string, number>,
   colorScale: (value: number) => string,
   codeProperty: string,
+  noStroke = false,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
@@ -123,16 +146,17 @@ export function buildChoroplethStyle(
     const code = String(feature.get(codeProperty) ?? '');
 
     const cached = styleCache.get(code);
-    if (cached) {return cached;}
+    if (cached) { return cached; }
 
     const value = data[code];
-    const style =
-      value !== undefined
-        ? new Style({
-            fill: new Fill({ color: colorScale(value) }),
-            stroke: choroplethStroke,
-          })
-        : noDataStyle;
+    let style: Style;
+    if (value !== undefined) {
+      style = noStroke
+        ? new Style({ fill: new Fill({ color: colorScale(value) }) })
+        : new Style({ fill: new Fill({ color: colorScale(value) }), stroke: choroplethStroke });
+    } else {
+      style = noStroke ? noDataFillStyle : noDataStyle;
+    }
 
     styleCache.set(code, style);
     return style;
@@ -164,6 +188,9 @@ const filteredOutStyle = new Style({
   fill:   new Fill({ color: 'rgba(195,188,178,0.82)' }),
   stroke: dimmedStroke,
 });
+const filteredOutFillStyle = new Style({
+  fill: new Fill({ color: 'rgba(195,188,178,0.82)' }),
+});
 
 /**
  * Choropleth style with filter overlay: matching features keep their choropleth
@@ -175,6 +202,7 @@ export function buildFilteredChoroplethStyle(
   colorScale: (value: number) => string,
   codeProperty: string,
   matchingAreas: Set<string>,
+  noStroke = false,
 ): (feature: FeatureLike) => Style {
   const styleCache = new Map<string, Style>();
 
@@ -182,18 +210,20 @@ export function buildFilteredChoroplethStyle(
     const code    = String(feature.get(codeProperty) ?? '');
     const matches = matchingAreas.has(code);
 
-    if (!matches) { return filteredOutStyle; }
+    if (!matches) { return noStroke ? filteredOutFillStyle : filteredOutStyle; }
 
     const cached = styleCache.get(code);
     if (cached) { return cached; }
 
     const value = data[code];
-    const style = value === undefined
-      ? noDataStyle
-      : new Style({
-          fill:   new Fill({ color: colorScale(value) }),
-          stroke: choroplethStroke,
-        });
+    let style: Style;
+    if (value === undefined) {
+      style = noStroke ? noDataFillStyle : noDataStyle;
+    } else {
+      style = noStroke
+        ? new Style({ fill: new Fill({ color: colorScale(value) }) })
+        : new Style({ fill: new Fill({ color: colorScale(value) }), stroke: choroplethStroke });
+    }
 
     styleCache.set(code, style);
     return style;

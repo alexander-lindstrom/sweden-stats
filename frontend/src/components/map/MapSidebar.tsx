@@ -28,6 +28,8 @@ interface MapSidebarProps {
   filterSortedValues:     Record<string, number[]>;
   filterMatchingCount:    number | null;
   filterLoading:          boolean;
+  fillOpacity:            number;
+  onFillOpacityChange:    (value: number) => void;
 }
 
 function SidebarSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -186,6 +188,8 @@ export function MapSidebar({
   filterSortedValues,
   filterMatchingCount,
   filterLoading,
+  fillOpacity,
+  onFillOpacityChange,
 }: MapSidebarProps) {
   const availableDatasets = getDatasetsForLevel(selectedLevel);
   const filterableDatasets = DATASETS.filter(d =>
@@ -292,12 +296,31 @@ export function MapSidebar({
 
         {/* Base map — collapsed by default, least-used setting */}
         <CollapsibleSection label="Bakgrundskarta" defaultOpen={false}>
-          <div className="px-4">
+          <div className="px-4 flex flex-col gap-3">
             <Dropdown
               value={selectedBase}
               onChange={val => onBaseChange(val as BaseMapKey)}
               options={(['None', ...Object.keys(baseMaps)] as BaseMapKey[]).map(key => ({ value: key, label: baseMapLabels[key] }))}
             />
+            {selectedBase !== 'None' && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-slate-500">Datatäckning</span>
+                  <span className="text-xs font-medium text-slate-700 tabular-nums">
+                    {Math.round(fillOpacity * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round(fillOpacity * 100)}
+                  onChange={e => onFillOpacityChange(Number(e.target.value) / 100)}
+                  className="w-full accent-blue-500"
+                />
+              </div>
+            )}
           </div>
         </CollapsibleSection>
 
