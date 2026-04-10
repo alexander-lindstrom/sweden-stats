@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
@@ -17,21 +17,25 @@ import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
 import { BoxPlot } from '@/components/visualizations/BoxPlot';
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import {
-  AdminLevel, ChartType, ViewType, ScalarDatasetResult, FilterCriterion,
-  viewsForLevel, chartTypesForLevel, CHART_TYPE_LABELS,
-  CategoryShare, CategoricalShareResult,
+  AdminLevel, ViewType, ScalarDatasetResult, FilterCriterion,
+  CHART_TYPE_LABELS,
+  type SelectedFeature,
 } from '@/datasets/types';
-import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
+import { DATASETS } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
-import { getMunicipalityLabels, ensureMunicipalityLabels } from '@/datasets/scb/population';
-import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
+import { PARTY_CODES, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
 import { useFilterMode } from '@/hooks/useFilterMode';
-import { useMapKeyboardNavigation, type DrillStackEntry } from '@/hooks/useMapKeyboardNavigation';
+import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
+import { useNavigationState } from '@/hooks/useNavigationState';
+import { useDatasetState } from '@/hooks/useDatasetState';
+import { useViewState } from '@/hooks/useViewState';
+import { useAreaFilterDerivedData } from '@/hooks/useAreaFilterDerivedData';
+import { useElectionDerivedData } from '@/hooks/useElectionDerivedData';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
@@ -78,65 +82,72 @@ const ALL_VIEWS: { key: ViewType; label: string }[] = [
 ];
 
 export default function MapPage() {
-  const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [selectedYear,      setSelectedYear]       = useState<number>(2024);
-  const [displayYear,       setDisplayYear]        = useState<number>(2024);
-  const [activeView,        setActiveView]         = useState<ViewType>('map');
-  const [activeChartType,   setActiveChartType]   = useState<ChartType>('bar');
-  const [selectedBase,      setSelectedBase]       = useState<BaseMapKey>('None');
-  const [selectedLan,       setSelectedLan]        = useState<string | null>(null);
-  const [selectedMuni,      setSelectedMuni]       = useState<string | null>(null);
-  const [selectedFeature,   setSelectedFeature]    = useState<{ code: string; label: string; parentCode?: string } | null>(null);
-  const [comparisonFeature, setComparisonFeature]  = useState<{ code: string; label: string; parentCode?: string } | null>(null);
-  const [selectionLevel,    setSelectionLevel]     = useState<AdminLevel>(selectedLevel);
+  // ── UI layout state ────────────────────────────────────────────────────
   const [isPanelOpen,         setIsPanelOpen]         = useState(false);
-  const userDismissedPanel    = useRef(false);
   const [desktopSidebarOpen,  setDesktopSidebarOpen]  = useState(true);
   const [mobileSidebarOpen,   setMobileSidebarOpen]   = useState(false);
-  const [mapResetToken,     setMapResetToken]       = useState(0);
-  /** Which party to show on the choropleth map (null = winner coloring). */
-  const [activeParty,       setActiveParty]        = useState<string | null>(null);
-  /** Secondary dataset for the scatter chart Y axis. */
-  const [scatterYDatasetId, setScatterYDatasetId]  = useState<string | null>(null);
-  /** Whether bivariate choropleth mode is active. */
-  const [bivariateMode,     setBivariateMode]       = useState(false);
-  /** Secondary dataset for the bivariate Y axis. */
-  const [bivariateYDatasetId, setBivariateYDatasetId] = useState<string | null>(null);
+  const [mapResetToken,       setMapResetToken]       = useState(0);
+  const [selectedBase,        setSelectedBase]        = useState<BaseMapKey>('None');
+  const [fillOpacity,         setFillOpacity]         = useState(1.0);
+
+  // ── Filter state ───────────────────────────────────────────────────────
   /** Whether threshold filter mode is active. */
   const [filterEnabled,   setFilterEnabled]   = useState(false);
   const [filterCriteria,  setFilterCriteria]  = useState<FilterCriterion[]>([]);
-  const [fillOpacity,     setFillOpacity]     = useState(1.0);
 
-  const [drillStack, setDrillStack] = useState<DrillStackEntry[]>([]);
-  const [munLabels,  setMunLabels]  = useState<Record<string, string> | null>(() => getMunicipalityLabels());
+  // ── Navigation (geo cursor) ────────────────────────────────────────────
+  const onSelectionChange = useCallback((feature: SelectedFeature | null, dismissed: boolean) => {
+    if (feature && !dismissed) { setIsPanelOpen(true); }
+  }, []);
 
-  useEffect(() => {
-    if (munLabels) { return; }
-    ensureMunicipalityLabels().then(setMunLabels).catch(() => {});
-  }, [munLabels]);
+  const nav = useNavigationState(onSelectionChange);
+  const {
+    selectedLevel, setSelectedLevel,
+    selectedFeature, setSelectedFeature,
+    selectionLevel, setSelectionLevel,
+    comparisonFeature, setComparisonFeature,
+    drillStack, setDrillStack,
+    selectedLan, setSelectedLan,
+    selectedMuni, setSelectedMuni,
+    munLabels,
+    pendingSelectionRef,
+    userDismissedPanel,
+    breadcrumbAncestors,
+    handleFeatureSelect,
+    handleComparisonSelect,
+    handleDrillDown,
+    handleBreadcrumbGoto,
+  } = nav;
 
-  const breadcrumbAncestors = useMemo(() => {
-    if (!selectedFeature) { return []; }
-    const countyCode = selectedFeature.code.slice(0, 2);
-    const munCode    = selectedFeature.code.slice(0, 4);
-    if (selectedLevel === 'Municipality') {
-      const lbl = COUNTY_NAMES[countyCode];
-      return lbl ? [{ code: countyCode, label: lbl, level: 'Region' as AdminLevel }] : [];
-    }
-    if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
-      const countyLbl = COUNTY_NAMES[countyCode];
-      const munLbl    = munLabels?.[munCode] ?? munCode;
-      const ancestors: Array<{ code: string; label: string; level: AdminLevel }> = [];
-      if (countyLbl) { ancestors.push({ code: countyCode, label: countyLbl, level: 'Region' }); }
-      ancestors.push({ code: munCode, label: munLbl, level: 'Municipality' });
-      return ancestors;
-    }
-    return [];
-  }, [selectedFeature, selectedLevel, munLabels]);
+  // ── Dataset (year, party, descriptor) ─────────────────────────────────
+  const ds = useDatasetState();
+  const {
+    selectedDatasetId, setSelectedDatasetId,
+    selectedYear,
+    displayYear,
+    handleYearChange,
+    activeParty, setActiveParty,
+    activeDescriptor,
+    resetDatasetForLevel,
+  } = ds;
 
-  const yearDebounceRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingSelectionRef = useRef<{ code: string; label: string; parentCode?: string } | null>(null);
+  // ── View / chart type / bivariate / scatter ────────────────────────────
+  const onElectionDataset = useCallback(() => {
+    setFilterEnabled(false);
+    setFilterCriteria([]);
+  }, []);
+
+  const view = useViewState(selectedLevel, selectedDatasetId, activeDescriptor, onElectionDataset);
+  const {
+    activeView, setActiveView,
+    activeChartType, setActiveChartType,
+    availableViews, availableChartTypes,
+    bivariateMode, setBivariateMode,
+    bivariateYDatasetId, setBivariateYDatasetId,
+    bivariateDatasets, bivariateYDescriptor,
+    scatterYDatasetId, setScatterYDatasetId,
+    scatterableDatasets,
+  } = view;
 
   const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
     selectedDatasetId, selectedLevel, selectedYear, activeParty,
@@ -190,7 +201,6 @@ export default function MapPage() {
     }
   }, [selectedLevel, selectedYear]);
 
-  const activeDescriptor = DATASETS.find((d) => d.id === selectedDatasetId) ?? null;
   const { data: hierarchyData,  loading: hierarchyLoading  } = useHierarchyFetch(activeDescriptor, activeChartType, selectedYear);
 
   const searchItems = useMemo(() => {
@@ -207,71 +217,45 @@ export default function MapPage() {
     };
     collect(hierarchyData, 0);
     return items;
-  }, [selectionLevel, selectedLevel, datasetResult, hierarchyData, activeDescriptor]);
+  }, [selectionLevel, selectedLevel, resultLabels, hierarchyData, activeDescriptor]);
 
-  // For election multiline at Region/Municipality level: allow picking a specific area via dropdowns.
-  const needsMultilineAreaFilter = activeChartType === 'multiline' && activeDescriptor?.group === 'val'
-    && (selectedLevel === 'Region' || selectedLevel === 'Municipality');
+  // ── Area filter + election derived data ──────────────────────────────────
+  const areaFilter = useAreaFilterDerivedData({
+    selectedLevel, activeChartType, activeDescriptor,
+    scalarResult, electionResult,
+    selectedLan, selectedMuni, selectedFeature,
+  });
+  const {
+    needsLanFilter, needsMuniFilter,
+    availableLans, effectiveLan,
+    availableMunis, effectiveMuni,
+    filteredForDiverging, filteredElectionResult,
+    needsMultilineAreaFilter,
+    availableMultilineLans, effectiveMultilineLan,
+    availableMultilineMunis, effectiveMultilineMuni,
+    timeSeriesFeatureCode,
+  } = areaFilter;
 
-  // Lan list: code-sorted, derived from COUNTY_NAMES (Region) or from election data (Municipality).
-  const availableMultilineLans = useMemo(() => {
-    if (!needsMultilineAreaFilter) { return []; }
-    if (selectedLevel === 'Region') {
-      return Object.entries(COUNTY_NAMES).sort(([a], [b]) => a.localeCompare(b)).map(([code, name]) => ({ code, name }));
-    }
-    const codes = new Set(electionResult ? Object.keys(electionResult.partyVotes).map(c => c.slice(0, 2)) : []);
-    return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
-  }, [needsMultilineAreaFilter, selectedLevel, electionResult]);
-
-  // At Region level: effectiveLan is the selected feature code (a 2-char county code).
-  // At Municipality level: effectiveLan comes from selectedLan state.
-  const effectiveMultilineLan = useMemo(() => {
-    if (availableMultilineLans.length === 0) { return null; }
-    if (selectedLevel === 'Region') {
-      const sf = selectedFeature?.code;
-      return availableMultilineLans.some(l => l.code === sf) ? sf! : availableMultilineLans[0].code;
-    }
-    return availableMultilineLans.some(l => l.code === selectedLan) ? selectedLan! : availableMultilineLans[0].code;
-  }, [availableMultilineLans, selectedLevel, selectedFeature, selectedLan]);
-
-  // Municipality list for Municipality-level multiline: areas under the selected Lan, code-sorted.
-  const availableMultilineMunis = useMemo(() => {
-    if (!needsMultilineAreaFilter || selectedLevel !== 'Municipality' || !electionResult || !effectiveMultilineLan) { return []; }
-    return Object.entries(electionResult.labels)
-      .filter(([code]) => code.startsWith(effectiveMultilineLan))
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([code, name]) => ({ code, name }));
-  }, [needsMultilineAreaFilter, selectedLevel, electionResult, effectiveMultilineLan]);
-
-  const effectiveMultilineMuni = useMemo(() => {
-    if (availableMultilineMunis.length === 0) { return null; }
-    const sf = selectedFeature?.code;
-    return availableMultilineMunis.some(m => m.code === sf) ? sf! : availableMultilineMunis[0].code;
-  }, [availableMultilineMunis, selectedFeature]);
-
-  const timeSeriesFeatureCode = activeDescriptor?.group === 'val'
-    ? (needsMultilineAreaFilter
-        ? (selectedLevel === 'Municipality' ? effectiveMultilineMuni : effectiveMultilineLan)
-        : (selectedFeature?.code ?? null))
-    : null;
   const { data: timeSeriesData, loading: timeSeriesLoading } = useTimeSeriesFetch(
     activeDescriptor, activeChartType, selectedLevel, timeSeriesFeatureCode,
   );
+
+  const election = useElectionDerivedData({
+    electionResult, filteredElectionResult, subElectionResult,
+    activeParty, activeChartType, selectedLevel, effectiveLan,
+    activeDescriptor, datasetResult,
+  });
+  const {
+    partyShareData, partyChoroplethValues, tooltipData, legendData,
+    partyRankingResult, rankingColorFn, rankingRowMeta,
+    subElectionTooltip, partyColorOverrides,
+  } = election;
 
   useMapKeyboardNavigation(
     selectedFeature, selectedLevel, scalarResult,
     setSelectedLevel, setSelectedFeature, pendingSelectionRef,
     drillStack, setDrillStack,
   );
-
-  const handleComparisonSelect = (feature: { code: string; label: string; parentCode?: string } | null) => {
-    if (!feature) { setComparisonFeature(null); return; }
-    // Toggle off if the same area is shift-clicked again.
-    if (feature.code === comparisonFeature?.code) { setComparisonFeature(null); return; }
-    // Don't allow comparing an area with itself.
-    if (feature.code === selectedFeature?.code) { return; }
-    setComparisonFeature(feature);
-  };
 
   const handleReset = () => {
     setDrillStack([]);
@@ -286,56 +270,9 @@ export default function MapPage() {
     setMapResetToken(t => t + 1);
   };
 
-  const handleYearChange = (y: number) => {
-    setDisplayYear(y);
-    if (yearDebounceRef.current) { clearTimeout(yearDebounceRef.current); }
-    yearDebounceRef.current = setTimeout(() => setSelectedYear(y), 350);
-  };
-
-  const handleFeatureSelect = (feature: { code: string; label: string; parentCode?: string } | null) => {
-    setSelectedFeature(feature);
-    // Regular click exits comparison mode — shift-click is the explicit comparison entry point.
-    if (feature) { setComparisonFeature(null); }
-  };
-
-  const handleDrillDown = (level: AdminLevel, code: string, label: string, parentCode?: string) => {
-    // Push the current position onto the drill stack so we can retrace later.
-    if (selectedFeature) {
-      setDrillStack(s => [...s, { level: selectedLevel, code: selectedFeature.code, label: selectedFeature.label }]);
-    }
-    pendingSelectionRef.current = { code, label, parentCode };
-    setSelectedLevel(level);
-  };
-
-  /**
-   * Navigate to a geographically-derived ancestor from the breadcrumb.
-   * Clears the drill stack since the user is explicitly jumping up the hierarchy.
-   */
-  const handleBreadcrumbGoto = (code: string, label: string, level: AdminLevel) => {
-    setDrillStack([]);
-    pendingSelectionRef.current = { code, label };
-    setSelectedLevel(level);
-  };
-
+  // When admin level changes: reset dataset if unavailable, clear comparison/filters/selection.
   useEffect(() => {
-    if (selectedFeature) { if (!userDismissedPanel.current) { setIsPanelOpen(true); } }
-    else { setComparisonFeature(null); }
-  }, [selectedFeature]);
-
-  useEffect(() => {
-    if (!selectedFeature) { return; }
-    if (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
-      setSelectedLan(selectedFeature.code.slice(0, 2));
-    }
-    if (selectedLevel === 'RegSO' || selectedLevel === 'DeSO') {
-      setSelectedMuni(selectedFeature.code.slice(0, 4));
-    }
-  }, [selectedFeature, selectedLevel]);
-
-  // When admin level changes, preserve dataset if still available; otherwise reset.
-  useEffect(() => {
-    const datasets = getDatasetsForLevel(selectedLevel);
-    setSelectedDatasetId(id => datasets.some(d => d.id === id) ? id : (datasets[0]?.id ?? null));
+    resetDatasetForLevel(selectedLevel);
     setSelectionLevel(selectedLevel);
     setComparisonFeature(null);
     setFilterCriteria([]);
@@ -345,106 +282,7 @@ export default function MapPage() {
     } else {
       setSelectedFeature(null);
     }
-  }, [selectedLevel]);
-
-  // When dataset changes: clamp year to available years, reset party filter if leaving elections.
-  useEffect(() => {
-    if (!selectedDatasetId) { return; }
-    const descriptor = DATASETS.find(d => d.id === selectedDatasetId);
-    if (!descriptor) { return; }
-
-    if (descriptor.availableYears.length > 0 && !descriptor.availableYears.includes(selectedYear)) {
-      const nearest = descriptor.availableYears.reduce((prev, curr) =>
-        Math.abs(curr - selectedYear) < Math.abs(prev - selectedYear) ? curr : prev,
-      );
-      setSelectedYear(nearest);
-      setDisplayYear(nearest);
-    }
-
-    if (descriptor.group !== 'val') {
-      setActiveParty(null);
-    }
-  }, [selectedDatasetId, selectedYear]);
-
-  const availableViews = useMemo(
-    () => activeDescriptor ? viewsForLevel(activeDescriptor, selectedLevel) : ['map' as ViewType],
-    [activeDescriptor, selectedLevel],
-  );
-  const availableChartTypes = useMemo(
-    () => activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType],
-    [activeDescriptor, selectedLevel],
-  );
-
-  useEffect(() => {
-    if ((activeView === 'profile' && selectedLevel === 'Country') || (activeView !== 'profile' && !availableViews.includes(activeView))) {
-      setActiveView(availableViews[0] ?? 'map');
-    }
-  }, [availableViews, activeView]);
-
-  useEffect(() => {
-    const types = activeDescriptor ? chartTypesForLevel(activeDescriptor, selectedLevel) : ['bar' as ChartType];
-    setActiveChartType(ct => types.includes(ct) ? ct : (types[0] ?? 'bar'));
-  }, [selectedLevel, activeDescriptor]);
-
-  // ── Scatter Y-axis dataset ─────────────────────────────────────────────────
-  // Scalar geographic datasets available as the Y axis (excludes active + elections).
-  const scatterableDatasets = useMemo(
-    () => DATASETS.filter(d =>
-      d.id !== selectedDatasetId &&
-      d.group !== 'val' &&
-      d.supportedLevels.includes(selectedLevel) &&
-      chartTypesForLevel(d, selectedLevel).some(ct => ['bar', 'diverging', 'histogram', 'scatter'].includes(ct)),
-    ),
-    [selectedDatasetId, selectedLevel],
-  );
-
-  // Auto-select the first available Y dataset when entering scatter mode or
-  // when the active dataset / level changes while in scatter mode.
-  useEffect(() => {
-    if (activeChartType !== 'scatter') { return; }
-    const valid = scatterableDatasets.some(d => d.id === scatterYDatasetId);
-    if (!valid) {
-      setScatterYDatasetId(scatterableDatasets[0]?.id ?? null);
-    }
-  }, [activeChartType, scatterableDatasets, scatterYDatasetId]);
-
-  // ── Bivariate choropleth ───────────────────────────────────────────────────
-  // Scalar datasets available as the bivariate Y axis (excludes active dataset + elections).
-  const bivariateDatasets = useMemo(
-    () => DATASETS.filter(d =>
-      d.id !== selectedDatasetId &&
-      d.group !== 'val' &&
-      d.supportedLevels.includes(selectedLevel),
-    ),
-    [selectedDatasetId, selectedLevel],
-  );
-
-  // Deactivate bivariate mode when leaving map view or switching to an election dataset.
-  useEffect(() => {
-    if (activeView !== 'map') { setBivariateMode(false); }
-  }, [activeView]);
-
-  useEffect(() => {
-    if (activeDescriptor?.group === 'val') {
-      setBivariateMode(false);
-      setFilterEnabled(false);
-      setFilterCriteria([]);
-    }
-  }, [activeDescriptor]);
-
-  // Auto-select a Y dataset when entering bivariate mode or when available datasets change.
-  useEffect(() => {
-    if (!bivariateMode) { return; }
-    const valid = bivariateDatasets.some(d => d.id === bivariateYDatasetId);
-    if (!valid) {
-      setBivariateYDatasetId(bivariateDatasets[0]?.id ?? null);
-    }
-  }, [bivariateMode, bivariateDatasets, bivariateYDatasetId]);
-
-  const bivariateYDescriptor = useMemo(
-    () => DATASETS.find(d => d.id === bivariateYDatasetId) ?? null,
-    [bivariateYDatasetId],
-  );
+  }, [selectedLevel, resetDatasetForLevel, pendingSelectionRef, setComparisonFeature, setSelectedFeature, setSelectionLevel]);
 
   // Color function for bivariate mode: maps (code) → 3×3 palette hex.
   const bivariateFn = useMemo(() => {
@@ -453,8 +291,7 @@ export default function MapPage() {
   }, [bivariateMode, scalarResult, bivariateYScalar]);
 
   // ── Profile search items ──────────────────────────────────────────────────
-  // Reuses the existing searchItems (from datasetResult.labels). Falls back to munLabels
-  // at Municipality level so the search box is always populated without needing a dataset.
+  // Reuses searchItems; falls back to munLabels so the profile search is always populated.
   const profileSearchItems = useMemo(() => {
     if (activeView !== 'profile') { return []; }
     if (searchItems.length > 0) { return searchItems; }
@@ -470,218 +307,6 @@ export default function MapPage() {
     }
     return [];
   }, [activeView, selectedLevel, searchItems, munLabels]);
-
-  // ── Lan/Municipality filter ────────────────────────────────────────────────
-  // Applied for: diverging chart at sub-county levels, election-bar at municipality level.
-  const needsLanFilter = (
-    (activeChartType === 'diverging' && (selectedLevel === 'Municipality' || selectedLevel === 'RegSO' || selectedLevel === 'DeSO'))
-    || (activeChartType === 'election-bar' && selectedLevel === 'Municipality')
-    || (activeChartType === 'party-ranking' && selectedLevel === 'Municipality')
-  );
-  const needsMuniFilter = activeChartType === 'diverging' &&
-    (selectedLevel === 'RegSO' || selectedLevel === 'DeSO');
-
-  const availableLans = useMemo(() => {
-    if (!needsLanFilter) { return []; }
-    const keys = scalarResult
-      ? Object.keys(scalarResult.values)
-      : electionResult
-        ? Object.keys(electionResult.partyVotes)
-        : [];
-    const codes = new Set(keys.map(c => c.slice(0, 2)));
-    return [...codes].sort().map(c => ({ code: c, name: COUNTY_NAMES[c] ?? c }));
-  }, [scalarResult, electionResult, needsLanFilter]);
-
-  const effectiveLan = useMemo(() => {
-    if (availableLans.length === 0) { return null; }
-    return availableLans.some(l => l.code === selectedLan) ? selectedLan : availableLans[0].code;
-  }, [availableLans, selectedLan]);
-
-  const availableMunis = useMemo(() => {
-    if (!scalarResult?.parentLabels || !effectiveLan || !needsMuniFilter) { return []; }
-    return Object.entries(scalarResult.parentLabels)
-      .filter(([code]) => code.startsWith(effectiveLan))
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([code, name]) => ({ code, name }));
-  }, [scalarResult, effectiveLan, needsMuniFilter]);
-
-  const effectiveMuni = useMemo(() => {
-    if (availableMunis.length === 0) { return null; }
-    return availableMunis.some(m => m.code === selectedMuni) ? selectedMuni : availableMunis[0].code;
-  }, [availableMunis, selectedMuni]);
-
-  const filteredForDiverging = useMemo(() => {
-    if (!scalarResult) { return null; }
-    if (!needsLanFilter || activeChartType !== 'diverging') { return scalarResult; }
-    const filterCode = needsMuniFilter ? effectiveMuni : effectiveLan;
-    if (!filterCode) { return null; }
-    const values = Object.fromEntries(Object.entries(scalarResult.values).filter(([c]) => c.startsWith(filterCode)));
-    const labels = Object.fromEntries(Object.entries(scalarResult.labels).filter(([c]) => c.startsWith(filterCode)));
-    return { ...scalarResult, values, labels };
-  }, [scalarResult, needsLanFilter, activeChartType, needsMuniFilter, effectiveLan, effectiveMuni]);
-
-  // Election chart: filter to selected Lan at municipality level.
-  const filteredElectionResult = useMemo(() => {
-    if (!electionResult) { return null; }
-    if (activeChartType !== 'election-bar' || selectedLevel !== 'Municipality' || !effectiveLan) {
-      return electionResult;
-    }
-    const keep = ([c]: [string, unknown]) => c.startsWith(effectiveLan);
-    return {
-      ...electionResult,
-      partyVotes:  Object.fromEntries(Object.entries(electionResult.partyVotes).filter(keep)),
-      winnerByGeo: Object.fromEntries(Object.entries(electionResult.winnerByGeo).filter(keep)),
-      labels:      Object.fromEntries(Object.entries(electionResult.labels).filter(keep)),
-    };
-  }, [electionResult, activeChartType, selectedLevel, effectiveLan]);
-
-  // Convert election result → CategoricalShareResult for the generic ShareBarChart.
-  const partyShareData = useMemo((): CategoricalShareResult | null => {
-    if (!filteredElectionResult) { return null; }
-    const codes = Object.keys(filteredElectionResult.partyVotes);
-    if (codes.length === 0) { return null; }
-
-    const partyOrder = Object.fromEntries(PARTY_CODES.map((p, i) => [p, i]));
-    const sortedCodes = codes.slice().sort((a, b) => {
-      const wa = filteredElectionResult.winnerByGeo[a] ?? 'ÖVRIGA';
-      const wb = filteredElectionResult.winnerByGeo[b] ?? 'ÖVRIGA';
-      const orderDiff = (partyOrder[wa] ?? 99) - (partyOrder[wb] ?? 99);
-      if (orderDiff !== 0) { return orderDiff; }
-      return (filteredElectionResult.partyVotes[b][wb] ?? 0) - (filteredElectionResult.partyVotes[a][wa] ?? 0);
-    });
-
-    const presentParties = PARTY_CODES.filter(p =>
-      codes.some(c => (filteredElectionResult.partyVotes[c][p] ?? 0) > 0),
-    );
-
-    const categories: CategoryShare[] = presentParties.map(p => ({
-      code:         p,
-      label:        p === 'ÖVRIGA' ? 'Övr.' : p,
-      tooltipLabel: PARTY_LABELS[p] ?? p,
-      color:        PARTY_COLORS[p] ?? '#ccc',
-    }));
-
-    const rows = sortedCodes.map(code => ({
-      code,
-      label:  filteredElectionResult.labels[code] ?? code,
-      shares: filteredElectionResult.partyVotes[code],
-    }));
-
-    return { kind: 'categorical-share', categories, rows, label: filteredElectionResult.label, unit: filteredElectionResult.unit };
-  }, [filteredElectionResult]);
-
-  // ── Party choropleth ───────────────────────────────────────────────────────
-  // Derived scalar values (geoCode → party share %) for the party choropleth map.
-  const partyChoroplethValues = useMemo(() => {
-    if (!electionResult || !activeParty) { return null; }
-    return Object.fromEntries(
-      Object.entries(electionResult.partyVotes).map(([code, votes]) => [code, votes[activeParty] ?? 0]),
-    );
-  }, [electionResult, activeParty]);
-
-  // Tooltip strings: winner mode vs party mode.
-  const tooltipData = useMemo(() => {
-    if (!electionResult) { return null; }
-    if (activeParty) {
-      return Object.fromEntries(
-        Object.entries(electionResult.partyVotes).map(([code, votes]) => {
-          const share = votes[activeParty] ?? 0;
-          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${share.toFixed(1)}%`];
-        }),
-      );
-    }
-    return Object.fromEntries(
-      Object.entries(electionResult.winnerByGeo).map(([code, winner]) => {
-        const share = electionResult.partyVotes[code]?.[winner] ?? 0;
-        return [code, `${PARTY_LABELS[winner] ?? winner} — ${share.toFixed(1)}%`];
-      }),
-    );
-  }, [electionResult, activeParty]);
-
-  // Legend data: when in party choropleth mode, synthesise a scalar-like result
-  // so MapLegend renders a gradient instead of party swatches.
-  const legendData = useMemo(() => {
-    if (activeParty && electionResult && partyChoroplethValues) {
-      return {
-        kind:   'scalar' as const,
-        values: partyChoroplethValues,
-        labels: electionResult.labels,
-        label:  PARTY_LABELS[activeParty] ?? activeParty,
-        unit:   '%',
-      };
-    }
-    return datasetResult;
-  }, [activeParty, electionResult, partyChoroplethValues, datasetResult]);
-
-  // Derived scalar result for party-ranking chart: areas ranked by selected party's share.
-  // Falls back to winner share when no party is selected. Filtered by Lan at Municipality level.
-  const partyRankingResult = useMemo(() => {
-    if (!electionResult) { return null; }
-    const filterByLan = activeChartType === 'party-ranking' && selectedLevel === 'Municipality' && effectiveLan;
-    const values: Record<string, number> = {};
-    for (const [code, votes] of Object.entries(electionResult.partyVotes)) {
-      if (filterByLan && !code.startsWith(effectiveLan)) { continue; }
-      values[code] = activeParty
-        ? (votes[activeParty] ?? 0)
-        : (votes[electionResult.winnerByGeo[code]] ?? 0);
-    }
-    const labels = filterByLan
-      ? Object.fromEntries(Object.entries(electionResult.labels).filter(([c]) => c.startsWith(effectiveLan)))
-      : electionResult.labels;
-    return {
-      kind:   'scalar' as const,
-      values,
-      labels,
-      label:  activeParty ? (PARTY_LABELS[activeParty] ?? activeParty) : 'Vinnande parti',
-      unit:   '%',
-    };
-  }, [electionResult, activeParty, activeChartType, selectedLevel, effectiveLan]);
-
-  // In winner mode, color each ranking bar by the winning party and show its name in the tooltip.
-  const rankingColorFn = useMemo(() => {
-    if (activeParty || !electionResult) { return null; }
-    return (code: string) => PARTY_COLORS[electionResult.winnerByGeo[code]] ?? '#ccc';
-  }, [activeParty, electionResult]);
-
-  const rankingRowMeta = useMemo(() => {
-    if (activeParty || !electionResult) { return null; }
-    return Object.fromEntries(
-      Object.entries(electionResult.winnerByGeo).map(([code, winner]) => [
-        code,
-        PARTY_LABELS[winner] ?? winner,
-      ]),
-    );
-  }, [activeParty, electionResult]);
-
-  // Sub-boundary tooltip strings for election datasets (winner or active-party mode).
-  const subElectionTooltip = useMemo(() => {
-    if (!subElectionResult) { return null; }
-    if (activeParty) {
-      return Object.fromEntries(
-        Object.entries(subElectionResult.partyVotes).map(([code, votes]) => {
-          const share = votes[activeParty] ?? 0;
-          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${share.toFixed(1)}%`];
-        }),
-      );
-    }
-    return Object.fromEntries(
-      Object.entries(subElectionResult.winnerByGeo).map(([code, winner]) => {
-        const share = subElectionResult.partyVotes[code]?.[winner] ?? 0;
-        return [code, `${PARTY_LABELS[winner] ?? winner} — ${share.toFixed(1)}%`];
-      }),
-    );
-  }, [subElectionResult, activeParty]);
-
-  // Color overrides for MultiLineChart: election party colors or descriptor lineColors.
-  const partyColorOverrides = useMemo(() => {
-    if (electionResult || activeDescriptor?.group === 'val') {
-      return new Map(PARTY_CODES.map(p => [p, PARTY_COLORS[p]]));
-    }
-    if (activeDescriptor?.lineColors) {
-      return new Map(Object.entries(activeDescriptor.lineColors));
-    }
-    return undefined;
-  }, [electionResult, activeDescriptor]);
 
   // Content-sized charts should shrink the render area to content height instead of filling.
   // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.

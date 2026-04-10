@@ -148,7 +148,8 @@ export async function fetchTimeSeriesCached(
  */
 export function preload(descriptor: DatasetDescriptor, levels: AdminLevel[], year: number): void {
   for (const level of levels) {
-    if (!descriptor.supportedLevels.includes(level)) {continue;}
+    if (!descriptor.supportedLevels.includes(level)) { continue; }
+    if (descriptor.availableYears.length > 0 && !descriptor.availableYears.includes(year)) { continue; }
     const key = resultKey(descriptor.id, level, year);
     if (resultCache.has(key) || resultInFlight.has(key)) {continue;}
     fetchCached(descriptor, level, year).catch(() => { /* ignore background errors */ });
