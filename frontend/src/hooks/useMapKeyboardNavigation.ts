@@ -1,12 +1,6 @@
 import { useEffect, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
-import type { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
+import type { AdminLevel, ScalarDatasetResult, SelectedFeature } from '@/datasets/types';
 import { COUNTY_NAMES } from '@/datasets/adminLevels';
-
-interface SelectedFeature {
-  code:        string;
-  label:       string;
-  parentCode?: string;
-}
 
 export interface DrillStackEntry {
   level: AdminLevel;
