@@ -1,20 +1,21 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
-import MapView from '@/components/map/MapView';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
 import { SelectionPanel } from '@/components/map/SelectionPanel';
-import { RankedBarChart } from '@/components/visualizations/RankedBarChart';
-import { Histogram } from '@/components/visualizations/Histogram';
-import { DivergingBarChart } from '@/components/visualizations/DivergingBarChart';
-import { SunburstWithBar } from '@/components/visualizations/SunburstWithBar';
-import { MultiLineChart } from '@/components/visualizations/MultiLineChart';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
-import { ShareBarChart } from '@/components/visualizations/ShareBarChart';
-import { DonutChart } from '@/components/visualizations/DonutChart';
-import { ScatterPlot } from '@/components/visualizations/ScatterPlot';
-import { BoxPlot } from '@/components/visualizations/BoxPlot';
+
+const MapView        = lazy(() => import('@/components/map/MapView'));
+const RankedBarChart = lazy(() => import('@/components/visualizations/RankedBarChart').then(m => ({ default: m.RankedBarChart })));
+const Histogram      = lazy(() => import('@/components/visualizations/Histogram').then(m => ({ default: m.Histogram })));
+const DivergingBarChart = lazy(() => import('@/components/visualizations/DivergingBarChart').then(m => ({ default: m.DivergingBarChart })));
+const SunburstWithBar = lazy(() => import('@/components/visualizations/SunburstWithBar').then(m => ({ default: m.SunburstWithBar })));
+const MultiLineChart = lazy(() => import('@/components/visualizations/MultiLineChart').then(m => ({ default: m.MultiLineChart })));
+const ShareBarChart  = lazy(() => import('@/components/visualizations/ShareBarChart').then(m => ({ default: m.ShareBarChart })));
+const DonutChart     = lazy(() => import('@/components/visualizations/DonutChart').then(m => ({ default: m.DonutChart })));
+const ScatterPlot    = lazy(() => import('@/components/visualizations/ScatterPlot').then(m => ({ default: m.ScatterPlot })));
+const BoxPlot        = lazy(() => import('@/components/visualizations/BoxPlot').then(m => ({ default: m.BoxPlot })));
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import {
   AdminLevel, ViewType, ScalarDatasetResult, FilterCriterion,
@@ -633,31 +634,33 @@ export default function MapPage() {
           )}
 
             <div className={`relative min-w-0 bg-slate-50 ${isContentSized ? '' : 'flex-1 overflow-hidden'}`} style={{ isolation: 'isolate' }}>
-              {activeView === 'map' && (
-                <MapView
-                  adminLevel={selectedLevel}
-                  selectedBase={selectedBase}
-                  choroplethData={partyChoroplethValues ?? scalarResult?.values ?? null}
-                  colorScale={bivariateFn ? null : colorScale}
-                  mapColorFn={bivariateFn ?? mapColorFn}
-                  tooltipData={tooltipData}
-                  featureLabels={resultLabels}
-                  featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
-                  featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
-                  featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
-                  unit={activeParty ? '%' : (datasetResult?.unit ?? '')}
-                  subChoroplethData={subScalarResult?.values ?? null}
-                  subTooltipData={subElectionTooltip}
-                  resetToken={mapResetToken}
-                  selectedFeature={selectedFeature}
-                  onFeatureSelect={handleFeatureSelect}
-                  onDrillDown={handleDrillDown}
-                  comparisonFeature={comparisonFeature}
-                  onComparisonSelect={handleComparisonSelect}
-                  matchingAreas={matchingAreas}
-                  fillOpacity={fillOpacity}
-                />
-              )}
+              <Suspense fallback={<Spinner />}>
+                {activeView === 'map' && (
+                  <MapView
+                    adminLevel={selectedLevel}
+                    selectedBase={selectedBase}
+                    choroplethData={partyChoroplethValues ?? scalarResult?.values ?? null}
+                    colorScale={bivariateFn ? null : colorScale}
+                    mapColorFn={bivariateFn ?? mapColorFn}
+                    tooltipData={tooltipData}
+                    featureLabels={resultLabels}
+                    featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
+                    featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+                    featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
+                    unit={activeParty ? '%' : (datasetResult?.unit ?? '')}
+                    subChoroplethData={subScalarResult?.values ?? null}
+                    subTooltipData={subElectionTooltip}
+                    resetToken={mapResetToken}
+                    selectedFeature={selectedFeature}
+                    onFeatureSelect={handleFeatureSelect}
+                    onDrillDown={handleDrillDown}
+                    comparisonFeature={comparisonFeature}
+                    onComparisonSelect={handleComparisonSelect}
+                    matchingAreas={matchingAreas}
+                    fillOpacity={fillOpacity}
+                  />
+                )}
+              </Suspense>
 
               {activeView === 'map' && bivariateFn && activeDescriptor && bivariateYDescriptor && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
@@ -673,118 +676,120 @@ export default function MapPage() {
                 </div>
               )}
 
-              {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
-                <div className="w-full p-6">
-                  <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
-                <div className="w-full h-full p-6">
-                  <Histogram data={scalarResult} colorScale={colorScale} />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
-                <div className="w-full p-6">
-                  <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
-                <div className="w-full p-6">
-                  <ShareBarChart
-                    data={partyShareData}
-                    sort="none"
-                    selectedCode={selectedFeature?.code ?? null}
-                    onSelect={handleFeatureSelect}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'share-bar' && categoricalResult && (
-                <div className="w-full p-6">
-                  <ShareBarChart data={categoricalResult} />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'donut' && donutResult && (
-                <div className="w-full p-4 flex justify-center">
-                  <DonutChart
-                    items={donutResult.items}
-                    size={160}
-                    holeRatio={22 / 48}
-                    legendPosition="right"
-                    showCount
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
-                <div className="w-full h-full p-4">
-                  <SunburstWithBar
-                    root={hierarchyData}
-                    unit={datasetResult?.unit ?? ''}
-                    label={activeDescriptor?.label ?? ''}
-                    onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? handleFeatureSelect : undefined}
-                    onComparisonSelect={activeDescriptor?.sunburstDepthToLevel ? handleComparisonSelect : undefined}
-                    depthToLevel={activeDescriptor?.sunburstDepthToLevel}
-                    onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && hierarchyLoading && (
-                <Spinner />
-              )}
-              {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
-                <div className="w-full h-full p-4">
-                  <MultiLineChart
-                    data={timeSeriesData}
-                    label={timeSeriesFeatureCode
-                      ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
-                      : (activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
-                    unit={activeDescriptor?.timeSeriesUnit}
-                    colorOverrides={partyColorOverrides}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'party-ranking' && partyRankingResult && (
-                <div className="w-full p-6">
-                  <RankedBarChart
-                    data={partyRankingResult}
-                    colorScale={activeParty ? colorScale : null}
-                    colorFn={rankingColorFn}
-                    rowMeta={rankingRowMeta}
-                    selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
-                    comparisonFeature={comparisonFeature}
-                    onComparisonSelect={handleComparisonSelect}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'scatter' && scalarResult && scatterYScalar && (
-                <div className="w-full h-full p-4">
-                  <ScatterPlot
-                    xData={scalarResult}
-                    yData={scatterYScalar}
-                    selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
-                    comparisonFeature={comparisonFeature}
-                    onComparisonSelect={handleComparisonSelect}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'boxplot' && scalarResult && (
-                <div className="w-full p-6">
-                  <BoxPlot
-                    data={scalarResult}
-                    colorScale={colorScale}
-                    selectedFeature={selectedFeature}
-                  />
-                </div>
-              )}
-              {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
-                <Spinner />
-              )}
-              {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && activeChartType !== 'donut' && !datasetResult && (
-                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                  Välj ett dataset för att visa diagram.
-                </div>
-              )}
+              <Suspense fallback={<Spinner />}>
+                {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
+                  <div className="w-full p-6">
+                    <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
+                  <div className="w-full h-full p-6">
+                    <Histogram data={scalarResult} colorScale={colorScale} />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
+                  <div className="w-full p-6">
+                    <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
+                  <div className="w-full p-6">
+                    <ShareBarChart
+                      data={partyShareData}
+                      sort="none"
+                      selectedCode={selectedFeature?.code ?? null}
+                      onSelect={handleFeatureSelect}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'share-bar' && categoricalResult && (
+                  <div className="w-full p-6">
+                    <ShareBarChart data={categoricalResult} />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'donut' && donutResult && (
+                  <div className="w-full p-4 flex justify-center">
+                    <DonutChart
+                      items={donutResult.items}
+                      size={160}
+                      holeRatio={22 / 48}
+                      legendPosition="right"
+                      showCount
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'sunburst' && hierarchyData && (
+                  <div className="w-full h-full p-4">
+                    <SunburstWithBar
+                      root={hierarchyData}
+                      unit={datasetResult?.unit ?? ''}
+                      label={activeDescriptor?.label ?? ''}
+                      onFeatureSelect={activeDescriptor?.sunburstDepthToLevel ? handleFeatureSelect : undefined}
+                      onComparisonSelect={activeDescriptor?.sunburstDepthToLevel ? handleComparisonSelect : undefined}
+                      depthToLevel={activeDescriptor?.sunburstDepthToLevel}
+                      onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'sunburst' && !hierarchyData && hierarchyLoading && (
+                  <Spinner />
+                )}
+                {activeView === 'chart' && activeChartType === 'multiline' && timeSeriesData && (
+                  <div className="w-full h-full p-4">
+                    <MultiLineChart
+                      data={timeSeriesData}
+                      label={timeSeriesFeatureCode
+                        ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
+                        : (activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
+                      unit={activeDescriptor?.timeSeriesUnit}
+                      colorOverrides={partyColorOverrides}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'party-ranking' && partyRankingResult && (
+                  <div className="w-full p-6">
+                    <RankedBarChart
+                      data={partyRankingResult}
+                      colorScale={activeParty ? colorScale : null}
+                      colorFn={rankingColorFn}
+                      rowMeta={rankingRowMeta}
+                      selectedFeature={selectedFeature}
+                      onFeatureSelect={handleFeatureSelect}
+                      comparisonFeature={comparisonFeature}
+                      onComparisonSelect={handleComparisonSelect}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'scatter' && scalarResult && scatterYScalar && (
+                  <div className="w-full h-full p-4">
+                    <ScatterPlot
+                      xData={scalarResult}
+                      yData={scatterYScalar}
+                      selectedFeature={selectedFeature}
+                      onFeatureSelect={handleFeatureSelect}
+                      comparisonFeature={comparisonFeature}
+                      onComparisonSelect={handleComparisonSelect}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'boxplot' && scalarResult && (
+                  <div className="w-full p-6">
+                    <BoxPlot
+                      data={scalarResult}
+                      colorScale={colorScale}
+                      selectedFeature={selectedFeature}
+                    />
+                  </div>
+                )}
+                {activeView === 'chart' && activeChartType === 'multiline' && !timeSeriesData && timeSeriesLoading && (
+                  <Spinner />
+                )}
+                {activeView === 'chart' && activeChartType !== 'sunburst' && activeChartType !== 'diverging' && activeChartType !== 'multiline' && activeChartType !== 'election-bar' && activeChartType !== 'party-ranking' && activeChartType !== 'scatter' && activeChartType !== 'boxplot' && activeChartType !== 'donut' && !datasetResult && (
+                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                    Välj ett dataset för att visa diagram.
+                  </div>
+                )}
+              </Suspense>
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">

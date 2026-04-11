@@ -12,6 +12,16 @@ export default defineConfig(({ mode }) => {
         "@": resolve(__dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('/node_modules/ol/')) { return 'vendor-ol'; }
+            if (id.includes('/node_modules/d3') || id.includes('/node_modules/d3-')) { return 'vendor-d3'; }
+          },
+        },
+      },
+    },
     server: {
       proxy: {
         "/api": "http://localhost:3001",

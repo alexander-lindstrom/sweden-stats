@@ -22,29 +22,11 @@ The single biggest UX upgrade available. Every interesting view is ephemeral —
 
 **Why it matters:** This is the difference between a tool and a product. People will want to share what they find. Without this, the richness of the explorer is invisible from the outside.
 
-### 2. Code splitting — lazy-load heavy dependencies
+### 2. Code splitting — lazy-load heavy dependencies ✓ done
 
-The production bundle is **1,058 KB** (327 KB gzip) in a single chunk. OpenLayers and D3 account for the vast majority. Zero `import()` calls exist in the codebase.
+~~The production bundle is **1,058 KB** (327 KB gzip) in a single chunk. OpenLayers and D3 account for the vast majority. Zero `import()` calls exist in the codebase.~~
 
-**What to do:**
-
-- Lazy-load `MapView` (pulls in OpenLayers) and chart components (pull in D3) behind `React.lazy()` with `Suspense` boundaries.
-- Use Vite's `manualChunks` in rollup config to split OL and D3 into separate cached chunks.
-- The map view is the default so it still loads fast — but chart/table/profile code won't block initial paint.
-
-**Why it matters:** First-load performance directly affects whether someone bouncing in from a shared link (see #1) stays or leaves.
-
-### 3. MapPage decomposition
-
-At ~1,200 lines with ~30 `useState` calls, MapPage is the central complexity bottleneck. It works — but any new feature pays the highest integration tax here.
-
-**What to do:** Extract custom hooks that encapsulate related state logic. The render function should read like a layout description, not a state machine. Candidates:
-
-- **Navigation state** (level, feature, drill stack, breadcrumb) → `useNavigationState`
-- **Dataset state** (dataset, year, party, scatter/bivariate) → `useDatasetState`
-- **View state** (view, chart type, sidebar, panel) → `useViewState`
-
-No behavior change — just reduced cognitive load.
+`MapView` and all D3 chart components are now lazy-loaded via `React.lazy()` + `Suspense`. `manualChunks` isolates OL → `vendor-ol` and D3 → `vendor-d3` for independent long-term caching. Chart chunks only download when the user first opens the Diagram view.
 
 ---
 
