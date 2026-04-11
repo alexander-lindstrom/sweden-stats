@@ -26,22 +26,17 @@ The single biggest UX upgrade available. Every interesting view is ephemeral —
 
 ## High-impact, lower effort
 
-### 4. CI quality gates
+### 4. CI quality gates ✓ done
 
-The deploy workflow does `git pull && docker compose up` with zero checks. A broken build deploys silently.
+~~The deploy workflow does `git pull && docker compose up` with zero checks. A broken build deploys silently.~~
 
-**What to do:** Add a CI job before deploy:
+A `ci` job now runs `npm run lint` + `npm run build` (includes `tsc`) on every push to `main`. The `deploy` job has `needs: ci`, so a failing lint or type error blocks the SSH deploy entirely.
 
-```yaml
-- npm run lint
-- npm run build # includes tsc type-check
-```
+### 6. Caddy cache headers for hashed assets ✓ done
 
-15 minutes to set up. Catches regressions before they hit production.
+~~Vite already produces content-hashed filenames (`index-oTxg3YlD.js`). Unless Caddy sends `Cache-Control: public, max-age=31536000, immutable` for those assets, browsers re-validate every visit.~~
 
-### 6. Caddy cache headers for hashed assets
-
-Vite already produces content-hashed filenames (`index-oTxg3YlD.js`). Unless Caddy sends `Cache-Control: public, max-age=31536000, immutable` for those assets, browsers re-validate every visit. One-line Caddy config change for a meaningful repeat-visit speedup.
+A dedicated `handle /assets/*` block now sets `Cache-Control: public, max-age=31536000, immutable` for all Vite-hashed assets. The SPA catch-all is unchanged (no caching for `index.html`).
 
 ---
 
