@@ -16,6 +16,8 @@ interface Props {
    *  When provided, onSelectionLevelChange fires with the level for each click. */
   depthToLevel?: AdminLevel[];
   onSelectionLevelChange?: (level: AdminLevel) => void;
+  /** If provided, the sunburst will pre-drill to the node with this code on mount. */
+  initialCode?: string;
 }
 
 interface TT {
@@ -29,13 +31,23 @@ const MAX_BARS   = 40;
 const MAX_BAR_H  = 20;   // max bar height in px — matches budget chart density
 const BAR_GAP    = 1;    // gap between bars in px
 
+/** Walk the hierarchy and return the node matching `code`, plus the path of ancestors. */
+function findNode(node: GeoHierarchyNode, code: string, path: GeoHierarchyNode[] = []): { node: GeoHierarchyNode; path: GeoHierarchyNode[] } | null {
+  if (node.code === code) { return { node, path }; }
+  for (const child of node.children ?? []) {
+    const result = findNode(child, code, [...path, node]);
+    if (result) { return result; }
+  }
+  return null;
+}
+
 function fmtShort(v: number): string {
   if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
   if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
   return v.toLocaleString('sv-SE');
 }
 
-export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, onComparisonSelect, depthToLevel, onSelectionLevelChange }) => {
+export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, onComparisonSelect, depthToLevel, onSelectionLevelChange, initialCode }) => {
   const containerRef               = useRef<HTMLDivElement>(null);
   const sunRef                     = useRef<SVGSVGElement>(null);
   const barRef                     = useRef<SVGSVGElement>(null);
@@ -55,12 +67,27 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     if (level) {onSelectionLevelChangeRef.current?.(level);}
   };
 
-  const [focus,   setFocus]   = useState<GeoHierarchyNode>(root);
-  const [history, setHistory] = useState<GeoHierarchyNode[]>([]);
+  const [focus,   setFocus]   = useState<GeoHierarchyNode>(() => {
+    if (!initialCode) { return root; }
+    return findNode(root, initialCode)?.node ?? root;
+  });
+  const [history, setHistory] = useState<GeoHierarchyNode[]>(() => {
+    if (!initialCode) { return []; }
+    return findNode(root, initialCode)?.path ?? [];
+  });
   const [tt,      setTT]      = useState<TT>({ visible: false, name: '', value: 0 });
 
-  // Reset when root data changes.
-  useEffect(() => { setFocus(root); setHistory([]); }, [root]);
+  // Reset when root data changes (dataset/year switch). Skips the initial mount
+  // so URL-initialized drill state is preserved, and uses prevRootRef to survive
+  // React Strict Mode's double-invocation (same root = Strict Mode re-fire, skip).
+  const prevRootRef = useRef<GeoHierarchyNode | null>(null);
+  useEffect(() => {
+    const prev = prevRootRef.current;
+    prevRootRef.current = root;
+    if (prev === null || prev === root) { return; }
+    setFocus(root);
+    setHistory([]);
+  }, [root]);
 
   // Keep refs so d3 event handlers always see current state.
   const focusRef   = useRef(focus);   focusRef.current   = focus;

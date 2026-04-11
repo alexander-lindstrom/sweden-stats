@@ -775,6 +775,7 @@ export default function MapPage() {
                       onComparisonSelect={activeDescriptor?.sunburstDepthToLevel ? handleComparisonSelect : undefined}
                       depthToLevel={activeDescriptor?.sunburstDepthToLevel}
                       onSelectionLevelChange={activeDescriptor?.sunburstDepthToLevel ? setSelectionLevel : undefined}
+                      initialCode={selectedFeature?.code ?? undefined}
                     />
                   </div>
                 )}
