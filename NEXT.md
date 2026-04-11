@@ -22,12 +22,6 @@ The single biggest UX upgrade available. Every interesting view is ephemeral —
 
 **Why it matters:** This is the difference between a tool and a product. People will want to share what they find. Without this, the richness of the explorer is invisible from the outside.
 
-### 2. Code splitting — lazy-load heavy dependencies ✓ done
-
-~~The production bundle is **1,058 KB** (327 KB gzip) in a single chunk. OpenLayers and D3 account for the vast majority. Zero `import()` calls exist in the codebase.~~
-
-`MapView` and all D3 chart components are now lazy-loaded via `React.lazy()` + `Suspense`. `manualChunks` isolates OL → `vendor-ol` and D3 → `vendor-d3` for independent long-term caching. Chart chunks only download when the user first opens the Diagram view.
-
 ---
 
 ## High-impact, lower effort

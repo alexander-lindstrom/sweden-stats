@@ -1,4 +1,4 @@
-import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
@@ -35,6 +35,7 @@ import { useMapKeyboardNavigation } from '@/hooks/useMapKeyboardNavigation';
 import { useNavigationState } from '@/hooks/useNavigationState';
 import { useDatasetState } from '@/hooks/useDatasetState';
 import { useViewState } from '@/hooks/useViewState';
+import { useUrlState } from '@/hooks/useUrlState';
 import { useAreaFilterDerivedData } from '@/hooks/useAreaFilterDerivedData';
 import { useElectionDerivedData } from '@/hooks/useElectionDerivedData';
 import { stripLanSuffix } from '@/utils/labelFormatting';
@@ -83,8 +84,17 @@ const ALL_VIEWS: { key: ViewType; label: string }[] = [
 ];
 
 export default function MapPage() {
+  // ── URL state (parsed once on mount; drives initial values below) ──────
+  const { initialValues, syncUrl } = useUrlState();
+
+  // Tracks the last admin level the level-change effect ran for.
+  // null = never ran (initial mount). Comparing against selectedLevel lets us
+  // skip Strict Mode's double-invocation (same level as previous run) while
+  // still firing when the user actually changes level (different level).
+  const lastProcessedLevelRef = useRef<AdminLevel | null>(null);
+
   // ── UI layout state ────────────────────────────────────────────────────
-  const [isPanelOpen,         setIsPanelOpen]         = useState(false);
+  const [isPanelOpen,         setIsPanelOpen]         = useState(!!initialValues.selectedFeature);
   const [desktopSidebarOpen,  setDesktopSidebarOpen]  = useState(true);
   const [mobileSidebarOpen,   setMobileSidebarOpen]   = useState(false);
   const [mapResetToken,       setMapResetToken]       = useState(0);
@@ -101,7 +111,11 @@ export default function MapPage() {
     if (feature && !dismissed) { setIsPanelOpen(true); }
   }, []);
 
-  const nav = useNavigationState(onSelectionChange);
+  const nav = useNavigationState(onSelectionChange, {
+    selectedLevel:     initialValues.selectedLevel     ?? undefined,
+    selectedFeature:   initialValues.selectedFeature   ?? undefined,
+    comparisonFeature: initialValues.comparisonFeature ?? undefined,
+  });
   const {
     selectedLevel, setSelectedLevel,
     selectedFeature, setSelectedFeature,
@@ -121,7 +135,11 @@ export default function MapPage() {
   } = nav;
 
   // ── Dataset (year, party, descriptor) ─────────────────────────────────
-  const ds = useDatasetState();
+  const ds = useDatasetState({
+    selectedDatasetId: initialValues.selectedDatasetId ?? undefined,
+    selectedYear:      initialValues.selectedYear      ?? undefined,
+    activeParty:       initialValues.activeParty       ?? undefined,
+  });
   const {
     selectedDatasetId, setSelectedDatasetId,
     selectedYear,
@@ -138,7 +156,10 @@ export default function MapPage() {
     setFilterCriteria([]);
   }, []);
 
-  const view = useViewState(selectedLevel, selectedDatasetId, activeDescriptor, onElectionDataset);
+  const view = useViewState(selectedLevel, selectedDatasetId, activeDescriptor, onElectionDataset, {
+    activeView:      initialValues.activeView      ?? undefined,
+    activeChartType: initialValues.activeChartType ?? undefined,
+  });
   const {
     activeView, setActiveView,
     activeChartType, setActiveChartType,
@@ -263,7 +284,11 @@ export default function MapPage() {
     setSelectedLevel('Region');
     setSelectedFeature(null);
     setComparisonFeature(null);
+    setSelectedDatasetId(null);
     setActiveView('map');
+    setActiveChartType('bar');
+    setFilterEnabled(false);
+    setFilterCriteria([]);
     userDismissedPanel.current = false;
     setIsPanelOpen(false);
     setMobileSidebarOpen(false);
@@ -272,7 +297,15 @@ export default function MapPage() {
   };
 
   // When admin level changes: reset dataset if unavailable, clear comparison/filters/selection.
+  // lastProcessedLevelRef tracks the last level this effect ran for:
+  //   - null  → initial mount, skip to preserve URL-initialized state
+  //   - same  → Strict Mode re-invocation with no real level change, skip
+  //   - diff  → user changed the level, run the reset
   useEffect(() => {
+    const prev = lastProcessedLevelRef.current;
+    lastProcessedLevelRef.current = selectedLevel;
+    if (prev === null || prev === selectedLevel) { return; }
+
     resetDatasetForLevel(selectedLevel);
     setSelectionLevel(selectedLevel);
     setComparisonFeature(null);
@@ -284,6 +317,20 @@ export default function MapPage() {
       setSelectedFeature(null);
     }
   }, [selectedLevel, resetDatasetForLevel, pendingSelectionRef, setComparisonFeature, setSelectedFeature, setSelectionLevel]);
+
+  // Sync settled state → URL after every relevant state change.
+  useEffect(() => {
+    syncUrl({
+      selectedLevel, selectedFeature, comparisonFeature,
+      selectedDatasetId, selectedYear, activeParty,
+      activeView, activeChartType,
+    });
+  }, [
+    syncUrl,
+    selectedLevel, selectedFeature, comparisonFeature,
+    selectedDatasetId, selectedYear, activeParty,
+    activeView, activeChartType,
+  ]);
 
   // Color function for bivariate mode: maps (code) → 3×3 palette hex.
   const bivariateFn = useMemo(() => {

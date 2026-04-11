@@ -36,14 +36,22 @@ export interface NavigationState {
  * @param onSelectionChange Called when the selected feature changes so the page
  *   can open/close the selection panel without the hook knowing about UI layout.
  *   Receives the new feature (or null) and whether the user has dismissed the panel.
+ * @param initialValues Optional initial state (e.g. parsed from URL search params).
  */
 export function useNavigationState(
   onSelectionChange?: (feature: SelectedFeature | null, dismissed: boolean) => void,
+  initialValues?: {
+    selectedLevel?:     AdminLevel;
+    selectedFeature?:   { code: string; label: string } | null;
+    comparisonFeature?: { code: string; label: string } | null;
+  },
 ): NavigationState {
-  const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>('Region');
-  const [selectedFeature,   setSelectedFeature]   = useState<SelectedFeature | null>(null);
-  const [selectionLevel,    setSelectionLevel]    = useState<AdminLevel>(selectedLevel);
-  const [comparisonFeature, setComparisonFeature] = useState<SelectedFeature | null>(null);
+  const initLevel = initialValues?.selectedLevel ?? 'Region';
+
+  const [selectedLevel,     setSelectedLevel]     = useState<AdminLevel>(initLevel);
+  const [selectedFeature,   setSelectedFeature]   = useState<SelectedFeature | null>(initialValues?.selectedFeature ?? null);
+  const [selectionLevel,    setSelectionLevel]    = useState<AdminLevel>(initLevel);
+  const [comparisonFeature, setComparisonFeature] = useState<SelectedFeature | null>(initialValues?.comparisonFeature ?? null);
   const [drillStack,        setDrillStack]        = useState<DrillStackEntry[]>([]);
   const [selectedLan,       setSelectedLan]       = useState<string | null>(null);
   const [selectedMuni,      setSelectedMuni]      = useState<string | null>(null);
@@ -53,7 +61,7 @@ export function useNavigationState(
   const userDismissedPanel   = useRef(false);
   // Refs kept in sync during render so stable callbacks can read current values.
   const selectedFeatureRef   = useRef<SelectedFeature | null>(null);
-  const selectedLevelRef     = useRef<AdminLevel>('Region');
+  const selectedLevelRef     = useRef<AdminLevel>(initLevel);
   selectedFeatureRef.current = selectedFeature;
   selectedLevelRef.current   = selectedLevel;
 

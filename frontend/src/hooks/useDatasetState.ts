@@ -21,12 +21,22 @@ export interface DatasetState {
  * Manages dataset selection, year (with debounce), active party, and
  * the constraint effect that clamps year to available range and clears
  * the party filter when leaving election datasets.
+ *
+ * @param initialValues Optional initial state (e.g. parsed from URL search params).
  */
-export function useDatasetState(): DatasetState {
-  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
-  const [selectedYear,      setSelectedYear]       = useState<number>(2024);
-  const [displayYear,       setDisplayYear]        = useState<number>(2024);
-  const [activeParty,       setActiveParty]        = useState<string | null>(null);
+export function useDatasetState(
+  initialValues?: {
+    selectedDatasetId?: string | null;
+    selectedYear?:      number;
+    activeParty?:       string | null;
+  },
+): DatasetState {
+  const initYear = initialValues?.selectedYear ?? 2024;
+
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(initialValues?.selectedDatasetId ?? null);
+  const [selectedYear,      setSelectedYear]       = useState<number>(initYear);
+  const [displayYear,       setDisplayYear]        = useState<number>(initYear);
+  const [activeParty,       setActiveParty]        = useState<string | null>(initialValues?.activeParty ?? null);
 
   const yearDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 

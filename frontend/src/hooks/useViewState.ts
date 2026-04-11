@@ -31,15 +31,17 @@ export interface ViewState {
  * @param activeDescriptor Descriptor for the active dataset.
  * @param onElectionDataset Called when the active dataset switches to an election
  *   dataset, so MapPage can clear filter state that is incompatible with elections.
+ * @param initialValues Optional initial state (e.g. parsed from URL search params).
  */
 export function useViewState(
   selectedLevel: AdminLevel,
   selectedDatasetId: string | null,
   activeDescriptor: DatasetDescriptor | null,
   onElectionDataset?: () => void,
+  initialValues?: { activeView?: ViewType; activeChartType?: ChartType },
 ): ViewState {
-  const [activeView,          setActiveView]          = useState<ViewType>('map');
-  const [activeChartType,     setActiveChartType]     = useState<ChartType>('bar');
+  const [activeView,          setActiveView]          = useState<ViewType>(initialValues?.activeView ?? 'map');
+  const [activeChartType,     setActiveChartType]     = useState<ChartType>(initialValues?.activeChartType ?? 'bar');
   const [bivariateMode,       setBivariateMode]       = useState(false);
   const [bivariateYDatasetId, setBivariateYDatasetId] = useState<string | null>(null);
   const [scatterYDatasetId,   setScatterYDatasetId]   = useState<string | null>(null);
@@ -85,7 +87,7 @@ export function useViewState(
     if ((activeView === 'profile' && selectedLevel === 'Country') || (activeView !== 'profile' && !availableViews.includes(activeView))) {
       setActiveView(availableViews[0] ?? 'map');
     }
-  }, [availableViews, activeView]);
+  }, [availableViews, activeView, selectedLevel]);
 
   // Snap activeChartType if it becomes unavailable.
   useEffect(() => {
