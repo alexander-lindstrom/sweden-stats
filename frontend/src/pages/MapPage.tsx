@@ -298,16 +298,22 @@ export default function MapPage() {
 
   // When admin level changes: reset dataset if unavailable, clear comparison/filters/selection.
   // lastProcessedLevelRef tracks the last level this effect ran for:
-  //   - null  → initial mount, skip to preserve URL-initialized state
-  //   - same  → Strict Mode re-invocation with no real level change, skip
-  //   - diff  → user changed the level, run the reset
+  //   - null  → initial mount: run dataset/level sync but skip state clearing to preserve URL state
+  //   - same  → Strict Mode re-invocation with no real level change, skip entirely
+  //   - diff  → user changed the level, run everything
   useEffect(() => {
     const prev = lastProcessedLevelRef.current;
     lastProcessedLevelRef.current = selectedLevel;
-    if (prev === null || prev === selectedLevel) { return; }
+    if (prev === selectedLevel) { return; }
 
+    // Always run on mount and on level change: ensures a valid default dataset is set
+    // (no-op if the URL-provided dataset is already valid for this level).
     resetDatasetForLevel(selectedLevel);
     setSelectionLevel(selectedLevel);
+
+    // Skip state clearing on initial mount to preserve URL-initialized state.
+    if (prev === null) { return; }
+
     setComparisonFeature(null);
     setFilterCriteria([]);
     if (pendingSelectionRef.current) {
