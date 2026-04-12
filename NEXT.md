@@ -12,34 +12,6 @@ The main risks are all about the gap between "works great for one person explori
 
 ---
 
-## High-impact, medium effort
-
-### 1. URL-driven state (deep linking)
-
-The single biggest UX upgrade available. Every interesting view is ephemeral — you can't share "look at employment rate in Malmö at DeSO level" with a link. All key state lives in `useState` and vanishes on reload.
-
-**What to do:** Sync `selectedLevel`, `selectedDatasetId`, `selectedYear`, `activeView`, `selectedFeature`, and `activeParty` to URL search params (e.g. `?level=DeSO&dataset=medianinkomst&year=2024&feature=0114&view=chart`). React Router v7 has `useSearchParams`. Initialize state from URL on mount, push state changes to URL. Every view becomes bookmarkable, shareable, and back-button-friendly.
-
-**Why it matters:** This is the difference between a tool and a product. People will want to share what they find. Without this, the richness of the explorer is invisible from the outside.
-
----
-
-## High-impact, lower effort
-
-### 4. CI quality gates ✓ done
-
-~~The deploy workflow does `git pull && docker compose up` with zero checks. A broken build deploys silently.~~
-
-A `ci` job now runs `npm run lint` + `npm run build` (includes `tsc`) on every push to `main`. The `deploy` job has `needs: ci`, so a failing lint or type error blocks the SSH deploy entirely.
-
-### 6. Caddy cache headers for hashed assets ✓ done
-
-~~Vite already produces content-hashed filenames (`index-oTxg3YlD.js`). Unless Caddy sends `Cache-Control: public, max-age=31536000, immutable` for those assets, browsers re-validate every visit.~~
-
-A dedicated `handle /assets/*` block now sets `Cache-Control: public, max-age=31536000, immutable` for all Vite-hashed assets. The SPA catch-all is unchanged (no caching for `index.html`).
-
----
-
 ## Medium-impact, strategic
 
 ### 7. Kolada integration
