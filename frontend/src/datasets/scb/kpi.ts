@@ -84,6 +84,7 @@ const EMPTY_RESULT: ScalarDatasetResult = { kind: 'scalar', values: {}, labels: 
 export const kpi: DatasetDescriptor = {
   id:              'kpi',
   label:           'KPI',
+  category:        'ekonomi' as const,
   source:          'SCB',
   availableYears:  [],         // no year slider — always fetches full time series
   supportedLevels: ['Country'],

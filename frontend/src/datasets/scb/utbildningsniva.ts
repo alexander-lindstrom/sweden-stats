@@ -278,6 +278,7 @@ async function fetchUtbildningsniva(level: AdminLevel, year: number): Promise<Sc
 export const utbildningsniva: DatasetDescriptor = {
   id: 'utbildningsniva',
   label: 'Utbildningsnivå',
+  category: 'utbildning' as const,
   source: 'SCB',
   availableYears: [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024],
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],

@@ -413,6 +413,7 @@ function makeElectionDescriptor(opts: {
     id,
     label,
     shortLabel,
+    category:        'val' as const,
     group:           'val',
     groupLabel:      'Val',
     source:          'SCB',

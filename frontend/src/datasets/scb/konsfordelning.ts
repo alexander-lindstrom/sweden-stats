@@ -350,6 +350,7 @@ async function fetchKonsfordelning(level: AdminLevel, year: number): Promise<Sca
 export const konsfordelning: DatasetDescriptor = {
   id: 'konsfordelning',
   label: 'Könsfördelning',
+  category: 'befolkning' as const,
   source: 'SCB',
   colorScaleType:  'diverging',
   divergingCenter: 50,

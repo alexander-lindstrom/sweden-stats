@@ -630,6 +630,7 @@ async function fetchPopulation(level: AdminLevel, year: number): Promise<ScalarD
 export const population: DatasetDescriptor = {
   id: 'population',
   label: 'Folkmängd',
+  category: 'befolkning' as const,
   source: 'SCB',
   availableYears: Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Country', 'Region', 'Municipality', 'RegSO', 'DeSO'],

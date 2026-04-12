@@ -39,6 +39,7 @@ async function fetchExpenses(_level: AdminLevel, _year: number): Promise<ScalarD
 export const stateExpenses: DatasetDescriptor = {
   id:             'state-expenses',
   label:          'Statens utgifter',
+  category:       'ekonomi' as const,
   source:         'ESV',
   availableYears: Array.from({ length: 28 }, (_, i) => 1997 + i), // 1997–2024
   supportedLevels: ['Country'],

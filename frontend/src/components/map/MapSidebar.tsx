@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
 import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
 import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
-import type { AdminLevel, DatasetDescriptor, FilterCriterion } from '@/datasets/types';
+import type { AdminLevel, DatasetCategory, DatasetDescriptor, FilterCriterion } from '@/datasets/types';
+import { DATASET_CATEGORY_LABELS, DATASET_CATEGORY_ORDER } from '@/datasets/types';
 
 interface MapSidebarProps {
   selectedLevel:          AdminLevel;
@@ -86,20 +87,13 @@ function NavItem({ active, onClick, children }: { active: boolean; onClick: () =
   );
 }
 
-/** Render datasets, collapsing any that share a `group` into one nav item + segmented sub-selector. */
-function DatasetList({
-  datasets,
-  selectedDatasetId,
-  onDatasetChange,
-}: {
-  datasets: DatasetDescriptor[];
-  selectedDatasetId: string | null;
-  onDatasetChange: (id: string) => void;
-}) {
-  // Partition into ungrouped items and groups (preserving order of first appearance).
-  const order: Array<{ kind: 'single'; ds: DatasetDescriptor } | { kind: 'group'; key: string; items: DatasetDescriptor[] }> = [];
-  const seenGroups = new Map<string, DatasetDescriptor[]>();
+type GroupEntry =
+  | { kind: 'single'; ds: DatasetDescriptor }
+  | { kind: 'group'; key: string; items: DatasetDescriptor[] };
 
+function buildGroupOrder(datasets: DatasetDescriptor[]): GroupEntry[] {
+  const order: GroupEntry[] = [];
+  const seenGroups = new Map<string, DatasetDescriptor[]>();
   for (const ds of datasets) {
     if (!ds.group) {
       order.push({ kind: 'single', ds });
@@ -111,59 +105,145 @@ function DatasetList({
       seenGroups.get(ds.group)!.push(ds);
     }
   }
+  return order;
+}
+
+function renderGroupEntry(
+  entry: GroupEntry,
+  selectedDatasetId: string | null,
+  onDatasetChange: (id: string) => void,
+) {
+  if (entry.kind === 'single') {
+    return (
+      <li key={entry.ds.id}>
+        <NavItem active={selectedDatasetId === entry.ds.id} onClick={() => onDatasetChange(entry.ds.id)}>
+          {entry.ds.label}
+        </NavItem>
+      </li>
+    );
+  }
+
+  const { key, items } = entry;
+  const isGroupActive = items.some(d => d.id === selectedDatasetId);
+  const groupLabel = items.find(d => d.groupLabel)?.groupLabel ?? key;
 
   return (
-    <ul>
-      {order.map((entry) => {
-        if (entry.kind === 'single') {
-          return (
-            <li key={entry.ds.id}>
-              <NavItem active={selectedDatasetId === entry.ds.id} onClick={() => onDatasetChange(entry.ds.id)}>
-                {entry.ds.label}
-              </NavItem>
-            </li>
-          );
-        }
+    <li key={key}>
+      <NavItem
+        active={isGroupActive}
+        onClick={() => {
+          const current = items.find(d => d.id === selectedDatasetId);
+          onDatasetChange((current ?? items[0]).id);
+        }}
+      >
+        {groupLabel}
+      </NavItem>
+      {isGroupActive && (
+        <div className="flex gap-1 px-3.5 pb-2 pt-1">
+          {items.map(ds => (
+            <button
+              key={ds.id}
+              onClick={() => onDatasetChange(ds.id)}
+              className={[
+                'flex-1 text-xs py-0.5 rounded-md text-center transition-colors font-medium',
+                selectedDatasetId === ds.id
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
+              ].join(' ')}
+            >
+              {ds.shortLabel ?? ds.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </li>
+  );
+}
 
-        // Group entry
-        const { key, items } = entry;
-        const isGroupActive = items.some(d => d.id === selectedDatasetId);
-        const groupLabel = items.find(d => d.groupLabel)?.groupLabel ?? key;
+/** Render datasets grouped by category, each category collapsible.
+ *  The category containing the active dataset is always open. */
+function DatasetList({
+  datasets,
+  selectedDatasetId,
+  onDatasetChange,
+}: {
+  datasets: DatasetDescriptor[];
+  selectedDatasetId: string | null;
+  onDatasetChange: (id: string) => void;
+}) {
+  const activeCategory = datasets.find(d => d.id === selectedDatasetId)?.category;
+  const [openCategories, setOpenCategories] = useState<Set<string>>(() =>
+    new Set(activeCategory ? [activeCategory] : []),
+  );
+
+  // When selection moves to a category that isn't open yet, open it automatically.
+  useEffect(() => {
+    if (!activeCategory) return;
+    setOpenCategories(prev => {
+      if (prev.has(activeCategory)) return prev;
+      return new Set([...prev, activeCategory]);
+    });
+  }, [activeCategory]);
+
+  const isCategoryOpen = (cat: string) => openCategories.has(cat);
+
+  const toggleCategory = (cat: string) => {
+    setOpenCategories(prev => {
+      const s = new Set(prev);
+      s.has(cat) ? s.delete(cat) : s.add(cat);
+      return s;
+    });
+  };
+
+  // Group datasets by category, preserving DATASET_CATEGORY_ORDER, then unknowns.
+  const byCategory = new Map<string, DatasetDescriptor[]>();
+  for (const ds of datasets) {
+    const cat = ds.category ?? 'other';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat)!.push(ds);
+  }
+  const orderedCats: string[] = [];
+  for (const cat of DATASET_CATEGORY_ORDER) {
+    if (byCategory.has(cat)) orderedCats.push(cat);
+  }
+  for (const cat of byCategory.keys()) {
+    if (!orderedCats.includes(cat)) orderedCats.push(cat);
+  }
+
+  return (
+    <div>
+      {orderedCats.map(cat => {
+        const catDatasets = byCategory.get(cat)!;
+        const open = isCategoryOpen(cat);
+        const label = DATASET_CATEGORY_LABELS[cat as DatasetCategory] ?? cat;
+        const entries = buildGroupOrder(catDatasets);
 
         return (
-          <li key={key}>
-            <NavItem
-              active={isGroupActive}
-              onClick={() => {
-                // Keep currently selected item in group; otherwise pick first.
-                const current = items.find(d => d.id === selectedDatasetId);
-                onDatasetChange((current ?? items[0]).id);
-              }}
+          <div key={cat}>
+            <button
+              onClick={() => toggleCategory(cat)}
+              className="w-full flex items-center gap-1.5 px-3.5 py-1 mt-1 group"
             >
-              {groupLabel}
-            </NavItem>
-            {isGroupActive && (
-              <div className="flex gap-1 px-3.5 pb-2 pt-1">
-                {items.map(ds => (
-                  <button
-                    key={ds.id}
-                    onClick={() => onDatasetChange(ds.id)}
-                    className={[
-                      'flex-1 text-xs py-0.5 rounded-md text-center transition-colors font-medium',
-                      selectedDatasetId === ds.id
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
-                    ].join(' ')}
-                  >
-                    {ds.shortLabel ?? ds.label}
-                  </button>
-                ))}
-              </div>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 group-hover:text-slate-500 transition-colors whitespace-nowrap">
+                {label}
+              </span>
+              <div className="flex-1 h-px bg-slate-100 group-hover:bg-slate-200 transition-colors" />
+              <svg
+                className={`w-2.5 h-2.5 text-slate-300 flex-shrink-0 transition-transform duration-150 ${open ? '' : '-rotate-90'}`}
+                fill="none" viewBox="0 0 10 8" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"
+              >
+                <path d="M1 2l4 4 4-4" />
+              </svg>
+            </button>
+            {open && (
+              <ul>
+                {entries.map(entry => renderGroupEntry(entry, selectedDatasetId, onDatasetChange))}
+              </ul>
             )}
-          </li>
+          </div>
         );
       })}
-    </ul>
+    </div>
   );
 }
 

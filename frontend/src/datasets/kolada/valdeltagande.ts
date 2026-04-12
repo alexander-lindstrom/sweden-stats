@@ -33,6 +33,7 @@ async function fetchValdeltagande(level: AdminLevel, year: number): Promise<Scal
 export const valdeltagande: DatasetDescriptor = {
   id:              'valdeltagande-kommunal',
   label:           'Valdeltagande (kommunalval)',
+  category:        'val' as const,
   source:          'Kolada',
   availableYears:  ELECTION_YEARS,
   supportedLevels: ['Region', 'Municipality'],

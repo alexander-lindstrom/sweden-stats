@@ -22,6 +22,7 @@ async function fetchKommunalskatt(_level: AdminLevel, year: number): Promise<Sca
 export const kommunalskatt: DatasetDescriptor = {
   id:              'kommunalskatt',
   label:           'Kommunalskatt',
+  category:        'ekonomi' as const,
   source:          'Kolada',
   availableYears:  Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Municipality'],

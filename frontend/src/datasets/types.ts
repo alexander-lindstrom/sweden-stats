@@ -1,4 +1,17 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
+export type DatasetCategory = 'befolkning' | 'utbildning' | 'val' | 'ekonomi' | 'valfard';
+
+export const DATASET_CATEGORY_LABELS: Record<DatasetCategory, string> = {
+  befolkning: 'Befolkning',
+  utbildning: 'Utbildning',
+  val:        'Val',
+  ekonomi:    'Ekonomi',
+  valfard:    'Välfärd',
+};
+
+export const DATASET_CATEGORY_ORDER: DatasetCategory[] = [
+  'befolkning', 'utbildning', 'val', 'ekonomi', 'valfard',
+];
 export type ViewType = 'map' | 'chart' | 'table' | 'profile';
 export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot' | 'share-bar' | 'donut';
 
@@ -96,6 +109,7 @@ export interface GeoHierarchyNode {
 export interface DatasetDescriptor {
   id: string;
   label: string;
+  category?: DatasetCategory;
   /** Short label for use in segmented controls (e.g. inside a group). Falls back to label. */
   shortLabel?: string;
   /** Group key — datasets sharing a group are rendered as one item with a sub-selector. */

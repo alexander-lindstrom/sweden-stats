@@ -339,6 +339,7 @@ async function fetchSysselsattning(level: AdminLevel, year: number): Promise<Sca
 export const sysselsattning: DatasetDescriptor = {
   id: 'sysselsattning',
   label: 'Sysselsättning',
+  category: 'befolkning' as const,
   source: 'SCB',
   availableYears: [2020, 2021, 2022, 2023, 2024],
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],

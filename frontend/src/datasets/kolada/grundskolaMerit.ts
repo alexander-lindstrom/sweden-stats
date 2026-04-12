@@ -25,6 +25,7 @@ async function fetchGrundskolaMerit(_level: AdminLevel, year: number): Promise<S
 export const grundskolaMerit: DatasetDescriptor = {
   id:              'grundskola-merit',
   label:           'Meritvärde åk 9',
+  category:        'utbildning' as const,
   source:          'Kolada',
   availableYears:  Array.from({ length: 9 }, (_, i) => 2015 + i),
   supportedLevels: ['Municipality'],

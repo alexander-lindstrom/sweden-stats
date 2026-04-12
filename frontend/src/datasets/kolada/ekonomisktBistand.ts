@@ -29,6 +29,7 @@ async function fetchEkonomisktBistand(level: AdminLevel, year: number): Promise<
 export const ekonomisktBistand: DatasetDescriptor = {
   id:              'ekonomiskt-bistand',
   label:           'Ekonomiskt bistånd',
+  category:        'valfard' as const,
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
   supportedLevels: ['Region', 'Municipality'],
