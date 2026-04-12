@@ -11,12 +11,18 @@ import { utbildningsniva } from './scb/utbildningsniva';
 import { gymnasiebetyg } from './scb/gymnasiebetyg';
 import { hogskolestudenter, hogskolestudenterAntal } from './scb/hogskolestudenter';
 import { konsfordelning } from './scb/konsfordelning';
+import { kommunalskatt } from './kolada/kommunalskatt';
+import { grundskolaMerit } from './kolada/grundskolaMerit';
+import { valdeltagande } from './kolada/valdeltagande';
+import { ekonomisktBistand } from './kolada/ekonomisktBistand';
+import { aldreomsorg } from './kolada/aldreomsorg';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
   utbildningsniva, konsfordelning, gymnasiebetyg, hogskolestudenterAntal, hogskolestudenter,
   stateExpenses, kpi,
   riksdagsval, regionval, kommunval,
+  kommunalskatt, grundskolaMerit, valdeltagande, ekonomisktBistand, aldreomsorg,
 ];
 
 export function getDatasetsForLevel(level: AdminLevel): DatasetDescriptor[] {

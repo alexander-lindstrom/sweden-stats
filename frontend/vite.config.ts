@@ -24,6 +24,13 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
+        // More specific rule must come first — Vite matches in insertion order.
+        // /api/kolada/* → https://api.kolada.se/v3/* (CORS not available on Kolada v3)
+        "/api/kolada": {
+          target: "https://api.kolada.se",
+          rewrite: (path) => path.replace("/api/kolada", "/v3"),
+          changeOrigin: true,
+        },
         "/api": "http://localhost:3001",
         "/geoserver": env.GEOSERVER_URL ?? "http://localhost:8080",
       },
