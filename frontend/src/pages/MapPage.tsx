@@ -473,6 +473,12 @@ export default function MapPage() {
           {/* Spacer */}
           <div className="flex-1" />
 
+          {/* Source attribution */}
+          {activeDescriptor?.source && (
+            <span className="hidden sm:flex items-center self-center mr-2 px-2 py-0.5 rounded bg-slate-100 text-[11px] text-slate-500">
+              Källa: {activeDescriptor.source}
+            </span>
+          )}
 
           {/* Party selector */}
           {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
