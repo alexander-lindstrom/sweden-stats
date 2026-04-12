@@ -75,7 +75,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale, year, source 
 
   return (
     <div className="flex flex-col gap-2 w-24">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</p>
+      <SectionLabel className="leading-tight block">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</SectionLabel>
       <div className="flex items-stretch gap-2">
         <svg width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT} className="flex-shrink-0">
           <defs>

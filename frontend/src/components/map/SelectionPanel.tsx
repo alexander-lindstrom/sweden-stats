@@ -796,7 +796,7 @@ function ComparisonStatRow({
 
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">{label}</div>
+      <SectionLabel className="mb-1 block">{label}</SectionLabel>
       {/* sm: 2-column (A | B); lg: 3-column (A | delta | B) */}
       <div className="grid grid-cols-2 lg:grid-cols-[1fr_auto_1fr] gap-x-2 items-start lg:items-baseline">
         {/* Area A */}
