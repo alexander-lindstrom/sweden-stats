@@ -42,6 +42,7 @@ import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
 import { Spinner } from '@/components/ui/Spinner';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 import BivariateMapLegend from '@/components/map/BivariateMapLegend';
 import { buildBivariateColorFn } from '@/util/bivariate';
 
@@ -284,7 +285,7 @@ export default function MapPage() {
     setSelectedLevel('Region');
     setSelectedFeature(null);
     setComparisonFeature(null);
-    setSelectedDatasetId(null);
+    resetDatasetForLevel('Region');
     setActiveView('map');
     setActiveChartType('bar');
     setFilterEnabled(false);
@@ -483,7 +484,7 @@ export default function MapPage() {
           {/* Party selector */}
           {electionResult && (activeView === 'map' || activeChartType === 'party-ranking') && (
             <div className="flex items-center gap-2 self-center pl-3 border-l border-slate-200">
-              <span className="hidden sm:block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Parti</span>
+              <SectionLabel className="hidden sm:inline">Parti</SectionLabel>
               <Dropdown
                 inputSize="sm"
                 value={activeParty ?? ''}
@@ -598,7 +599,7 @@ export default function MapPage() {
           {/* Area selector for multiline election time series at Region/Municipality level */}
           {activeView === 'chart' && needsMultilineAreaFilter && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
+              <SectionLabel className="whitespace-nowrap">Län</SectionLabel>
               <Dropdown
                 inputSize="sm"
                 value={effectiveMultilineLan ?? ''}
@@ -613,7 +614,7 @@ export default function MapPage() {
               />
               {selectedLevel === 'Municipality' && (
                 <>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
+                  <SectionLabel className="whitespace-nowrap ml-2">Kommun</SectionLabel>
                   <Dropdown
                     inputSize="sm"
                     value={effectiveMultilineMuni ?? ''}
@@ -631,7 +632,7 @@ export default function MapPage() {
           {/* Lan / Municipality filter */}
           {activeView === 'chart' && needsLanFilter && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Län</label>
+              <SectionLabel className="whitespace-nowrap">Län</SectionLabel>
               <Dropdown
                 inputSize="sm"
                 value={effectiveLan ?? ''}
@@ -640,7 +641,7 @@ export default function MapPage() {
               />
               {needsMuniFilter && (
                 <>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap ml-2">Kommun</label>
+                  <SectionLabel className="whitespace-nowrap ml-2">Kommun</SectionLabel>
                   <Dropdown
                     inputSize="sm"
                     value={effectiveMuni ?? ''}
@@ -682,7 +683,7 @@ export default function MapPage() {
           {/* Y-axis dataset selector for scatter chart */}
           {activeView === 'chart' && activeChartType === 'scatter' && scatterableDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 whitespace-nowrap">Y-axel</label>
+              <SectionLabel className="whitespace-nowrap">Y-axel</SectionLabel>
               <Dropdown
                 inputSize="sm"
                 value={scatterYDatasetId ?? ''}

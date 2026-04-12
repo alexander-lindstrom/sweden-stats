@@ -177,7 +177,7 @@ export const ShareBarChart: React.FC<Props> = ({
 
       {tooltip && tooltipRowData && (
         <div
-          className="pointer-events-none absolute z-20 bg-slate-800 text-white rounded-md shadow-lg px-3 py-2 text-xs"
+          className="pointer-events-none absolute z-20 bg-gray-900 text-white rounded-md shadow-lg px-3 py-2 text-xs"
           style={{ left: tooltip.x, top: tooltip.y, maxWidth: 220 }}
         >
           <div className="font-semibold mb-1.5 text-slate-100">{tooltipRowData.label}</div>

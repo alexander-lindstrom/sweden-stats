@@ -163,7 +163,7 @@ export function DonutChart({
 
       {tooltip && (
         <div
-          className="pointer-events-none absolute z-20 bg-slate-800 text-white rounded-md shadow-lg px-3 py-2 text-xs"
+          className="pointer-events-none absolute z-20 bg-gray-900 text-white rounded-md shadow-lg px-3 py-2 text-xs"
           style={{ left: tooltip.x, top: tooltip.y, maxWidth: 240 }}
         >
           <div className="font-semibold text-slate-100">{tooltip.item.label}</div>

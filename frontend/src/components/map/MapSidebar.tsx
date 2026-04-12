@@ -4,6 +4,7 @@ import * as Switch from '@radix-ui/react-switch';
 import { ChevronDown } from 'lucide-react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
 import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
@@ -59,9 +60,9 @@ function SidebarItem({
             onDimBg ? 'hover:bg-slate-100' : 'hover:bg-slate-50',
           ].join(' ')}
         >
-          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 group-hover:text-slate-700 transition-colors">
+          <SectionLabel className="font-bold text-slate-500 group-hover:text-slate-700 transition-colors">
             {label}
-          </span>
+          </SectionLabel>
           <ChevronDown
             className="w-3.5 h-3.5 text-slate-400 flex-shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
             strokeWidth={2.5}
@@ -206,15 +207,15 @@ export function MapSidebar({
     const map = new Map<string, DatasetDescriptor[]>();
     for (const ds of availableDatasets) {
       const cat = ds.category ?? 'other';
-      if (!map.has(cat)) map.set(cat, []);
+      if (!map.has(cat)) { map.set(cat, []); }
       map.get(cat)!.push(ds);
     }
     const ordered: string[] = [];
     for (const cat of DATASET_CATEGORY_ORDER) {
-      if (map.has(cat)) ordered.push(cat);
+      if (map.has(cat)) { ordered.push(cat); }
     }
     for (const cat of map.keys()) {
-      if (!ordered.includes(cat)) ordered.push(cat);
+      if (!ordered.includes(cat)) { ordered.push(cat); }
     }
     return { byCategory: map, orderedCats: ordered };
   }, [availableDatasets]);
@@ -226,7 +227,7 @@ export function MapSidebar({
     activeCategory ? [activeCategory] : [],
   );
   useEffect(() => {
-    if (!activeCategory) return;
+    if (!activeCategory) { return; }
     setOpenDatasets(prev => prev.includes(activeCategory) ? prev : [...prev, activeCategory]);
   }, [activeCategory]);
 
@@ -269,9 +270,7 @@ export function MapSidebar({
       {/* ── Zone 1: NIVÅ (fixed, always visible) ────────────────────────────── */}
       <div className="flex-shrink-0 bg-slate-50 border-b-2 border-slate-200">
         <div className="px-4 pt-3 pb-1">
-          <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
-            Nivå
-          </span>
+          <SectionLabel className="font-bold">Nivå</SectionLabel>
         </div>
         <ul className="pb-1">
           {ADMIN_LEVELS.map(level => (
@@ -307,7 +306,7 @@ export function MapSidebar({
         {showYearSlider && (
           <div className="border-b border-slate-100 px-4 py-3">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">År</span>
+              <SectionLabel className="font-bold text-slate-500">År</SectionLabel>
               <span className="text-sm font-semibold text-slate-700 tabular-nums">{displayYear}</span>
             </div>
             <YearSlider

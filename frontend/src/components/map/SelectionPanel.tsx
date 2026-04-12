@@ -5,6 +5,7 @@ import { fetchCached } from '@/datasets/cache';
 import { fetchPopulationMultiYear } from '@/datasets/scb/population';
 import { DATASETS } from '@/datasets/registry';
 import { Spinner } from '@/components/ui/Spinner';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 import { FeatureSearch, FeatureSearchItem } from '@/components/ui/FeatureSearch';
 import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 import { ProfileSection } from '@/components/profile/ProfileSection';
@@ -86,7 +87,7 @@ function PercentileBar({ percentile, rank, total }: { percentile: number; rank?:
         />
       </div>
       {showTip && rank != null && total != null && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 px-2 py-1 bg-slate-800 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-10 shadow-md">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 px-2 py-1 bg-gray-900 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-10 shadow-md">
           #{rank} av {total}
         </div>
       )}
@@ -97,9 +98,7 @@ function PercentileBar({ percentile, rank, total }: { percentile: number; rank?:
 function StatRow({ label, stat }: { label: string; stat: StatData }) {
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-0.5">
-        {label}
-      </div>
+      <SectionLabel className="mb-0.5 block">{label}</SectionLabel>
       {stat.value === null ? (
         <div className="text-sm text-slate-400">—</div>
       ) : (
@@ -797,7 +796,7 @@ function ComparisonStatRow({
 
   return (
     <div>
-      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">{label}</div>
+      <SectionLabel className="mb-1 block">{label}</SectionLabel>
       {/* sm: 2-column (A | B); lg: 3-column (A | delta | B) */}
       <div className="grid grid-cols-2 lg:grid-cols-[1fr_auto_1fr] gap-x-2 items-start lg:items-baseline">
         {/* Area A */}

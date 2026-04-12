@@ -6,6 +6,7 @@ import { PopulationPyramid } from '@/components/visualizations/PopulationPyramid
 import { ProfileSection } from './ProfileSection';
 import { ProfileCard } from './ProfileCard';
 import { Spinner } from '@/components/ui/Spinner';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 import { UI } from '@/theme';
 import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
 
@@ -38,7 +39,7 @@ function StatMini({ label, value, mean, unit }: {
 
   return (
     <div className={`${UI.card} min-w-0`}>
-      <div className={`${UI.statLabel} mb-1 truncate`}>{label}</div>
+      <SectionLabel className="mb-1 block truncate">{label}</SectionLabel>
       {value === null ? (
         <div className="text-sm text-slate-300">—</div>
       ) : (

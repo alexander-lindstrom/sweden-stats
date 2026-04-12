@@ -2,6 +2,7 @@ import React from 'react';
 import * as d3 from 'd3';
 import { DatasetResult } from '@/datasets/types';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 
 interface MapLegendProps {
   data: DatasetResult | null;
@@ -29,7 +30,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale, year, source 
     const parties = PARTY_CODES.filter(p => presentParties.has(p));
     return (
       <div className="flex flex-col gap-1.5">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</p>
+        <SectionLabel className="leading-tight block">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</SectionLabel>
         <div className="grid grid-cols-2 gap-x-3 gap-y-1">
           {parties.map(p => (
             <div key={p} className="flex items-center gap-1.5">
@@ -74,7 +75,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, scale, year, source 
 
   return (
     <div className="flex flex-col gap-2 w-24">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-tight">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</p>
+      <SectionLabel className="leading-tight block">{data.label}{source ? ` · ${source}` : ''}{year ? ` · ${year}` : ''}</SectionLabel>
       <div className="flex items-stretch gap-2">
         <svg width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT} className="flex-shrink-0">
           <defs>

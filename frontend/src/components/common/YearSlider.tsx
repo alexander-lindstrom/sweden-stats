@@ -7,7 +7,7 @@ type YearSliderProps = {
 };
 
 export default function YearSlider({ years, selectedYear, onYearChange }: YearSliderProps) {
-  if (!years || years.length === 0) return null;
+  if (!years || years.length === 0) { return null; }
 
   const idx = years.indexOf(selectedYear);
   const value = idx < 0 ? 0 : idx;
@@ -19,7 +19,7 @@ export default function YearSlider({ years, selectedYear, onYearChange }: YearSl
         max={years.length - 1}
         step={1}
         value={[value]}
-        onValueChange={([i]) => { if (years[i]) onYearChange(years[i]); }}
+        onValueChange={([i]) => { if (years[i]) { onYearChange(years[i]); } }}
         className="relative flex items-center select-none touch-none w-full h-4"
       >
         <SliderPrimitive.Track className="relative grow rounded-full h-1.5 bg-slate-200">
