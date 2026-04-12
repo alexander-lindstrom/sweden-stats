@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
@@ -196,19 +196,22 @@ function DatasetList({
   };
 
   // Group datasets by category, preserving DATASET_CATEGORY_ORDER, then unknowns.
-  const byCategory = new Map<string, DatasetDescriptor[]>();
-  for (const ds of datasets) {
-    const cat = ds.category ?? 'other';
-    if (!byCategory.has(cat)) byCategory.set(cat, []);
-    byCategory.get(cat)!.push(ds);
-  }
-  const orderedCats: string[] = [];
-  for (const cat of DATASET_CATEGORY_ORDER) {
-    if (byCategory.has(cat)) orderedCats.push(cat);
-  }
-  for (const cat of byCategory.keys()) {
-    if (!orderedCats.includes(cat)) orderedCats.push(cat);
-  }
+  const { byCategory, orderedCats } = useMemo(() => {
+    const byCategory = new Map<string, DatasetDescriptor[]>();
+    for (const ds of datasets) {
+      const cat = ds.category ?? 'other';
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat)!.push(ds);
+    }
+    const orderedCats: string[] = [];
+    for (const cat of DATASET_CATEGORY_ORDER) {
+      if (byCategory.has(cat)) orderedCats.push(cat);
+    }
+    for (const cat of byCategory.keys()) {
+      if (!orderedCats.includes(cat)) orderedCats.push(cat);
+    }
+    return { byCategory, orderedCats };
+  }, [datasets]);
 
   return (
     <div>
@@ -271,9 +274,10 @@ export function MapSidebar({
   fillOpacity,
   onFillOpacityChange,
 }: MapSidebarProps) {
-  const availableDatasets = getDatasetsForLevel(selectedLevel);
-  const filterableDatasets = DATASETS.filter(d =>
-    d.group !== 'val' && d.supportedLevels.includes(selectedLevel),
+  const availableDatasets = useMemo(() => getDatasetsForLevel(selectedLevel), [selectedLevel]);
+  const filterableDatasets = useMemo(
+    () => DATASETS.filter(d => d.group !== 'val' && d.supportedLevels.includes(selectedLevel)),
+    [selectedLevel],
   );
 
   return (

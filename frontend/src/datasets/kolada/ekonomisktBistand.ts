@@ -6,30 +6,13 @@
  * High median income in a municipality can coexist with significant welfare dependency.
  */
 
-import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
-import {
-  fetchKoladaMunicipality, getKoladaMunicipalityLabels,
-  fetchKoladaRegion, getKoladaRegionLabels,
-} from './api';
-
-const KPI_ID = 'N31807';
-
-async function fetchEkonomisktBistand(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
-  if (level === 'Region') {
-    const values = fetchKoladaRegion(KPI_ID, year);
-    return { kind: 'scalar', values: await values, labels: getKoladaRegionLabels(), label: 'Ekonomiskt bistånd', unit: '% av bef.' };
-  }
-  const [values, labels] = await Promise.all([
-    fetchKoladaMunicipality(KPI_ID, year),
-    getKoladaMunicipalityLabels(),
-  ]);
-  return { kind: 'scalar', values, labels, label: 'Ekonomiskt bistånd', unit: '% av bef.' };
-}
+import type { DatasetDescriptor } from '../types';
+import { fetchKoladaScalar } from './api';
 
 export const ekonomisktBistand: DatasetDescriptor = {
   id:              'ekonomiskt-bistand',
   label:           'Ekonomiskt bistånd',
-  category:        'valfard' as const,
+  category:        'valfard',
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
   supportedLevels: ['Region', 'Municipality'],
@@ -38,5 +21,5 @@ export const ekonomisktBistand: DatasetDescriptor = {
     Region:       ['bar', 'diverging', 'histogram'],
     Municipality: ['bar', 'diverging', 'histogram'],
   },
-  fetch: fetchEkonomisktBistand,
+  fetch: (level, year) => fetchKoladaScalar('N31807', level, year, 'Ekonomiskt bistånd', '% av bef.'),
 };

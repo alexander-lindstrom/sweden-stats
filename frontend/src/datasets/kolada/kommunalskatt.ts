@@ -6,23 +6,13 @@
  * "This municipality has median income 380 tkr and charges 19.4% in local tax."
  */
 
-import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
-import { fetchKoladaMunicipality, getKoladaMunicipalityLabels } from './api';
-
-const KPI_ID = 'N00901';
-
-async function fetchKommunalskatt(_level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
-  const [values, labels] = await Promise.all([
-    fetchKoladaMunicipality(KPI_ID, year),
-    getKoladaMunicipalityLabels(),
-  ]);
-  return { kind: 'scalar', values, labels, label: 'Kommunalskatt', unit: '%' };
-}
+import type { DatasetDescriptor } from '../types';
+import { fetchKoladaScalar } from './api';
 
 export const kommunalskatt: DatasetDescriptor = {
   id:              'kommunalskatt',
   label:           'Kommunalskatt',
-  category:        'ekonomi' as const,
+  category:        'ekonomi',
   source:          'Kolada',
   availableYears:  Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Municipality'],
@@ -30,5 +20,5 @@ export const kommunalskatt: DatasetDescriptor = {
   chartTypes: {
     Municipality: ['diverging', 'histogram'],
   },
-  fetch: fetchKommunalskatt,
+  fetch: (level, year) => fetchKoladaScalar('N00901', level, year, 'Kommunalskatt', '%'),
 };

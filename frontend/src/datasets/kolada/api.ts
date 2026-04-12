@@ -18,6 +18,7 @@
 // Vite:  /api/kolada/* → https://api.kolada.se/v3/*  (vite.config.ts)
 // Caddy: /api/kolada/* → https://api.kolada.se/v3/*  (Caddyfile)
 import { COUNTY_NAMES } from '../adminLevels';
+import type { AdminLevel, ScalarDatasetResult } from '../types';
 
 const BASE_URL = '/api/kolada';
 
@@ -103,14 +104,17 @@ const MUNICIPALITY_CODE_RE = /^(?!00)\d{4}$/;
 // Matches Kolada region codes: 00XX where XX is the 2-digit SCB county code.
 const REGION_CODE_RE = /^00(0[1-9]|1[0-9]|2[0-5])$/;
 
+// Per-(kpiId, year, variant) promise cache so repeat visits don't re-fetch.
+const dataCache = new Map<string, Promise<Record<string, number>>>();
+
 /**
- * Fetch the total (gender=T) value for every region for a given KPI and year.
- * Returns a map of SCB 2-digit county code → numeric value (e.g. "01" → 3.2).
- * Only works for KPIs with municipality_type "A".
+ * Shared pagination loop. `accept` maps a municipality code to a result key,
+ * or returns null to skip the entry.
  */
-export async function fetchKoladaRegion(
+async function fetchKoladaKpiData(
   kpiId: string,
-  year:  number,
+  year: number,
+  accept: (code: string) => string | null,
 ): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
   let url: string | null = `${BASE_URL}/data/kpi/${kpiId}/year/${year}?per_page=1000`;
@@ -121,11 +125,11 @@ export async function fetchKoladaRegion(
     const page: KoladaPage = await res.json();
 
     for (const entry of page.values) {
-      if (!REGION_CODE_RE.test(entry.municipality)) { continue; }
+      const key = accept(entry.municipality);
+      if (key === null) { continue; }
       const total = entry.values.find(v => v.gender === 'T');
       if (total?.value != null) {
-        // Strip "00" prefix to get the SCB 2-digit county code used by the map.
-        result[entry.municipality.slice(2)] = total.value;
+        result[key] = total.value;
       }
     }
 
@@ -133,6 +137,21 @@ export async function fetchKoladaRegion(
   }
 
   return result;
+}
+
+/**
+ * Fetch the total (gender=T) value for every region for a given KPI and year.
+ * Returns a map of SCB 2-digit county code → numeric value (e.g. "01" → 3.2).
+ * Only works for KPIs with municipality_type "A".
+ */
+export function fetchKoladaRegion(kpiId: string, year: number): Promise<Record<string, number>> {
+  const key = `region:${kpiId}:${year}`;
+  if (!dataCache.has(key)) {
+    dataCache.set(key, fetchKoladaKpiData(kpiId, year, code =>
+      REGION_CODE_RE.test(code) ? code.slice(2) : null,
+    ));
+  }
+  return dataCache.get(key)!;
 }
 
 /** Region labels: reuse COUNTY_NAMES for consistency with the rest of the app. */
@@ -145,31 +164,34 @@ export function getKoladaRegionLabels(): Record<string, string> {
  * Returns a map of 4-digit municipality code → numeric value.
  * Entries with null values or privacy-suppressed data are omitted.
  */
-export async function fetchKoladaMunicipality(
-  kpiId: string,
-  year:  number,
-): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
-  let url: string | null = `${BASE_URL}/data/kpi/${kpiId}/year/${year}?per_page=1000`;
-
-  while (url) {
-    const res = await fetch(url);
-    if (!res.ok) { throw new Error(`Kolada data fetch failed (${kpiId}/${year}): ${res.status}`); }
-    const page: KoladaPage = await res.json();
-
-    for (const entry of page.values) {
-      // Skip national aggregate (0000), regions, and grouped areas (G-prefix)
-      if (!MUNICIPALITY_CODE_RE.test(entry.municipality) || entry.municipality === '0000') {
-        continue;
-      }
-      const total = entry.values.find(v => v.gender === 'T');
-      if (total?.value != null) {
-        result[entry.municipality] = total.value;
-      }
-    }
-
-    url = proxyUrl(page.next_url);
+export function fetchKoladaMunicipality(kpiId: string, year: number): Promise<Record<string, number>> {
+  const key = `municipality:${kpiId}:${year}`;
+  if (!dataCache.has(key)) {
+    dataCache.set(key, fetchKoladaKpiData(kpiId, year, code =>
+      MUNICIPALITY_CODE_RE.test(code) ? code : null,
+    ));
   }
+  return dataCache.get(key)!;
+}
 
-  return result;
+/**
+ * Fetch a scalar KPI result for any supported admin level.
+ * Handles Region vs Municipality dispatch and label resolution.
+ */
+export async function fetchKoladaScalar(
+  kpiId: string,
+  level: AdminLevel,
+  year: number,
+  label: string,
+  unit: string,
+): Promise<ScalarDatasetResult> {
+  if (level === 'Region') {
+    const values = await fetchKoladaRegion(kpiId, year);
+    return { kind: 'scalar', values, labels: getKoladaRegionLabels(), label, unit };
+  }
+  const [values, labels] = await Promise.all([
+    fetchKoladaMunicipality(kpiId, year),
+    getKoladaMunicipalityLabels(),
+  ]);
+  return { kind: 'scalar', values, labels, label, unit };
 }

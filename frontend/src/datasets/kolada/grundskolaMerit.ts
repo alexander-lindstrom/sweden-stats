@@ -9,23 +9,13 @@
  * Cross-reference with: gymnasiebetyg, utbildningsniva, hogskolestudenter
  */
 
-import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
-import { fetchKoladaMunicipality, getKoladaMunicipalityLabels } from './api';
-
-const KPI_ID = 'N15507';
-
-async function fetchGrundskolaMerit(_level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
-  const [values, labels] = await Promise.all([
-    fetchKoladaMunicipality(KPI_ID, year),
-    getKoladaMunicipalityLabels(),
-  ]);
-  return { kind: 'scalar', values, labels, label: 'Meritvärde åk 9', unit: 'poäng' };
-}
+import type { DatasetDescriptor } from '../types';
+import { fetchKoladaScalar } from './api';
 
 export const grundskolaMerit: DatasetDescriptor = {
   id:              'grundskola-merit',
   label:           'Meritvärde åk 9',
-  category:        'utbildning' as const,
+  category:        'utbildning',
   source:          'Kolada',
   availableYears:  Array.from({ length: 9 }, (_, i) => 2015 + i),
   supportedLevels: ['Municipality'],
@@ -33,5 +23,5 @@ export const grundskolaMerit: DatasetDescriptor = {
   chartTypes: {
     Municipality: ['bar', 'diverging', 'histogram'],
   },
-  fetch: fetchGrundskolaMerit,
+  fetch: (level, year) => fetchKoladaScalar('N15507', level, year, 'Meritvärde åk 9', 'poäng'),
 };
