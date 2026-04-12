@@ -28,7 +28,7 @@ export const kommunalskatt: DatasetDescriptor = {
   supportedLevels: ['Municipality'],
   supportedViews:  ['map', 'chart', 'table'],
   chartTypes: {
-    Municipality: ['bar', 'diverging', 'histogram'],
+    Municipality: ['diverging', 'histogram'],
   },
   fetch: fetchKommunalskatt,
 };
