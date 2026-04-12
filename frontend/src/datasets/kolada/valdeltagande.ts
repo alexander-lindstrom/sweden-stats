@@ -8,14 +8,21 @@
  */
 
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
-import { fetchKoladaMunicipality, getKoladaMunicipalityLabels } from './api';
+import {
+  fetchKoladaMunicipality, getKoladaMunicipalityLabels,
+  fetchKoladaRegion, getKoladaRegionLabels,
+} from './api';
 
 const KPI_ID = 'N05401';
 
 // Swedish municipal elections are held every 4 years.
 const ELECTION_YEARS = [2006, 2010, 2014, 2018, 2022];
 
-async function fetchValdeltagande(_level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
+async function fetchValdeltagande(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
+  if (level === 'Region') {
+    const values = await fetchKoladaRegion(KPI_ID, year);
+    return { kind: 'scalar', values, labels: getKoladaRegionLabels(), label: 'Valdeltagande kommunalvalet', unit: '%' };
+  }
   const [values, labels] = await Promise.all([
     fetchKoladaMunicipality(KPI_ID, year),
     getKoladaMunicipalityLabels(),
@@ -28,9 +35,10 @@ export const valdeltagande: DatasetDescriptor = {
   label:           'Valdeltagande (kommunalval)',
   source:          'Kolada',
   availableYears:  ELECTION_YEARS,
-  supportedLevels: ['Municipality'],
+  supportedLevels: ['Region', 'Municipality'],
   supportedViews:  ['map', 'chart', 'table'],
   chartTypes: {
+    Region:       ['bar', 'diverging', 'histogram'],
     Municipality: ['bar', 'diverging', 'histogram'],
   },
   fetch: fetchValdeltagande,

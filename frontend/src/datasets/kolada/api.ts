@@ -3,10 +3,12 @@
  *
  * Docs/note from research:
  *  - Base:  https://api.kolada.se/v3
- *  - CORS-enabled, no auth required
  *  - Data endpoint: GET /data/kpi/{kpi_id}/year/{year}
  *  - Municipality codes in responses are SCB 4-digit codes — no remapping needed
+ *  - Region codes in responses are "00XX" (e.g. "0001" for Stockholm).
+ *    Strip the leading "00" to get the SCB 2-digit county code used by the map.
  *  - Gender codes: T = total, K = female, M = male
+ *  - KPI metadata field municipality_type: "K" = municipality only, "A" = all (K + L regions)
  *  - Some entries use code "0000" (national aggregate) or "G…" prefixed codes
  *    (grouped/aggregated areas) — these are filtered out.
  */
@@ -15,6 +17,8 @@
 // CORS — the Kolada v3 API does not send Access-Control-Allow-Origin headers.
 // Vite:  /api/kolada/* → https://api.kolada.se/v3/*  (vite.config.ts)
 // Caddy: /api/kolada/* → https://api.kolada.se/v3/*  (Caddyfile)
+import { COUNTY_NAMES } from '../adminLevels';
+
 const BASE_URL = '/api/kolada';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -93,7 +97,48 @@ function proxyUrl(koladaUrl: string | null): string | null {
   return koladaUrl.replace('https://api.kolada.se/v3', '/api/kolada');
 }
 
-const MUNICIPALITY_CODE_RE = /^\d{4}$/;
+// Matches valid 4-digit SCB municipality codes (0114–2584), excluding regions (00XX) and national (0000).
+const MUNICIPALITY_CODE_RE = /^(?!00)\d{4}$/;
+
+// Matches Kolada region codes: 00XX where XX is the 2-digit SCB county code.
+const REGION_CODE_RE = /^00(0[1-9]|1[0-9]|2[0-5])$/;
+
+/**
+ * Fetch the total (gender=T) value for every region for a given KPI and year.
+ * Returns a map of SCB 2-digit county code → numeric value (e.g. "01" → 3.2).
+ * Only works for KPIs with municipality_type "A".
+ */
+export async function fetchKoladaRegion(
+  kpiId: string,
+  year:  number,
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+  let url: string | null = `${BASE_URL}/data/kpi/${kpiId}/year/${year}?per_page=1000`;
+
+  while (url) {
+    const res = await fetch(url);
+    if (!res.ok) { throw new Error(`Kolada data fetch failed (${kpiId}/${year}): ${res.status}`); }
+    const page: KoladaPage = await res.json();
+
+    for (const entry of page.values) {
+      if (!REGION_CODE_RE.test(entry.municipality)) { continue; }
+      const total = entry.values.find(v => v.gender === 'T');
+      if (total?.value != null) {
+        // Strip "00" prefix to get the SCB 2-digit county code used by the map.
+        result[entry.municipality.slice(2)] = total.value;
+      }
+    }
+
+    url = proxyUrl(page.next_url);
+  }
+
+  return result;
+}
+
+/** Region labels: reuse COUNTY_NAMES for consistency with the rest of the app. */
+export function getKoladaRegionLabels(): Record<string, string> {
+  return COUNTY_NAMES;
+}
 
 /**
  * Fetch the total (gender=T) value for every municipality for a given KPI and year.

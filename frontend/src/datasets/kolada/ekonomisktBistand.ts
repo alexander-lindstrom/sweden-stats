@@ -7,11 +7,18 @@
  */
 
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
-import { fetchKoladaMunicipality, getKoladaMunicipalityLabels } from './api';
+import {
+  fetchKoladaMunicipality, getKoladaMunicipalityLabels,
+  fetchKoladaRegion, getKoladaRegionLabels,
+} from './api';
 
 const KPI_ID = 'N31807';
 
-async function fetchEkonomisktBistand(_level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
+async function fetchEkonomisktBistand(level: AdminLevel, year: number): Promise<ScalarDatasetResult> {
+  if (level === 'Region') {
+    const values = fetchKoladaRegion(KPI_ID, year);
+    return { kind: 'scalar', values: await values, labels: getKoladaRegionLabels(), label: 'Ekonomiskt bistånd', unit: '% av bef.' };
+  }
   const [values, labels] = await Promise.all([
     fetchKoladaMunicipality(KPI_ID, year),
     getKoladaMunicipalityLabels(),
@@ -24,9 +31,10 @@ export const ekonomisktBistand: DatasetDescriptor = {
   label:           'Ekonomiskt bistånd',
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
-  supportedLevels: ['Municipality'],
+  supportedLevels: ['Region', 'Municipality'],
   supportedViews:  ['map', 'chart', 'table'],
   chartTypes: {
+    Region:       ['bar', 'diverging', 'histogram'],
     Municipality: ['bar', 'diverging', 'histogram'],
   },
   fetch: fetchEkonomisktBistand,
