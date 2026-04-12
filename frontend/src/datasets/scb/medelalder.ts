@@ -311,6 +311,7 @@ async function fetchMedelalder(level: AdminLevel, year: number): Promise<ScalarD
 export const medelalder: DatasetDescriptor = {
   id: 'medelalder',
   label: 'Medelålder',
+  category: 'befolkning' as const,
   source: 'SCB',
   availableYears: Array.from({ length: 27 }, (_, i) => 1998 + i),
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],

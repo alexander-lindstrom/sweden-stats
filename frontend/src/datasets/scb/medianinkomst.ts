@@ -195,6 +195,7 @@ async function fetchMedianinkomst(level: AdminLevel, year: number): Promise<Scal
 export const medianinkomst: DatasetDescriptor = {
   id: 'medianinkomst',
   label: 'Medianinkomst',
+  category: 'befolkning' as const,
   source: 'SCB',
   availableYears: Array.from({ length: 14 }, (_, i) => 2011 + i),
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],

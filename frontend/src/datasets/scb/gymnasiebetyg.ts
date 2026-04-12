@@ -80,6 +80,7 @@ const EMPTY_RESULT: ScalarDatasetResult = {
 export const gymnasiebetyg: DatasetDescriptor = {
   id:              'gymnasiebetyg',
   label:           'Gymnasiebetyg',
+  category:        'utbildning' as const,
   source:          'SCB',
   timeSeriesUnit:  'poäng',
   availableYears:  [],

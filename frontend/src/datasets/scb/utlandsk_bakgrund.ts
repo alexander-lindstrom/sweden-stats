@@ -239,6 +239,7 @@ async function fetchUtlandskBakgrund(level: AdminLevel, year: number): Promise<S
 export const utlandskBakgrund: DatasetDescriptor = {
   id: 'utlandsk_bakgrund',
   label: 'Utländsk bakgrund',
+  category: 'befolkning' as const,
   source: 'SCB',
   availableYears: Array.from({ length: 15 }, (_, i) => 2010 + i), // 2010–2024
   supportedLevels: ['Region', 'Municipality', 'RegSO', 'DeSO'],

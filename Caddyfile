@@ -3,6 +3,12 @@ datamedmera.se {
         respond 403
     }
 
+    # More specific rule first — /api/kolada/* proxied to Kolada v3 (no CORS headers on their end)
+    handle_path /api/kolada/* {
+        rewrite * /v3{path}
+        reverse_proxy https://api.kolada.se
+    }
+
     handle /api/* {
         reverse_proxy backend:3001
     }
