@@ -285,7 +285,7 @@ export default function MapPage() {
     setSelectedLevel('Region');
     setSelectedFeature(null);
     setComparisonFeature(null);
-    setSelectedDatasetId(null);
+    resetDatasetForLevel('Region');
     setActiveView('map');
     setActiveChartType('bar');
     setFilterEnabled(false);

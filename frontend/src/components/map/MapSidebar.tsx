@@ -207,15 +207,15 @@ export function MapSidebar({
     const map = new Map<string, DatasetDescriptor[]>();
     for (const ds of availableDatasets) {
       const cat = ds.category ?? 'other';
-      if (!map.has(cat)) map.set(cat, []);
+      if (!map.has(cat)) { map.set(cat, []); }
       map.get(cat)!.push(ds);
     }
     const ordered: string[] = [];
     for (const cat of DATASET_CATEGORY_ORDER) {
-      if (map.has(cat)) ordered.push(cat);
+      if (map.has(cat)) { ordered.push(cat); }
     }
     for (const cat of map.keys()) {
-      if (!ordered.includes(cat)) ordered.push(cat);
+      if (!ordered.includes(cat)) { ordered.push(cat); }
     }
     return { byCategory: map, orderedCats: ordered };
   }, [availableDatasets]);
@@ -227,7 +227,7 @@ export function MapSidebar({
     activeCategory ? [activeCategory] : [],
   );
   useEffect(() => {
-    if (!activeCategory) return;
+    if (!activeCategory) { return; }
     setOpenDatasets(prev => prev.includes(activeCategory) ? prev : [...prev, activeCategory]);
   }, [activeCategory]);
 
