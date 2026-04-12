@@ -1,6 +1,7 @@
 import type { DatasetDescriptor, FilterCriterion } from '@/datasets/types';
 import { percentileOf, valueAtPercentile } from '@/hooks/useFilterMode';
 import { Dropdown } from '@/components/ui/Dropdown';
+import { SectionLabel } from '@/components/ui/SectionLabel';
 
 interface CriterionRowProps {
   criterion:          FilterCriterion;
@@ -70,7 +71,7 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
       {/* Percentile slider */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Percentil</span>
+          <SectionLabel>Percentil</SectionLabel>
           {hasData && Number.isFinite(criterion.absoluteThreshold) && (
             <span className="text-[11px] font-semibold text-blue-600 tabular-nums">p{sliderPct}</span>
           )}
@@ -89,7 +90,7 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
 
       {/* Absolute value input */}
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 whitespace-nowrap">Värde</span>
+        <SectionLabel className="whitespace-nowrap">Värde</SectionLabel>
         <input
           type="text"
           inputMode="decimal"

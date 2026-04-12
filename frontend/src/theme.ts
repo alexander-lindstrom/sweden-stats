@@ -15,7 +15,6 @@ export const UI = {
   sectionTitle: 'text-sm font-bold uppercase tracking-[0.10em] text-slate-500 whitespace-nowrap',
 
   // ── Stat display (StatMini, future stat cards) ───────────────────────────
-  statLabel: 'text-[10px] uppercase tracking-[0.12em] font-semibold text-slate-400',
   statValue: 'text-xl font-bold tabular-nums text-slate-900',
   statUnit:  'text-xs text-slate-500',
 

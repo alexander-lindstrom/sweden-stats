@@ -82,6 +82,26 @@ ESV (Ekonomistyrningsverket) CSV files in `processing/data/esv/` → Python pars
 
 The processed JSON files (`state_expenses_1997_2024.json`, `state_revenue_2006_2024.json`) are keyed by year.
 
+## UI Patterns
+
+These patterns are established and must be followed consistently. Full rationale in `docs/ui-design-system.md`.
+
+### Section / eyebrow labels
+Use `<SectionLabel>` (`src/components/ui/SectionLabel.tsx`) for every small-caps label that appears above a control, stat, or section of content. Never write ad-hoc strings like `text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400` inline. Use the `className` prop to layer dynamic styles (e.g. `group-hover`).
+
+### Select / dropdown controls
+`Dropdown` (`src/components/ui/Dropdown.tsx`, wraps Radix Select) is the only select pattern. Do not use native `<select>` elements or `SelectInput` (deleted). `Dropdown` supports `inputSize="sm"` for tight contexts.
+
+### Tooltips
+- **Cursor-tracking tooltips** (D3 charts): use `UI.tooltip` from `src/theme.ts` as the className, `fixed` positioned.
+- **Absolute-positioned tooltips** (within a `relative` container): write the classes inline but always use `bg-gray-900` as the background. Never use `bg-slate-800`.
+- The existing `Tooltip` component (`src/components/ui/Tooltip.tsx`, forwardRef) is for D3 charts that need a permanently-mounted ref target.
+
+### Buttons
+`Button` (`src/components/ui/button.tsx`, shadcn) with `variant="ghost"` or `variant="outline"` is preferred over raw `<button className="...border...hover:...">` for non-navigation actions. Nav items with a left-border active style can remain bespoke. Audit button usages when touching a component.
+
+---
+
 ## Working Preferences
 
 - **Never commit without explicit user approval.** Always show what you plan to commit and wait for an "ok", "go ahead", or equivalent before running `git commit`.
