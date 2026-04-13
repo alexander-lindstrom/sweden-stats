@@ -93,9 +93,11 @@ async function fetchAllMunicipalityLabels(): Promise<Record<string, string>> {
 
 // Kolada's next_url values are absolute (https://api.kolada.se/v3/...).
 // Rewrite them to go through the proxy so the browser never calls Kolada directly.
+// Strip any hostname — Kolada may reflect X-Forwarded-Host (e.g. our own domain)
+// rather than its own, so we match on the /v3 path prefix only.
 function proxyUrl(koladaUrl: string | null): string | null {
   if (!koladaUrl) { return null; }
-  return koladaUrl.replace('https://api.kolada.se/v3', '/api/kolada');
+  return koladaUrl.replace(/^https?:\/\/[^/]+\/v3/, '/api/kolada');
 }
 
 // Matches valid 4-digit SCB municipality codes (0114–2584), excluding regions (00XX) and national (0000).

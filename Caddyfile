@@ -4,9 +4,13 @@ datamedmera.se {
     }
 
     # More specific rule first — /api/kolada/* proxied to Kolada v3 (no CORS headers on their end)
+    # Strip X-Forwarded-Host so Kolada uses its own hostname in next_url pagination links,
+    # not our domain.
     handle_path /api/kolada/* {
         rewrite * /v3{path}
-        reverse_proxy https://api.kolada.se
+        reverse_proxy https://api.kolada.se {
+            header_up -X-Forwarded-Host
+        }
     }
 
     handle /api/* {
