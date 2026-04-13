@@ -3,6 +3,10 @@ import type { AdminLevel, ChartType, DatasetDescriptor, ViewType } from '@/datas
 import { chartTypesForLevel, viewsForLevel } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 
+function mergeDatasets(extra?: DatasetDescriptor[]): DatasetDescriptor[] {
+  return extra && extra.length > 0 ? [...DATASETS, ...extra] : DATASETS;
+}
+
 export interface ViewState {
   activeView: ViewType;
   setActiveView: (v: ViewType) => void;
@@ -39,6 +43,7 @@ export function useViewState(
   activeDescriptor: DatasetDescriptor | null,
   onElectionDataset?: () => void,
   initialValues?: { activeView?: ViewType; activeChartType?: ChartType },
+  extraDatasets?: DatasetDescriptor[],
 ): ViewState {
   const [activeView,          setActiveView]          = useState<ViewType>(initialValues?.activeView ?? 'map');
   const [activeChartType,     setActiveChartType]     = useState<ChartType>(initialValues?.activeChartType ?? 'bar');
@@ -56,30 +61,32 @@ export function useViewState(
     [activeDescriptor, selectedLevel],
   );
 
+  const allDatasets = useMemo(() => mergeDatasets(extraDatasets), [extraDatasets]);
+
   // Scalar geographic datasets available as the scatter Y axis (excludes active + elections).
   const scatterableDatasets = useMemo(
-    () => DATASETS.filter(d =>
+    () => allDatasets.filter(d =>
       d.id !== selectedDatasetId &&
       d.group !== 'val' &&
       d.supportedLevels.includes(selectedLevel) &&
       chartTypesForLevel(d, selectedLevel).some(ct => ['bar', 'diverging', 'histogram', 'scatter'].includes(ct)),
     ),
-    [selectedDatasetId, selectedLevel],
+    [allDatasets, selectedDatasetId, selectedLevel],
   );
 
   // Scalar datasets available as the bivariate Y axis (excludes active dataset + elections).
   const bivariateDatasets = useMemo(
-    () => DATASETS.filter(d =>
+    () => allDatasets.filter(d =>
       d.id !== selectedDatasetId &&
       d.group !== 'val' &&
       d.supportedLevels.includes(selectedLevel),
     ),
-    [selectedDatasetId, selectedLevel],
+    [allDatasets, selectedDatasetId, selectedLevel],
   );
 
   const bivariateYDescriptor = useMemo(
-    () => DATASETS.find(d => d.id === bivariateYDatasetId) ?? null,
-    [bivariateYDatasetId],
+    () => allDatasets.find(d => d.id === bivariateYDatasetId) ?? null,
+    [allDatasets, bivariateYDatasetId],
   );
 
   // Snap activeView if it becomes unavailable at the new level/dataset.

@@ -12,7 +12,7 @@ import { fetchKoladaScalar } from './api';
 export const kommunalskatt: DatasetDescriptor = {
   id:              'kommunalskatt',
   label:           'Kommunalskatt',
-  category:        'ekonomi',
+  category:        'kolada',
   source:          'Kolada',
   availableYears:  Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Municipality'],

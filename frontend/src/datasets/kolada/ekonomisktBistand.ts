@@ -12,7 +12,7 @@ import { fetchKoladaScalar } from './api';
 export const ekonomisktBistand: DatasetDescriptor = {
   id:              'ekonomiskt-bistand',
   label:           'Ekonomiskt bistånd',
-  category:        'valfard',
+  category:        'kolada',
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
   supportedLevels: ['Region', 'Municipality'],

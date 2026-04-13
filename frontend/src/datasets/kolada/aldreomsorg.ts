@@ -13,7 +13,7 @@ import { fetchKoladaScalar } from './api';
 export const aldreomsorg: DatasetDescriptor = {
   id:              'aldreomsorg-kostnad',
   label:           'Äldreomsorg (kostnad/inv 80+)',
-  category:        'valfard',
+  category:        'kolada',
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
   supportedLevels: ['Municipality'],
