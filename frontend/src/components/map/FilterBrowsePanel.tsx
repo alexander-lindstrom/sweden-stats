@@ -24,7 +24,9 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
 
   const handleSliderChange = (pct: number) => {
     if (!sortedVals) { return; }
-    onUpdate({ ...criterion, absoluteThreshold: valueAtPercentile(pct, sortedVals) });
+    const newThreshold = valueAtPercentile(pct, sortedVals);
+    if (newThreshold === criterion.absoluteThreshold) { return; }
+    onUpdate({ ...criterion, absoluteThreshold: newThreshold });
   };
 
   const handleAbsoluteChange = (raw: string) => {
