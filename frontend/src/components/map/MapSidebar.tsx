@@ -327,16 +327,18 @@ export function MapSidebar({
           </div>
         )}
 
-        {/* Browse Kolada catalog */}
-        <div className="px-4 py-3">
-          <button
-            onClick={onOpenKoladaBrowse}
-            className="w-full flex items-center gap-2 text-xs text-slate-400 hover:text-blue-600 transition-colors group"
-          >
-            <LibraryBig className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-blue-500" />
-            <span>Utforska Kolada-katalogen</span>
-          </button>
-        </div>
+        {/* Browse Kolada catalog — only meaningful at Region/Municipality level */}
+        {(selectedLevel === 'Region' || selectedLevel === 'Municipality') && (
+          <div className="px-4 py-3">
+            <button
+              onClick={onOpenKoladaBrowse}
+              className="w-full flex items-center gap-2 text-xs text-slate-400 hover:text-blue-600 transition-colors group"
+            >
+              <LibraryBig className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-blue-500" />
+              <span>Utforska Kolada-katalogen</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Zone 3: Settings (fixed at bottom) ──────────────────────────────── */}
