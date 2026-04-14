@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import * as Switch from '@radix-ui/react-switch';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, LibraryBig } from 'lucide-react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
@@ -35,6 +35,9 @@ interface MapSidebarProps {
   filterLoading:          boolean;
   fillOpacity:            number;
   onFillOpacityChange:    (value: number) => void;
+  /** Extra descriptors to merge into the nav (e.g. user-pinned Kolada KPIs). */
+  extraDatasets?:         DatasetDescriptor[];
+  onOpenKoladaBrowse:     () => void;
 }
 
 // ─── Shared accordion section ─────────────────────────────────────────────────
@@ -196,8 +199,15 @@ export function MapSidebar({
   filterLoading,
   fillOpacity,
   onFillOpacityChange,
+  extraDatasets,
+  onOpenKoladaBrowse,
 }: MapSidebarProps) {
-  const availableDatasets = useMemo(() => getDatasetsForLevel(selectedLevel), [selectedLevel]);
+  const availableDatasets = useMemo(() => {
+    const base = getDatasetsForLevel(selectedLevel);
+    const extra = (extraDatasets ?? []).filter(d => d.supportedLevels.includes(selectedLevel));
+    return [...base, ...extra];
+  }, [selectedLevel, extraDatasets]);
+
   const filterableDatasets = useMemo(
     () => DATASETS.filter(d => d.group !== 'val' && d.supportedLevels.includes(selectedLevel)),
     [selectedLevel],
@@ -314,6 +324,19 @@ export function MapSidebar({
               selectedYear={String(displayYear)}
               onYearChange={y => onYearChange(Number(y))}
             />
+          </div>
+        )}
+
+        {/* Browse Kolada catalog — only meaningful at Region/Municipality level */}
+        {(selectedLevel === 'Region' || selectedLevel === 'Municipality') && (
+          <div className="px-4 py-3">
+            <button
+              onClick={onOpenKoladaBrowse}
+              className="w-full flex items-center gap-2 text-xs text-slate-400 hover:text-blue-600 transition-colors group"
+            >
+              <LibraryBig className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-blue-500" />
+              <span>Utforska Kolada-katalogen</span>
+            </button>
           </div>
         )}
       </div>

@@ -24,13 +24,8 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        // More specific rule must come first — Vite matches in insertion order.
-        // /api/kolada/* → https://api.kolada.se/v3/* (CORS not available on Kolada v3)
-        "/api/kolada": {
-          target: "https://api.kolada.se",
-          rewrite: (path) => path.replace("/api/kolada", "/v3"),
-          changeOrigin: true,
-        },
+        // All /api/* requests go to the FastAPI backend at :3001.
+        // Kolada proxying is handled there (avoids CORS — Kolada v3 has no CORS headers).
         "/api": "http://localhost:3001",
         "/geoserver": env.GEOSERVER_URL ?? "http://localhost:8080",
       },

@@ -176,6 +176,48 @@ export function fetchKoladaMunicipality(kpiId: string, year: number): Promise<Re
   return dataCache.get(key)!;
 }
 
+// ── KPI catalog ───────────────────────────────────────────────────────────────
+
+export interface KoladaKpiMeta {
+  id:                   string;
+  title:                string;
+  description:          string;
+  municipality_type:    'K' | 'L' | 'A' | string;
+  operating_area:       string;
+  perspective:          string;
+  is_divided_by_gender: boolean;
+  prel_publication_date: string | null;
+  publication_date:     string | null;
+}
+
+interface KoladaKpiPage {
+  values:       KoladaKpiMeta[];
+  count:        number;
+  next_url:     string | null;
+  previous_url: string | null;
+}
+
+/**
+ * Fetch every KPI in the Kolada catalog by paginating /v3/kpi.
+ * Called by catalogCache — not exported directly; use getKoladaKpiCatalog() instead.
+ */
+export async function fetchAllKoladaKpis(): Promise<KoladaKpiMeta[]> {
+  const kpis: KoladaKpiMeta[] = [];
+  let url: string | null = `${BASE_URL}/kpi?per_page=500`;
+
+  while (url) {
+    const res = await fetch(url);
+    if (!res.ok) { throw new Error(`Kolada KPI catalog fetch failed: ${res.status}`); }
+    const page: KoladaKpiPage = await res.json();
+    kpis.push(...page.values);
+    url = proxyUrl(page.next_url);
+  }
+
+  return kpis;
+}
+
+// ── Scalar fetch (used by descriptors) ────────────────────────────────────────
+
 /**
  * Fetch a scalar KPI result for any supported admin level.
  * Handles Region vs Municipality dispatch and label resolution.

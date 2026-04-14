@@ -1,5 +1,5 @@
 export type AdminLevel = 'Country' | 'Region' | 'Municipality' | 'RegSO' | 'DeSO';
-export type DatasetCategory = 'befolkning' | 'utbildning' | 'val' | 'ekonomi' | 'valfard';
+export type DatasetCategory = 'befolkning' | 'utbildning' | 'val' | 'ekonomi' | 'valfard' | 'kolada';
 
 export const DATASET_CATEGORY_LABELS: Record<DatasetCategory, string> = {
   befolkning: 'Befolkning',
@@ -7,10 +7,11 @@ export const DATASET_CATEGORY_LABELS: Record<DatasetCategory, string> = {
   val:        'Val',
   ekonomi:    'Ekonomi',
   valfard:    'Välfärd',
+  kolada:     'Kolada',
 };
 
 export const DATASET_CATEGORY_ORDER: DatasetCategory[] = [
-  'befolkning', 'utbildning', 'val', 'ekonomi', 'valfard',
+  'befolkning', 'utbildning', 'val', 'ekonomi', 'valfard', 'kolada',
 ];
 export type ViewType = 'map' | 'chart' | 'table' | 'profile';
 export type ChartType = 'bar' | 'histogram' | 'sunburst' | 'diverging' | 'multiline' | 'election-bar' | 'party-ranking' | 'scatter' | 'boxplot' | 'share-bar' | 'donut';

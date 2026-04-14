@@ -2,6 +2,8 @@ import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useS
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
+import { KoladaBrowsePanel } from '@/components/map/KoladaBrowsePanel';
+import { usePinnedKolada } from '@/hooks/usePinnedKolada';
 import { SelectionPanel } from '@/components/map/SelectionPanel';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
@@ -94,10 +96,14 @@ export default function MapPage() {
   // still firing when the user actually changes level (different level).
   const lastProcessedLevelRef = useRef<AdminLevel | null>(null);
 
+  // ── Pinned Kolada KPIs ─────────────────────────────────────────────────
+  const pinnedKolada = usePinnedKolada();
+
   // ── UI layout state ────────────────────────────────────────────────────
   const [isPanelOpen,         setIsPanelOpen]         = useState(!!initialValues.selectedFeature);
   const [desktopSidebarOpen,  setDesktopSidebarOpen]  = useState(true);
   const [mobileSidebarOpen,   setMobileSidebarOpen]   = useState(false);
+  const [koladaBrowseOpen,    setKoladaBrowseOpen]    = useState(false);
   const [mapResetToken,       setMapResetToken]       = useState(0);
   const [selectedBase,        setSelectedBase]        = useState<BaseMapKey>('None');
   const [fillOpacity,         setFillOpacity]         = useState(1.0);
@@ -136,11 +142,14 @@ export default function MapPage() {
   } = nav;
 
   // ── Dataset (year, party, descriptor) ─────────────────────────────────
-  const ds = useDatasetState({
-    selectedDatasetId: initialValues.selectedDatasetId ?? undefined,
-    selectedYear:      initialValues.selectedYear      ?? undefined,
-    activeParty:       initialValues.activeParty       ?? undefined,
-  });
+  const ds = useDatasetState(
+    {
+      selectedDatasetId: initialValues.selectedDatasetId ?? undefined,
+      selectedYear:      initialValues.selectedYear      ?? undefined,
+      activeParty:       initialValues.activeParty       ?? undefined,
+    },
+    pinnedKolada.descriptors,
+  );
   const {
     selectedDatasetId, setSelectedDatasetId,
     selectedYear,
@@ -157,10 +166,17 @@ export default function MapPage() {
     setFilterCriteria([]);
   }, []);
 
-  const view = useViewState(selectedLevel, selectedDatasetId, activeDescriptor, onElectionDataset, {
-    activeView:      initialValues.activeView      ?? undefined,
-    activeChartType: initialValues.activeChartType ?? undefined,
-  });
+  const view = useViewState(
+    selectedLevel,
+    selectedDatasetId,
+    activeDescriptor,
+    onElectionDataset,
+    {
+      activeView:      initialValues.activeView      ?? undefined,
+      activeChartType: initialValues.activeChartType ?? undefined,
+    },
+    pinnedKolada.descriptors,
+  );
   const {
     activeView, setActiveView,
     activeChartType, setActiveChartType,
@@ -173,7 +189,7 @@ export default function MapPage() {
   } = view;
 
   const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
-    selectedDatasetId, selectedLevel, selectedYear, activeParty,
+    selectedDatasetId, selectedLevel, selectedYear, activeParty, pinnedKolada.descriptors,
   );
 
   const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
@@ -412,6 +428,8 @@ export default function MapPage() {
         filterLoading={filterLoading}
         fillOpacity={fillOpacity}
         onFillOpacityChange={setFillOpacity}
+        extraDatasets={pinnedKolada.descriptors}
+        onOpenKoladaBrowse={() => setKoladaBrowseOpen(true)}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
@@ -905,6 +923,15 @@ export default function MapPage() {
           />
         </div>
       </div>
+
+      <KoladaBrowsePanel
+        open={koladaBrowseOpen}
+        onClose={() => setKoladaBrowseOpen(false)}
+        pinnedKpiIds={pinnedKolada.pinnedKpiIds}
+        pinnedConfigs={pinnedKolada.configs}
+        onPin={pinnedKolada.pin}
+        onUnpin={pinnedKolada.unpin}
+      />
     </main>
   );
 }

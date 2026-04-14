@@ -15,7 +15,7 @@ import { fetchKoladaScalar } from './api';
 export const grundskolaMerit: DatasetDescriptor = {
   id:              'grundskola-merit',
   label:           'Meritvärde åk 9',
-  category:        'utbildning',
+  category:        'kolada',
   source:          'Kolada',
   availableYears:  Array.from({ length: 9 }, (_, i) => 2015 + i),
   supportedLevels: ['Municipality'],
