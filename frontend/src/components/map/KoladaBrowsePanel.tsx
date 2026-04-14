@@ -2,43 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { X, Bookmark, BookmarkCheck, Search } from 'lucide-react';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import type { KoladaDescriptorConfig } from '@/datasets/kolada/factory';
-import {
-  DEFAULT_KOLADA_YEARS,
-  PRESET_KPI_IDS,
-} from '@/datasets/kolada/factory';
+import { extractUnit, stripUnit, makeKoladaDescriptorFromMeta } from '@/datasets/kolada/factory';
 import { getKoladaKpiCatalog } from '@/datasets/kolada/catalogCache';
 import type { KoladaKpiMeta } from '@/datasets/kolada/api';
-import type { AdminLevel } from '@/datasets/types';
+import { getKoladaPresetIds } from '@/datasets/registry';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/** Extract the unit from a KPI title like "Skattesats till kommun (%)". */
-function extractUnit(title: string): string {
-  const match = title.match(/\(([^)]+)\)$/);
-  return match ? match[1] : '';
-}
-
-/** Strip the trailing unit parenthetical from the title. */
-function stripUnit(title: string): string {
-  return title.replace(/\s*\([^)]+\)$/, '').trim();
-}
-
-function toSupportedLevels(municipalityType: string): AdminLevel[] {
-  if (municipalityType === 'L') { return ['Region']; }
-  if (municipalityType === 'A') { return ['Region', 'Municipality']; }
-  return ['Municipality'];
-}
-
-function buildConfig(kpi: KoladaKpiMeta): KoladaDescriptorConfig {
-  return {
-    id:              `kolada-${kpi.id}`,
-    kpiId:           kpi.id,
-    label:           stripUnit(kpi.title),
-    unit:            extractUnit(kpi.title),
-    availableYears:  DEFAULT_KOLADA_YEARS,
-    supportedLevels: toSupportedLevels(kpi.municipality_type),
-  };
-}
+// Derived once from the static registry — stays in sync automatically when presets are added/removed.
+const PRESET_KPI_IDS = getKoladaPresetIds();
 
 // ── Client-side search ────────────────────────────────────────────────────────
 
@@ -113,7 +83,7 @@ function KpiRow({
           </button>
         ) : (
           <button
-            onClick={() => onPin(buildConfig(kpi))}
+            onClick={() => onPin(makeKoladaDescriptorFromMeta(kpi))}
             title="Lägg till"
             className="flex items-center gap-1 text-xs text-slate-500 hover:text-blue-600 transition-colors font-medium"
           >

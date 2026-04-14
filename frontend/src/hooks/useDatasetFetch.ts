@@ -20,8 +20,8 @@ export function useDatasetFetch(
   selectedYear:      number,
   /** When set, switches election map from winner-color to a per-party gradient choropleth. */
   activeParty?:      string | null,
-  /** Additional descriptors beyond the static registry (e.g. pinned Kolada KPIs). */
-  extraDatasets?:    DatasetDescriptor[],
+  /** Complete merged dataset list (static registry + any extras). Defaults to DATASETS. */
+  allDatasets?:      DatasetDescriptor[],
 ): DatasetFetchResult {
   const [datasetResult, setDatasetResult] = useState<DatasetResult | null>(null);
   const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
@@ -49,9 +49,8 @@ export function useDatasetFetch(
   useEffect(() => {
     if (!selectedDatasetId) { return; }
 
-    const descriptor =
-      DATASETS.find((d) => d.id === selectedDatasetId) ??
-      extraDatasets?.find((d) => d.id === selectedDatasetId);
+    const datasets = allDatasets ?? DATASETS;
+    const descriptor = datasets.find((d) => d.id === selectedDatasetId);
     if (!descriptor) { return; }
 
     const gen = ++fetchGenRef.current;
@@ -133,7 +132,7 @@ export function useDatasetFetch(
           setLoading(false);
         }
       });
-  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, extraDatasets]);
+  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets]);
 
   return { datasetResult, colorScale, mapColorFn, loading };
 }

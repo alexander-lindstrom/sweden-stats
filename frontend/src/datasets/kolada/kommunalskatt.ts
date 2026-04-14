@@ -11,6 +11,7 @@ import { fetchKoladaScalar } from './api';
 
 export const kommunalskatt: DatasetDescriptor = {
   id:              'kommunalskatt',
+  kpiId:           'N00901',
   label:           'Kommunalskatt',
   category:        'kolada',
   source:          'Kolada',

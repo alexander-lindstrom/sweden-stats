@@ -12,6 +12,7 @@ import { fetchKoladaScalar } from './api';
 
 export const aldreomsorg: DatasetDescriptor = {
   id:              'aldreomsorg-kostnad',
+  kpiId:           'N20048',
   label:           'Äldreomsorg (kostnad/inv 80+)',
   category:        'kolada',
   source:          'Kolada',

@@ -2,10 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AdminLevel, DatasetDescriptor } from '@/datasets/types';
 import { DATASETS, getDatasetsForLevel } from '@/datasets/registry';
 
-function mergeDatasets(extra?: DatasetDescriptor[]): DatasetDescriptor[] {
-  return extra && extra.length > 0 ? [...DATASETS, ...extra] : DATASETS;
-}
-
 export interface DatasetState {
   selectedDatasetId: string | null;
   setSelectedDatasetId: (id: string | null) => void;
@@ -27,7 +23,8 @@ export interface DatasetState {
  * the party filter when leaving election datasets.
  *
  * @param initialValues Optional initial state (e.g. parsed from URL search params).
- * @param extraDatasets  Additional descriptors beyond the static registry (e.g. pinned Kolada KPIs).
+ * @param allDatasets   Complete merged dataset list (static registry + any extras).
+ *                      Defaults to the static DATASETS registry when omitted.
  */
 export function useDatasetState(
   initialValues?: {
@@ -35,7 +32,7 @@ export function useDatasetState(
     selectedYear?:      number;
     activeParty?:       string | null;
   },
-  extraDatasets?: DatasetDescriptor[],
+  allDatasets?: DatasetDescriptor[],
 ): DatasetState {
   const initYear = initialValues?.selectedYear ?? 2024;
 
@@ -46,17 +43,17 @@ export function useDatasetState(
 
   const yearDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const allDatasets = useMemo(() => mergeDatasets(extraDatasets), [extraDatasets]);
+  const datasets = useMemo(() => allDatasets ?? DATASETS, [allDatasets]);
 
   const activeDescriptor = useMemo(
-    () => allDatasets.find((d) => d.id === selectedDatasetId) ?? null,
-    [allDatasets, selectedDatasetId],
+    () => datasets.find((d) => d.id === selectedDatasetId) ?? null,
+    [datasets, selectedDatasetId],
   );
 
   // When dataset or year changes: clamp year to available years, clear party on non-election.
   useEffect(() => {
     if (!selectedDatasetId) { return; }
-    const descriptor = allDatasets.find(d => d.id === selectedDatasetId);
+    const descriptor = datasets.find(d => d.id === selectedDatasetId);
     if (!descriptor) { return; }
 
     if (descriptor.availableYears.length > 0 && !descriptor.availableYears.includes(selectedYear)) {
@@ -70,7 +67,7 @@ export function useDatasetState(
     if (descriptor.group !== 'val') {
       setActiveParty(null);
     }
-  }, [allDatasets, selectedDatasetId, selectedYear]);
+  }, [datasets, selectedDatasetId, selectedYear]);
 
   const handleYearChange = (y: number) => {
     setDisplayYear(y);
@@ -79,11 +76,10 @@ export function useDatasetState(
   };
 
   const resetDatasetForLevel = useCallback((level: AdminLevel) => {
-    const base = getDatasetsForLevel(level);
-    const extra = (extraDatasets ?? []).filter(d => d.supportedLevels.includes(level));
-    const all = [...base, ...extra];
-    setSelectedDatasetId(id => all.some(d => d.id === id) ? id : (base[0]?.id ?? null));
-  }, [extraDatasets]);
+    const available = (allDatasets ?? DATASETS).filter(d => d.supportedLevels.includes(level));
+    const fallback = getDatasetsForLevel(level)[0]?.id ?? null;
+    setSelectedDatasetId(id => available.some(d => d.id === id) ? id : fallback);
+  }, [allDatasets]);
 
   return {
     selectedDatasetId, setSelectedDatasetId,

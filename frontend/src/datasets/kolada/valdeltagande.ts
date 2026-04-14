@@ -15,6 +15,7 @@ const ELECTION_YEARS = [2006, 2010, 2014, 2018, 2022];
 
 export const valdeltagande: DatasetDescriptor = {
   id:              'valdeltagande-kommunal',
+  kpiId:           'N05401',
   label:           'Valdeltagande (kommunalval)',
   category:        'kolada',
   source:          'Kolada',

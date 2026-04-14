@@ -98,6 +98,11 @@ export default function MapPage() {
 
   // ── Pinned Kolada KPIs ─────────────────────────────────────────────────
   const pinnedKolada = usePinnedKolada();
+  // Merge once so every hook receives the same stable reference.
+  const allDatasets = useMemo(
+    () => pinnedKolada.descriptors.length > 0 ? [...DATASETS, ...pinnedKolada.descriptors] : DATASETS,
+    [pinnedKolada.descriptors],
+  );
 
   // ── UI layout state ────────────────────────────────────────────────────
   const [isPanelOpen,         setIsPanelOpen]         = useState(!!initialValues.selectedFeature);
@@ -148,7 +153,7 @@ export default function MapPage() {
       selectedYear:      initialValues.selectedYear      ?? undefined,
       activeParty:       initialValues.activeParty       ?? undefined,
     },
-    pinnedKolada.descriptors,
+    allDatasets,
   );
   const {
     selectedDatasetId, setSelectedDatasetId,
@@ -175,7 +180,7 @@ export default function MapPage() {
       activeView:      initialValues.activeView      ?? undefined,
       activeChartType: initialValues.activeChartType ?? undefined,
     },
-    pinnedKolada.descriptors,
+    allDatasets,
   );
   const {
     activeView, setActiveView,
@@ -189,7 +194,7 @@ export default function MapPage() {
   } = view;
 
   const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
-    selectedDatasetId, selectedLevel, selectedYear, activeParty, pinnedKolada.descriptors,
+    selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets,
   );
 
   const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
@@ -199,11 +204,20 @@ export default function MapPage() {
   const resultLabels        = scalarResult?.labels ?? electionResult?.labels;
 
   // Sub-level fetch so hovering sub-boundaries shows their own values.
+  // Pass allDatasets only when the active descriptor explicitly supports the sub-level —
+  // this lets pinned Kolada KPIs with municipality_type='A' show municipality values
+  // when the user is at Region level, while preventing spurious fetches at lower levels
+  // where Kolada has no sub-boundary (RegSO/DeSO) data.
   const subLevel = SUB_LEVEL_FOR_FETCH[selectedLevel];
+  const subLevelDatasets = subLevel && activeDescriptor?.supportedLevels.includes(subLevel)
+    ? allDatasets
+    : undefined;
   const { datasetResult: subDatasetResult } = useDatasetFetch(
     selectedFeature && subLevel ? selectedDatasetId : null,
     subLevel ?? selectedLevel,
     selectedYear,
+    undefined,
+    subLevelDatasets,
   );
   const subScalarResult    = subDatasetResult?.kind === 'scalar'   ? subDatasetResult as ScalarDatasetResult : null;
   const subElectionResult  = subDatasetResult?.kind === 'election' ? subDatasetResult : null;

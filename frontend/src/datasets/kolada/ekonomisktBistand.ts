@@ -11,6 +11,7 @@ import { fetchKoladaScalar } from './api';
 
 export const ekonomisktBistand: DatasetDescriptor = {
   id:              'ekonomiskt-bistand',
+  kpiId:           'N31807',
   label:           'Ekonomiskt bistånd',
   category:        'kolada',
   source:          'Kolada',

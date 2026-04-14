@@ -111,6 +111,8 @@ export interface DatasetDescriptor {
   id: string;
   label: string;
   category?: DatasetCategory;
+  /** Kolada KPI identifier (e.g. 'N00901'). Set on Kolada descriptors; used to detect presets. */
+  kpiId?: string;
   /** Short label for use in segmented controls (e.g. inside a group). Falls back to label. */
   shortLabel?: string;
   /** Group key — datasets sharing a group are rendered as one item with a sub-selector. */

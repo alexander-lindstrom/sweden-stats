@@ -28,3 +28,8 @@ export const DATASETS: DatasetDescriptor[] = [
 export function getDatasetsForLevel(level: AdminLevel): DatasetDescriptor[] {
   return DATASETS.filter((d) => d.supportedLevels.includes(level));
 }
+
+/** KPI IDs of the hard-coded Kolada presets. Derived from DATASETS so it stays in sync automatically. */
+export function getKoladaPresetIds(): Set<string> {
+  return new Set(DATASETS.filter(d => d.source === 'Kolada' && d.kpiId).map(d => d.kpiId!));
+}
