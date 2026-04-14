@@ -141,7 +141,7 @@ export function buildChoroplethStyle(
 
     const value = data[code];
     let style: Style;
-    if (value !== undefined) {
+    if (value !== undefined && Number.isFinite(value)) {
       style = noStroke
         ? new Style({ fill: new Fill({ color: colorScale(value) }) })
         : new Style({ fill: new Fill({ color: colorScale(value) }), stroke: choroplethStroke });
@@ -208,7 +208,7 @@ export function buildFilteredChoroplethStyle(
 
     const value = data[code];
     let style: Style;
-    if (value === undefined) {
+    if (value === undefined || !Number.isFinite(value)) {
       style = noStroke ? noDataFillStyle : noDataStyle;
     } else {
       style = noStroke

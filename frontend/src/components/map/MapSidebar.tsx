@@ -1,43 +1,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
-import * as Switch from '@radix-ui/react-switch';
-import { ChevronDown, LibraryBig } from 'lucide-react';
+import { ChevronDown, LibraryBig, SlidersHorizontal } from 'lucide-react';
 import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
-import { FilterPanel } from '@/components/map/FilterPanel';
 import { ADMIN_LEVELS, LEVEL_LABELS } from '@/datasets/adminLevels';
-import { getDatasetsForLevel, DATASETS } from '@/datasets/registry';
+import { getDatasetsForLevel } from '@/datasets/registry';
 import type { AdminLevel, DatasetCategory, DatasetDescriptor, FilterCriterion } from '@/datasets/types';
 import { DATASET_CATEGORY_LABELS, DATASET_CATEGORY_ORDER } from '@/datasets/types';
 
 interface MapSidebarProps {
-  selectedLevel:          AdminLevel;
-  onLevelChange:          (level: AdminLevel) => void;
-  selectedDatasetId:      string | null;
-  onDatasetChange:        (id: string) => void;
-  activeDescriptor:       DatasetDescriptor | null;
-  displayYear:            number;
-  onYearChange:           (year: number) => void;
-  selectedBase:           BaseMapKey;
-  onBaseChange:           (base: BaseMapKey) => void;
-  onReset:                () => void;
-  desktopOpen:            boolean;
-  mobileOpen:             boolean;
-  onMobileClose:          () => void;
-  filterEnabled:          boolean;
-  onFilterEnabledChange:  (enabled: boolean) => void;
-  filterCriteria:         FilterCriterion[];
-  onFilterCriteriaChange: (criteria: FilterCriterion[]) => void;
-  filterSortedValues:     Record<string, number[]>;
-  filterMatchingCount:    number | null;
-  filterLoading:          boolean;
-  fillOpacity:            number;
-  onFillOpacityChange:    (value: number) => void;
+  selectedLevel:      AdminLevel;
+  onLevelChange:      (level: AdminLevel) => void;
+  selectedDatasetId:  string | null;
+  onDatasetChange:    (id: string) => void;
+  activeDescriptor:   DatasetDescriptor | null;
+  displayYear:        number;
+  onYearChange:       (year: number) => void;
+  selectedBase:       BaseMapKey;
+  onBaseChange:       (base: BaseMapKey) => void;
+  onReset:            () => void;
+  desktopOpen:        boolean;
+  mobileOpen:         boolean;
+  onMobileClose:      () => void;
+  filterEnabled:      boolean;
+  filterCriteria:     FilterCriterion[];
+  fillOpacity:        number;
+  onFillOpacityChange: (value: number) => void;
   /** Extra descriptors to merge into the nav (e.g. user-pinned Kolada KPIs). */
-  extraDatasets?:         DatasetDescriptor[];
-  onOpenKoladaBrowse:     () => void;
+  extraDatasets?:     DatasetDescriptor[];
+  onOpenKoladaBrowse: () => void;
+  onOpenFilterPanel:  () => void;
 }
 
 // ─── Shared accordion section ─────────────────────────────────────────────────
@@ -191,27 +185,18 @@ export function MapSidebar({
   mobileOpen,
   onMobileClose,
   filterEnabled,
-  onFilterEnabledChange,
   filterCriteria,
-  onFilterCriteriaChange,
-  filterSortedValues,
-  filterMatchingCount,
-  filterLoading,
   fillOpacity,
   onFillOpacityChange,
   extraDatasets,
   onOpenKoladaBrowse,
+  onOpenFilterPanel,
 }: MapSidebarProps) {
   const availableDatasets = useMemo(() => {
     const base = getDatasetsForLevel(selectedLevel);
     const extra = (extraDatasets ?? []).filter(d => d.supportedLevels.includes(selectedLevel));
     return [...base, ...extra];
   }, [selectedLevel, extraDatasets]);
-
-  const filterableDatasets = useMemo(
-    () => DATASETS.filter(d => d.group !== 'val' && d.supportedLevels.includes(selectedLevel)),
-    [selectedLevel],
-  );
 
   const { byCategory, orderedCats } = useMemo(() => {
     const map = new Map<string, DatasetDescriptor[]>();
@@ -343,36 +328,42 @@ export function MapSidebar({
 
       {/* ── Zone 3: Settings (fixed at bottom) ──────────────────────────────── */}
       <div className="flex-shrink-0 bg-slate-50 border-t-2 border-slate-200">
+        {/* Filter trigger */}
+        <div className="px-4 py-2.5 border-b border-slate-100">
+          <button
+            onClick={onOpenFilterPanel}
+            className={[
+              'w-full flex items-center gap-2 text-xs transition-colors group',
+              filterEnabled && filterCriteria.length > 0
+                ? 'text-blue-600 hover:text-blue-700'
+                : 'text-slate-400 hover:text-blue-600',
+            ].join(' ')}
+          >
+            <SlidersHorizontal className={[
+              'w-3.5 h-3.5 flex-shrink-0',
+              filterEnabled && filterCriteria.length > 0
+                ? 'text-blue-500'
+                : 'group-hover:text-blue-500',
+            ].join(' ')} />
+            <span>Filter</span>
+            {filterCriteria.length > 0 && (
+              <span className={[
+                'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
+                filterEnabled
+                  ? 'bg-blue-100 text-blue-600'
+                  : 'bg-slate-200 text-slate-500',
+              ].join(' ')}>
+                {filterCriteria.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         <Accordion.Root
           type="multiple"
           value={openSettings}
           onValueChange={setOpenSettings}
         >
-          <SidebarItem value="filter" label="Filter" onDimBg>
-            <div className="px-4 pt-1 pb-3 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Aktivera filter</span>
-                <Switch.Root
-                  checked={filterEnabled}
-                  onCheckedChange={onFilterEnabledChange}
-                  className="relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/30 data-[state=checked]:bg-blue-500 data-[state=unchecked]:bg-slate-300"
-                >
-                  <Switch.Thumb className="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition-transform duration-150 ease-in-out data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
-                </Switch.Root>
-              </div>
-              {filterEnabled && (
-                <FilterPanel
-                  criteria={filterCriteria}
-                  onCriteriaChange={onFilterCriteriaChange}
-                  sortedValues={filterSortedValues}
-                  filterableDatasets={filterableDatasets}
-                  matchingCount={filterMatchingCount}
-                  loading={filterLoading}
-                />
-              )}
-            </div>
-          </SidebarItem>
-
           <SidebarItem value="basemap" label="Bakgrundskarta" onDimBg>
             <div className="px-4 pt-1 pb-3 flex flex-col gap-3">
               <Dropdown

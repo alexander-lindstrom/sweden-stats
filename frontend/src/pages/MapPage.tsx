@@ -3,6 +3,7 @@ import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
 import { KoladaBrowsePanel } from '@/components/map/KoladaBrowsePanel';
+import { FilterBrowsePanel } from '@/components/map/FilterBrowsePanel';
 import { usePinnedKolada } from '@/hooks/usePinnedKolada';
 import { SelectionPanel } from '@/components/map/SelectionPanel';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
@@ -109,6 +110,7 @@ export default function MapPage() {
   const [desktopSidebarOpen,  setDesktopSidebarOpen]  = useState(true);
   const [mobileSidebarOpen,   setMobileSidebarOpen]   = useState(false);
   const [koladaBrowseOpen,    setKoladaBrowseOpen]    = useState(false);
+  const [filterPanelOpen,     setFilterPanelOpen]     = useState(false);
   const [mapResetToken,       setMapResetToken]       = useState(0);
   const [selectedBase,        setSelectedBase]        = useState<BaseMapKey>('None');
   const [fillOpacity,         setFillOpacity]         = useState(1.0);
@@ -434,16 +436,12 @@ export default function MapPage() {
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
         filterEnabled={filterEnabled}
-        onFilterEnabledChange={setFilterEnabled}
         filterCriteria={filterCriteria}
-        onFilterCriteriaChange={setFilterCriteria}
-        filterSortedValues={filterSortedValues}
-        filterMatchingCount={filterMatchingCount}
-        filterLoading={filterLoading}
         fillOpacity={fillOpacity}
         onFillOpacityChange={setFillOpacity}
         extraDatasets={pinnedKolada.descriptors}
         onOpenKoladaBrowse={() => setKoladaBrowseOpen(true)}
+        onOpenFilterPanel={() => setFilterPanelOpen(true)}
       />
 
       {/* ── Centre panel ─────────────────────────────────────────────────── */}
@@ -945,6 +943,19 @@ export default function MapPage() {
         pinnedConfigs={pinnedKolada.configs}
         onPin={pinnedKolada.pin}
         onUnpin={pinnedKolada.unpin}
+      />
+
+      <FilterBrowsePanel
+        open={filterPanelOpen}
+        onClose={() => setFilterPanelOpen(false)}
+        selectedLevel={selectedLevel}
+        filterEnabled={filterEnabled}
+        onFilterEnabledChange={setFilterEnabled}
+        criteria={filterCriteria}
+        onCriteriaChange={setFilterCriteria}
+        sortedValues={filterSortedValues}
+        matchingCount={filterMatchingCount}
+        loading={filterLoading}
       />
     </main>
   );

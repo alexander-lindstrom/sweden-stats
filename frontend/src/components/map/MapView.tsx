@@ -18,6 +18,7 @@ import {
   buildCategoricalStyle,
   buildChoroplethStyle,
   buildFilteredChoroplethStyle,
+  buildFilterStyle,
   createBoundaryLayer,
   createComparisonSelectionLayer,
   createHighlightLayer,
@@ -653,8 +654,10 @@ const MapView: React.FC<MapViewProps> = ({
     if (matchingAreas) {
       if (choroplethData && colorScale) {
         layer.setStyle(buildFilteredChoroplethStyle(choroplethData, colorScale, featureCodeProperty, matchingAreas, true));
+      } else {
+        // No choropleth loaded — fall back to binary blue/gray filter style.
+        layer.setStyle(buildFilterStyle(matchingAreas, featureCodeProperty));
       }
-      // else: choropleth not yet loaded — keep current style rather than flashing blue
     } else if (mapColorFn) {
       layer.setStyle(buildCategoricalStyle(mapColorFn, featureCodeProperty, true));
     } else if (choroplethData && colorScale) {
