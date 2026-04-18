@@ -131,6 +131,24 @@ function zoomToWfsFeature(
     .catch(() => { /* WFS failed — leave map as-is */ });
 }
 
+const makeCacheHandler = (codeProp: string, cache: Map<string, number[]>) =>
+  (rawEvt: unknown) => {
+    const tile = (rawEvt as { tile: OlVectorTile<RenderFeature> }).tile;
+    for (const f of tile.getFeatures()) {
+      const code = String(f.get(codeProp) ?? '');
+      if (!code) { continue; }
+      const geom = f.getGeometry();
+      if (!geom) { continue; }
+      const ext = geom.getExtent();
+      const cached = cache.get(code);
+      if (cached) {
+        extendExtent(cached, ext);
+      } else {
+        cache.set(code, ext.slice());
+      }
+    }
+  };
+
 const MapView: React.FC<MapViewProps> = ({
   adminLevel,
   selectedBase,
@@ -179,8 +197,11 @@ const MapView: React.FC<MapViewProps> = ({
   const comparisonSelectionLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef          = useRef<string | null>(null);
   const subSourceRef               = useRef<VectorTileSource | null>(null);
-  const extentCacheRef = useRef<Map<string, number[]>>(null!);
-  if (!extentCacheRef.current) extentCacheRef.current = new Map();
+  const extentCacheRef    = useRef<Map<string, number[]>>(null!);
+  if (!extentCacheRef.current) { extentCacheRef.current = new Map(); }
+  // Same cache for the one-level-down (sub) source — promoted to extentCacheRef on drill-down.
+  const subExtentCacheRef = useRef<Map<string, number[]>>(null!);
+  if (!subExtentCacheRef.current) { subExtentCacheRef.current = new Map(); }
 
   // Keep latest prop refs so effects/callbacks always see current values
   // without needing them in dependency arrays.
@@ -524,16 +545,20 @@ const MapView: React.FC<MapViewProps> = ({
     if (comparisonSelectionLayerRef.current) { map.removeLayer(comparisonSelectionLayerRef.current); comparisonSelectionLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
-    extentCacheRef.current.clear();
+    // Promote: sub-level extents become the new level's main extents after drill-down.
+    extentCacheRef.current    = subExtentCacheRef.current;
+    subExtentCacheRef.current = new Map();
 
     const { url } = adminVectorTileLayers[adminLevel];
     const source = createVectorTileSource(url);
     sourceRef.current = source;
 
-    const subLevel = SUB_LEVEL[adminLevel];
-    subSourceRef.current = subLevel
+    const subLevel           = SUB_LEVEL[adminLevel];
+    const subCodeProp = SUB_LEVEL_CODE_PROP[adminLevel];
+    const newSubSource       = subLevel
       ? createVectorTileSource(adminVectorTileLayers[subLevel].url)
       : null;
+    subSourceRef.current = newSubSource;
 
     const fillLayer      = createVectorTileLayer(source);
     const boundaryLayer  = createBoundaryLayer(source);
@@ -567,27 +592,15 @@ const MapView: React.FC<MapViewProps> = ({
     };
     source.on('tileloadend', onTileLoad);
 
-    const onCacheTile = (rawEvt: unknown) => {
-      const tile = (rawEvt as { tile: OlVectorTile<RenderFeature> }).tile;
-      for (const f of tile.getFeatures()) {
-        const code = String(f.get(featureCodeProperty) ?? '');
-        if (!code) { continue; }
-        const geom = f.getGeometry();
-        if (!geom) { continue; }
-        const ext = geom.getExtent();
-        const cached = extentCacheRef.current.get(code);
-        if (cached) {
-          extendExtent(cached, ext);
-        } else {
-          extentCacheRef.current.set(code, ext.slice());
-        }
-      }
-    };
+    const onCacheTile    = makeCacheHandler(featureCodeProperty, extentCacheRef.current);
+    const onCacheSubTile = subCodeProp ? makeCacheHandler(subCodeProp, subExtentCacheRef.current) : null;
     source.on('tileloadend', onCacheTile);
+    if (newSubSource && onCacheSubTile) { newSubSource.on('tileloadend', onCacheSubTile); }
 
     return () => {
       source.un('tileloadend', onTileLoad);
       source.un('tileloadend', onCacheTile);
+      if (newSubSource && onCacheSubTile) { newSubSource.un('tileloadend', onCacheSubTile); }
       // Effect re-ran before tiles arrived — remove outgoing layers now.
       if (!settled) {
         if (outgoingFillLayerRef.current) {
