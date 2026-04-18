@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import Map from "ol/Map";
+import OlMap from "ol/Map";
 import View from "ol/View";
 import { defaults as defaultControls } from "ol/control";
 import TileLayer from "ol/layer/Tile";
@@ -93,13 +93,16 @@ export interface MapViewProps {
   fillOpacity?: number;
 }
 
-// Module-level helper — fit the OL view to a WFS feature's extent.
-// Uses 22% padding on each side (relative to the map viewport) so features
-// are shown with generous context. maxZoom guards against absurdly close zoom
-// on tiny features (small DeSO areas etc.).
+function fitViewToExtent(view: View, map: OlMap, extent: number[], maxZoom: number): void {
+  const size = map.getSize() ?? [800, 600];
+  const padH = Math.round(size[0] * 0.22);
+  const padV = Math.round(size[1] * 0.22);
+  view.fit(extent, { padding: [padV, padH, padV, padH], maxZoom, duration: 800 });
+}
+
 function zoomToWfsFeature(
   view: View,
-  map: Map,
+  map: OlMap,
   wfsTypeName: string,
   codeProperty: string,
   code: string,
@@ -122,12 +125,7 @@ function zoomToWfsFeature(
       if (geojson.features?.length > 0) {
         const features = new GeoJSON().readFeatures(geojson);
         const extent   = features[0].getGeometry()?.getExtent();
-        if (extent) {
-          const size = map.getSize() ?? [800, 600];
-          const padH = Math.round(size[0] * 0.22);
-          const padV = Math.round(size[1] * 0.22);
-          view.fit(extent, { padding: [padV, padH, padV, padH], maxZoom, duration: 800 });
-        }
+        if (extent) { fitViewToExtent(view, map, extent, maxZoom); }
       }
     })
     .catch(() => { /* WFS failed — leave map as-is */ });
@@ -157,7 +155,7 @@ const MapView: React.FC<MapViewProps> = ({
   fillOpacity = 1,
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
-  const mapInstanceRef   = useRef<Map | null>(null);
+  const mapInstanceRef   = useRef<OlMap | null>(null);
   const baseLayerRef     = useRef<TileLayer<XYZ>>(
     new TileLayer({ visible: false })
   );
@@ -181,9 +179,8 @@ const MapView: React.FC<MapViewProps> = ({
   const comparisonSelectionLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef          = useRef<string | null>(null);
   const subSourceRef               = useRef<VectorTileSource | null>(null);
-  // Maps feature code → merged bounding-box extent, built from tile features as
-  // they load. Lets us call view.fit() instantly on click with no WFS round-trip.
-  const extentCacheRef = useRef(new globalThis.Map<string, number[]>());
+  const extentCacheRef = useRef<Map<string, number[]>>(null!);
+  if (!extentCacheRef.current) extentCacheRef.current = new Map();
 
   // Keep latest prop refs so effects/callbacks always see current values
   // without needing them in dependency arrays.
@@ -444,7 +441,7 @@ const MapView: React.FC<MapViewProps> = ({
   useEffect(() => {
     if (!mapRef.current) {return;}
 
-    const map = new Map({
+    const map = new OlMap({
       target: mapRef.current,
       layers: [baseLayerRef.current],
       view: new View({ center: SWEDEN_CENTER, zoom: 5.5 }),
@@ -533,9 +530,6 @@ const MapView: React.FC<MapViewProps> = ({
     const source = createVectorTileSource(url);
     sourceRef.current = source;
 
-    // Create the sub-level source once per admin level. Reused across all
-    // selections so tile fetches happen only once regardless of how many
-    // different regions the user clicks.
     const subLevel = SUB_LEVEL[adminLevel];
     subSourceRef.current = subLevel
       ? createVectorTileSource(adminVectorTileLayers[subLevel].url)
@@ -573,9 +567,6 @@ const MapView: React.FC<MapViewProps> = ({
     };
     source.on('tileloadend', onTileLoad);
 
-    // Populate the extent cache as each tile arrives. Unioning tile-clipped
-    // extents across all loaded tiles gives a bounding box accurate enough for
-    // view.fit() — no WFS round-trip needed when the user clicks a feature.
     const onCacheTile = (rawEvt: unknown) => {
       const tile = (rawEvt as { tile: OlVectorTile<RenderFeature> }).tile;
       for (const f of tile.getFeatures()) {
@@ -633,14 +624,7 @@ const MapView: React.FC<MapViewProps> = ({
     const view       = map.getView();
     const cachedExtent = extentCacheRef.current.get(selectedFeature.code);
     if (cachedExtent) {
-      const size = map.getSize() ?? [800, 600];
-      const padH = Math.round(size[0] * 0.22);
-      const padV = Math.round(size[1] * 0.22);
-      view.fit([...cachedExtent] as [number, number, number, number], {
-        padding: [padV, padH, padV, padH],
-        maxZoom: LEVEL_MAX_ZOOM[adminLevel],
-        duration: 800,
-      });
+      fitViewToExtent(view, map, cachedExtent, LEVEL_MAX_ZOOM[adminLevel]);
     } else {
       zoomToWfsFeature(view, map, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_MAX_ZOOM[adminLevel], controller.signal);
     }
