@@ -146,11 +146,6 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       setHovered(null);
     };
     d3.select(svgRef.current)
-      .on('mousemove.clear', (event: MouseEvent) => {
-        if (!(event.target as Element).classList?.contains('bar') && hoveredElRef.current !== null) {
-          clearHighlight();
-        }
-      })
       .on('mouseleave', () => { if (hoveredElRef.current !== null) { clearHighlight(); } });
 
     // Value labels (right of bar)
