@@ -104,8 +104,8 @@ export const ShareBarChart: React.FC<Props> = ({
         .attr('x', 0).attr('y', y)
         .attr('width', innerW).attr('height', BAR_H)
         .attr('fill', 'none')
-        .attr('stroke', isSelected ? '#1e40af' : '#000')
-        .attr('stroke-width', isSelected ? 1.5 : 0.5)
+        .attr('stroke', isSelected ? CT.selected : 'none')
+        .attr('stroke-width', isSelected ? 1.5 : 0)
         .attr('pointer-events', 'none');
 
       // Transparent hit target.
@@ -134,7 +134,7 @@ export const ShareBarChart: React.FC<Props> = ({
         .attr('x', -8).attr('y', y + BAR_H / 2)
         .attr('dy', '0.35em').attr('text-anchor', 'end')
         .attr('font-size', 12)
-        .attr('fill', isSelected ? '#1e40af' : '#475569')
+        .attr('fill', isSelected ? CT.selected : '#475569')
         .attr('font-weight', isSelected ? 600 : 400)
         .attr('pointer-events', 'none')
         .text(row.label)

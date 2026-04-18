@@ -12,7 +12,7 @@ export const UI = {
 
   // ── Section headings ─────────────────────────────────────────────────────
   /** Profile-tab section title (collapsible header label). */
-  sectionTitle: 'text-sm font-bold uppercase tracking-[0.10em] text-slate-500 whitespace-nowrap',
+  sectionTitle: 'text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400 whitespace-nowrap',
 
   // ── Stat display (StatMini, future stat cards) ───────────────────────────
   statValue: 'text-xl font-bold tabular-nums text-slate-900',

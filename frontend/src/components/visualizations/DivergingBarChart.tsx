@@ -22,8 +22,8 @@ const MAX_BAR_H  = 20;
 const BAR_GAP    = 1;
 const BAR_RADIUS = 2;
 
-const COLOR_BELOW = '#60a5fa';
-const COLOR_ABOVE = '#fb923c';
+const COLOR_BELOW = CT.divergingLow;
+const COLOR_ABOVE = CT.divergingHigh;
 
 function fmtVal(v: number): string {
   const abs = Math.abs(v);

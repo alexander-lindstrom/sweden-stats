@@ -1,3 +1,4 @@
+import * as d3 from 'd3';
 import { AdminLevel, CategoryShare, CategoricalShareResult, DatasetDescriptor, DonutDatasetResult, TimeSeriesNode } from '../types';
 
 // ── TAB5325 ───────────────────────────────────────────────────────────────────
@@ -22,17 +23,13 @@ const FIELD_LABELS: Record<string, string> = {
   '999': 'Övrigt',
 };
 
-// d3.schemeTableau10 — cohesive, accessible categorical palette.
-const FIELD_COLORS: Record<string, string> = {
-  '10':  '#f28e2b', // orange  — Humaniora & teologi
-  '20':  '#4e79a7', // blue    — Juridik & samhällsvet.
-  '40':  '#76b7b2', // teal    — Naturvetenskap
-  '45':  '#e15759', // red     — Teknik
-  '60':  '#edc948', // yellow  — Medicin & odontologi
-  '70':  '#59a14f', // green   — Vård & omsorg
-  '80':  '#b07aa1', // purple  — Konstnärligt
-  '999': '#bab0ac', // grey    — Övrigt (neutral "other")
+// Stable field→Tableau10 slot mapping; indices chosen for color-semantic fit.
+const FIELD_COLOR_INDICES: Record<string, number> = {
+  '20': 0, '10': 1, '45': 2, '40': 3, '70': 4, '60': 5, '80': 6, '999': 9,
 };
+const FIELD_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(FIELD_COLOR_INDICES).map(([code, i]) => [code, d3.schemeTableau10[i] as string])
+);
 
 const SCHOOL_YEARS = [
   '2007/08', '2008/09', '2009/10', '2010/11', '2011/12',

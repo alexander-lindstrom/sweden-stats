@@ -145,15 +145,13 @@ export function PopulationPyramid({ data }: PopulationPyramidProps) {
         .attr('x', barColW - menW).attr('y', y)
         .attr('width', menW).attr('height', ROW_H)
         .attr('rx', BAR_R)
-        .attr('fill', CT.menFill).attr('fill-opacity', BAR_OP)
-        .attr('stroke', '#000').attr('stroke-width', 0.5);
+        .attr('fill', CT.menFill).attr('fill-opacity', BAR_OP);
 
       rg.append('rect').attr('class', 'wom-bar')
         .attr('x', barColW + LABEL_W).attr('y', y)
         .attr('width', womW).attr('height', ROW_H)
         .attr('rx', BAR_R)
-        .attr('fill', CT.womenFill).attr('fill-opacity', BAR_OP)
-        .attr('stroke', '#000').attr('stroke-width', 0.5);
+        .attr('fill', CT.womenFill).attr('fill-opacity', BAR_OP);
 
       // Age label — centered in label column, shifted slightly upward to leave
       // room for the diff sliver at the bottom.

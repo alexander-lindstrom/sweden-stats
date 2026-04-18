@@ -28,7 +28,7 @@ interface TT {
 
 const BAR_M      = { top: 20, right: 72, bottom: 50, left: 168 };
 const MAX_BARS   = 40;
-const MAX_BAR_H  = 20;   // max bar height in px — matches budget chart density
+const MAX_BAR_H  = 20;   // max bar height in px
 const BAR_GAP    = 1;    // gap between bars in px
 
 /** Walk the hierarchy and return the node matching `code`, plus the path of ancestors. */
@@ -129,14 +129,11 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     }
   }, []);
 
-  // Shared color scale — same keys and colors in both charts.
-  // Offset by 0.5/n so colors are evenly centred and don't wrap near t=0/t=1.
   const colorScale = useMemo(() => {
     const ch = focus.children ?? [];
-    const n  = Math.max(ch.length, 1);
     return d3.scaleOrdinal<string>()
       .domain(ch.map(c => c.name))
-      .range(ch.map((_, i) => d3.interpolateRainbow((i + 0.5) / n)));
+      .range([...d3.schemeTableau10]);
   }, [focus]);
 
   // ── Sunburst ───────────────────────────────────────────────────────────────
@@ -189,7 +186,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .join('path')
       .attr('d', arc)
       .attr('fill', nodeColor)
-      .attr('stroke', '#000')
+      .attr('stroke', 'rgba(255,255,255,0.35)')
       .attr('stroke-width', 0.5)
       .style('cursor', d => (drillable(d) ? 'pointer' : 'default'))
       .on('click', (e, d) => {
@@ -303,7 +300,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('width', d => xScale(d.value))
       .attr('height', yScale.bandwidth())
       .attr('fill', d => colorScale(d.name))
-      .attr('stroke', '#000').attr('stroke-width', 0.5)
+      .attr('stroke', 'none')
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
       .on('click', (e, d) => {
         if (d.children?.length) { drillDown(d); return; }

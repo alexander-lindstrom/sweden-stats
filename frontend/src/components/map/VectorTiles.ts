@@ -18,7 +18,7 @@ export const baseFillStyle = new Style({
 
 // Stroke-only style — always rendered by the dedicated boundary layer.
 export const boundaryOnlyStyle = new Style({
-  stroke: new Stroke({ color: '#7898a8', width: 1.2 }),
+  stroke: new Stroke({ color: '#9fb1bb', width: 1.0 }),
 });
 
 // Highlight is a separate layer on top — just a bright border, no fill change needed.
@@ -306,7 +306,7 @@ export function createSelectionLayer(
   selectedCodeRef: { current: string | null },
 ): VectorTileLayer {
   const selectionStyle = new Style({
-    stroke: new Stroke({ color: '#1e293b', width: 2.5 }),
+    stroke: new Stroke({ color: '#2563eb', width: 2.5 }),
   });
   return new VectorTileLayer({
     source,

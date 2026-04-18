@@ -84,7 +84,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('class', 'grid')
       .attr('x1', d => xScale(d)).attr('x2', d => xScale(d))
       .attr('y1', 0).attr('y2', innerH)
-      .attr('stroke', CT.gridLine).attr('stroke-width', 1);
+      .attr('stroke', CT.gridLine).attr('stroke-width', 0.5);
 
     drawChartFrame(g, innerW, innerH, {
       separatorCount: n - 1,
@@ -109,12 +109,12 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
         matchingAreas && !matchingAreas.has(d.code) ? 0.18 : 1
       )
       .attr('stroke', d =>
-        d.code === comparisonFeature?.code ? '#f97316'
-          : d.code === selectedFeature?.code ? '#1e40af'
-          : '#000'
+        d.code === comparisonFeature?.code ? CT.comparison
+          : d.code === selectedFeature?.code ? CT.selected
+          : 'none'
       )
       .attr('stroke-width', d =>
-        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0.5
+        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0
       )
       .style('cursor', 'pointer')
       .on('click', (event: MouseEvent, d) => {

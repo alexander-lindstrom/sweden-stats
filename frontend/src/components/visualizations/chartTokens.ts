@@ -8,7 +8,6 @@ export const CT = {
   // Structure
   gridLine:    '#e5e7eb', // grid lines & row separators
   border:      '#d1d5db', // frame borders & shelf line
-  barStroke:   '#b0b8c4', // bar outlines (visible on both light and coloured bars)
 
   // Text
   tickText:    '#9ca3af', // axis tick labels
@@ -16,8 +15,12 @@ export const CT = {
   labelText:   '#374151', // row / item labels (default)
 
   // Interaction
-  selected:    '#1d4ed8', // selected feature
+  selected:    '#1e40af', // selected feature
   comparison:  '#f97316', // comparison feature
+
+  // Diverging bar chart (above/below mean)
+  divergingLow:  '#60a5fa', // blue-400  — below average
+  divergingHigh: '#fb923c', // orange-400 — above average
 
   // Default fill when no colour scale is provided
   defaultFill: '#3b82f6',

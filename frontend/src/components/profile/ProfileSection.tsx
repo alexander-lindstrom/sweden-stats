@@ -16,7 +16,7 @@ export function ProfileSection({ title, children, defaultOpen = true }: {
         <span className={UI.sectionTitle}>
           {title}
         </span>
-        <div className="flex-1 h-px bg-slate-200 group-hover:bg-slate-300 transition-colors" />
+        <div className="flex-1 h-px bg-slate-100 group-hover:bg-slate-200 transition-colors" />
         <svg
           className={`w-3 h-3 text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? '' : '-rotate-90'}`}
           viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth={1.5}
