@@ -27,7 +27,9 @@ export function tableRowClass(isSelected: boolean, clickable: boolean): string {
   return [
     'border-b border-gray-100 transition-colors',
     clickable ? 'cursor-pointer' : '',
-    isSelected ? 'bg-blue-50' : 'hover:bg-gray-50',
+    isSelected
+      ? 'bg-blue-50 shadow-[inset_3px_0_0_#1e40af]'
+      : 'hover:bg-slate-100',
   ].join(' ');
 }
 
