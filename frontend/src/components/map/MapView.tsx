@@ -6,8 +6,11 @@ import TileLayer from "ol/layer/Tile";
 import DoubleClickZoom from "ol/interaction/DoubleClickZoom";
 import XYZ from "ol/source/XYZ";
 import { fromLonLat } from "ol/proj";
+import { extend as extendExtent } from "ol/extent";
 import GeoJSON from "ol/format/GeoJSON";
 import VectorTileSource from "ol/source/VectorTile";
+import type OlVectorTile from "ol/VectorTile";
+import type RenderFeature from "ol/render/Feature";
 import "ol/ol.css";
 
 import { BaseMapKey, baseMaps } from "./BaseMaps";
@@ -177,6 +180,10 @@ const MapView: React.FC<MapViewProps> = ({
   const comparisonCodeRef          = useRef<string | null>(null);
   const comparisonSelectionLayerRef = useRef<VectorTileLayer | null>(null);
   const hoveredSubCodeRef          = useRef<string | null>(null);
+  const subSourceRef               = useRef<VectorTileSource | null>(null);
+  // Maps feature code → merged bounding-box extent, built from tile features as
+  // they load. Lets us call view.fit() instantly on click with no WFS round-trip.
+  const extentCacheRef = useRef(new globalThis.Map<string, number[]>());
 
   // Keep latest prop refs so effects/callbacks always see current values
   // without needing them in dependency arrays.
@@ -520,10 +527,19 @@ const MapView: React.FC<MapViewProps> = ({
     if (comparisonSelectionLayerRef.current) { map.removeLayer(comparisonSelectionLayerRef.current); comparisonSelectionLayerRef.current = null; }
 
     hoveredCodeRef.current = null;
+    extentCacheRef.current.clear();
 
     const { url } = adminVectorTileLayers[adminLevel];
     const source = createVectorTileSource(url);
     sourceRef.current = source;
+
+    // Create the sub-level source once per admin level. Reused across all
+    // selections so tile fetches happen only once regardless of how many
+    // different regions the user clicks.
+    const subLevel = SUB_LEVEL[adminLevel];
+    subSourceRef.current = subLevel
+      ? createVectorTileSource(adminVectorTileLayers[subLevel].url)
+      : null;
 
     const fillLayer      = createVectorTileLayer(source);
     const boundaryLayer  = createBoundaryLayer(source);
@@ -557,8 +573,30 @@ const MapView: React.FC<MapViewProps> = ({
     };
     source.on('tileloadend', onTileLoad);
 
+    // Populate the extent cache as each tile arrives. Unioning tile-clipped
+    // extents across all loaded tiles gives a bounding box accurate enough for
+    // view.fit() — no WFS round-trip needed when the user clicks a feature.
+    const onCacheTile = (rawEvt: unknown) => {
+      const tile = (rawEvt as { tile: OlVectorTile<RenderFeature> }).tile;
+      for (const f of tile.getFeatures()) {
+        const code = String(f.get(featureCodeProperty) ?? '');
+        if (!code) { continue; }
+        const geom = f.getGeometry();
+        if (!geom) { continue; }
+        const ext = geom.getExtent();
+        const cached = extentCacheRef.current.get(code);
+        if (cached) {
+          extendExtent(cached, ext);
+        } else {
+          extentCacheRef.current.set(code, ext.slice());
+        }
+      }
+    };
+    source.on('tileloadend', onCacheTile);
+
     return () => {
       source.un('tileloadend', onTileLoad);
+      source.un('tileloadend', onCacheTile);
       // Effect re-ran before tiles arrived — remove outgoing layers now.
       if (!settled) {
         if (outgoingFillLayerRef.current) {
@@ -593,7 +631,19 @@ const MapView: React.FC<MapViewProps> = ({
     // StrictMode unmounts the first mount, so only the live view gets animated.
     const controller = new AbortController();
     const view       = map.getView();
-    zoomToWfsFeature(view, map, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_MAX_ZOOM[adminLevel], controller.signal);
+    const cachedExtent = extentCacheRef.current.get(selectedFeature.code);
+    if (cachedExtent) {
+      const size = map.getSize() ?? [800, 600];
+      const padH = Math.round(size[0] * 0.22);
+      const padV = Math.round(size[1] * 0.22);
+      view.fit([...cachedExtent] as [number, number, number, number], {
+        padding: [padV, padH, padV, padH],
+        maxZoom: LEVEL_MAX_ZOOM[adminLevel],
+        duration: 800,
+      });
+    } else {
+      zoomToWfsFeature(view, map, adminWfsLayers[adminLevel], featureCodeProperty, selectedFeature.code, LEVEL_MAX_ZOOM[adminLevel], controller.signal);
+    }
 
     // Selection outline (z=5) — shares source with main layer, no extra tile fetches
     const selLayer = createSelectionLayer(sourceRef.current, featureCodeProperty, selectedCodeRef);
@@ -605,10 +655,9 @@ const MapView: React.FC<MapViewProps> = ({
     const subLevel    = SUB_LEVEL[adminLevel];
     const filterProp  = SUB_LEVEL_FILTER_PROP[adminLevel];
     const subCodeProp = SUB_LEVEL_CODE_PROP[adminLevel];
-    if (subLevel && filterProp && subCodeProp) {
-      const subSource    = createVectorTileSource(adminVectorTileLayers[subLevel].url);
-      const subLayer     = createSubBoundaryLayer(subSource, filterProp, selectedFeature.code);
-      const subHighlight = createHighlightLayer(subSource, subCodeProp, hoveredSubCodeRef);
+    if (subLevel && filterProp && subCodeProp && subSourceRef.current) {
+      const subLayer     = createSubBoundaryLayer(subSourceRef.current, filterProp, selectedFeature.code);
+      const subHighlight = createHighlightLayer(subSourceRef.current, subCodeProp, hoveredSubCodeRef);
       subLayer.setZIndex(2);
       subHighlight.setZIndex(3);
       map.addLayer(subLayer);
