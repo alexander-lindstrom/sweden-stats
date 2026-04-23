@@ -26,7 +26,7 @@ interface TT {
   value: number;
 }
 
-const BAR_M      = { top: 20, right: 72, bottom: 50, left: 168 };
+const BAR_M      = { top: 20, right: 16, bottom: 50, left: 168 };
 const MAX_BARS   = 40;
 const MAX_BAR_H  = 20;   // max bar height in px
 const BAR_GAP    = 1;    // gap between bars in px
@@ -325,17 +325,6 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
         d3.select(e.currentTarget).attr('fill-opacity', 1);
         setTT(t => ({ ...t, visible: false }));
       });
-
-    // Value labels (right of bar).
-    g.selectAll<SVGTextElement, GeoHierarchyNode>('text.val')
-      .data(sorted)
-      .join('text').attr('class', 'val')
-      .attr('x', d => xScale(d.value) + 5)
-      .attr('y', d => yScale(d.name)! + yScale.bandwidth() / 2)
-      .attr('dy', '0.35em')
-      .attr('font-size', 11).attr('fill', '#6b7280')
-      .attr('pointer-events', 'none')
-      .text(d => fmtShort(d.value));
 
     // Y-axis — names, truncated to fit the left margin using actual render width.
     g.append('g')
