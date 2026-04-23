@@ -25,7 +25,7 @@ interface RankedBarChartProps {
   matchingAreas?: Set<string> | null;
 }
 
-const MARGIN = { top: 8, right: 80, bottom: 42, left: 148 };
+const MARGIN = { top: 8, right: 16, bottom: 42, left: 148 };
 const ROW_HEIGHT = 28;
 const BAR_RADIUS = 3;
 
@@ -51,7 +51,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
     }
 
     const left  = svgWidth < 480 ? 90  : MARGIN.left;
-    const right = svgWidth < 480 ? 62  : MARGIN.right;
+    const right = svgWidth < 480 ? 12  : MARGIN.right;
     const innerW = svgWidth  - left - right;
     const innerH = svgHeight - MARGIN.top  - MARGIN.bottom;
 
@@ -111,10 +111,10 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .attr('stroke', d =>
         d.code === comparisonFeature?.code ? CT.comparison
           : d.code === selectedFeature?.code ? CT.selected
-          : 'none'
+          : CT.barStroke
       )
       .attr('stroke-width', d =>
-        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0
+        d.code === comparisonFeature?.code || d.code === selectedFeature?.code ? 2 : 0.5
       )
       .style('cursor', 'pointer')
       .on('click', (event: MouseEvent, d) => {
@@ -147,18 +147,6 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
     };
     d3.select(svgRef.current)
       .on('mouseleave', () => { if (hoveredElRef.current !== null) { clearHighlight(); } });
-
-    // Value labels (right of bar)
-    g.selectAll('text.val')
-      .data(sorted)
-      .join('text')
-      .attr('class', 'val')
-      .attr('x', d => xScale(d.value) + 6)
-      .attr('y', d => yScale(d.code)! + yScale.bandwidth() / 2)
-      .attr('dy', '0.35em')
-      .attr('font-size', 11)
-      .attr('fill', CT.axisLabel)
-      .text(d => d.value.toLocaleString('sv-SE'));
 
     // Y-axis labels (region names)
     g.selectAll('text.label')

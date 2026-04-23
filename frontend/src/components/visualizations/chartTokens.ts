@@ -8,6 +8,7 @@ export const CT = {
   // Structure
   gridLine:    '#e5e7eb', // grid lines & row separators
   border:      '#d1d5db', // frame borders & shelf line
+  barStroke:   '#000',    // bar outlines
 
   // Text
   tickText:    '#9ca3af', // axis tick labels

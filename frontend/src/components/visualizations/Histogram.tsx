@@ -98,7 +98,8 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
         const mid = ((d.x0 ?? 0) + (d.x1 ?? 0)) / 2;
         return colorScale(mid);
       })
-      .attr('stroke', 'none')
+      .attr('stroke', CT.barStroke)
+      .attr('stroke-width', 0.5)
       .style('cursor', 'pointer')
       .on('mousemove', (event: MouseEvent, d) => {
         const el = event.currentTarget as SVGRectElement;

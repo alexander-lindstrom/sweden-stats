@@ -300,7 +300,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('width', d => xScale(d.value))
       .attr('height', yScale.bandwidth())
       .attr('fill', d => colorScale(d.name))
-      .attr('stroke', 'none')
+      .attr('stroke', CT.barStroke).attr('stroke-width', 0.5)
       .style('cursor', d => (d.children?.length ? 'pointer' : 'default'))
       .on('click', (e, d) => {
         if (d.children?.length) { drillDown(d); return; }
