@@ -1,4 +1,5 @@
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, TimeSeriesNode } from '../types';
+import { buildStrides } from '@/util/jsonstat';
 
 const DATA_URL = 'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB5512/data?outputFormat=json-stat2';
 
@@ -49,11 +50,7 @@ async function fetchKpiTimeSeries(): Promise<TimeSeriesNode[]> {
   if (!response.ok) { throw new Error(`SCB KPI fetch failed: ${response.statusText}`); }
   const raw: KpiApiResponse = await response.json();
 
-  // Compute strides for indexing into the flat value array.
-  const strides = new Array(raw.id.length).fill(1);
-  for (let i = raw.id.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * raw.size[i + 1];
-  }
+  const strides = buildStrides(raw.size);
   const catPos = raw.id.indexOf('VaruTjanstegrupp');
   const tidPos = raw.id.indexOf('Tid');
 

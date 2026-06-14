@@ -1,4 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildReverseIndex, buildStrides, parseScbValue, postScbQuery } from '@/util/jsonstat';
 import { AdminLevel, DatasetDescriptor, DatasetResult, DonutDatasetResult, ScalarDatasetResult, TimeSeriesNode } from '../types';
 import { stripCodePrefix } from '@/utils/labelFormatting';
 
@@ -36,18 +37,9 @@ const PRODUCTION_COLORS: Record<string, string> = {
   '4.3+4.4': '#8b5cf6', // violet-500 (nuclear)
 };
 
-const AVAILABLE_YEARS = Array.from({ length: 16 }, (_, i) => 2009 + i);
-
-// ── Metadata types ───────────────────────────────────────────────────────────
-
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
-  }>;
-}
+const FIRST_YEAR = 2009;
+const LAST_YEAR  = 2024;
+const AVAILABLE_YEARS = Array.from({ length: LAST_YEAR - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i);
 
 // ── Municipality code cache ──────────────────────────────────────────────────
 
@@ -74,31 +66,7 @@ async function getMunicipalityCodes(): Promise<{ codes: string[]; labels: Record
   return municipalityCodeCache;
 }
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-function buildReverseIndex(cat: { index: Record<string, number> }): Record<number, string> {
-  const map: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(cat.index)) { map[idx] = code; }
-  return map;
-}
-
-function buildStrides(sizes: number[]): number[] {
-  const strides = new Array(sizes.length).fill(1);
-  for (let i = sizes.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
-  return strides;
-}
-
-async function postQuery(selection: Array<{ variableCode: string; valueCodes: string[] }>): Promise<JsonStat2Response> {
-  const res = await fetch(DATA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selection }),
-  });
-  if (!res.ok) { throw new Error(`TAB3451 data fetch failed: ${res.status}`); }
-  return res.json();
-}
+void getMunicipalityCodes();
 
 // ── Shared scalar aggregation ─────────────────────────────────────────────────
 // Uses the SCB "Totalt" row when available; falls back to summing individual
@@ -136,19 +104,17 @@ function aggregateScalar(
         ?? stripCodePrefix(regionDim.category.label[code] ?? code);
     }
 
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) {
+    const num = parseScbValue(data.value[i]);
+    if (num === null) {
       if (prodCode === 'Totalt' && !(code in totals)) {
         totals[code] = null;
       }
       continue;
     }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
 
     if (prodCode === 'Totalt') {
       totals[code] = num;
-    } else {
+    } else if (typeof totals[code] !== 'number') {
       partials[code] = (partials[code] ?? 0) + num;
     }
   }
@@ -171,40 +137,36 @@ function aggregateScalar(
   return { kind: 'scalar', values: gwh, labels, label: 'Elproduktion', unit: 'GWh' };
 }
 
-// ── Fetch: Region (scalar) ───────────────────────────────────────────────────
+// ── Fetch: Scalar (shared by Region + Municipality) ──────────────────────────
 
-async function fetchByRegion(year: number): Promise<ScalarDatasetResult> {
-  const data = await postQuery([
-    { variableCode: 'Region',          valueCodes: REGION_CODES },
+async function fetchScalar(
+  regionCodes: string[],
+  year: number,
+  externalLabels?: Record<string, string>,
+): Promise<ScalarDatasetResult> {
+  const data = await postScbQuery(DATA_URL, [
+    { variableCode: 'Region',          valueCodes: regionCodes },
     { variableCode: 'Produktionssatt', valueCodes: [...PRODUCTION_CODES, 'Totalt'] },
     { variableCode: 'Bransle',         valueCodes: ['17'] },
     { variableCode: 'ContentsCode',    valueCodes: ['EN0203AD'] },
     { variableCode: 'Tid',             valueCodes: [String(year)] },
   ]);
-
-  return aggregateScalar(data);
+  return aggregateScalar(data, externalLabels);
 }
 
-// ── Fetch: Municipality (scalar) ─────────────────────────────────────────────
+async function fetchByRegion(year: number): Promise<ScalarDatasetResult> {
+  return fetchScalar(REGION_CODES, year);
+}
 
 async function fetchByMunicipality(year: number): Promise<ScalarDatasetResult> {
-  const { codes, labels: metaLabels } = await getMunicipalityCodes();
-
-  const data = await postQuery([
-    { variableCode: 'Region',          valueCodes: codes },
-    { variableCode: 'Produktionssatt', valueCodes: [...PRODUCTION_CODES, 'Totalt'] },
-    { variableCode: 'Bransle',         valueCodes: ['17'] },
-    { variableCode: 'ContentsCode',    valueCodes: ['EN0203AD'] },
-    { variableCode: 'Tid',             valueCodes: [String(year)] },
-  ]);
-
-  return aggregateScalar(data, metaLabels);
+  const { codes, labels } = await getMunicipalityCodes();
+  return fetchScalar(codes, year, labels);
 }
 
 // ── Fetch: Country donut (breakdown by production type) ──────────────────────
 
 async function fetchCountryDonut(year: number): Promise<DonutDatasetResult> {
-  const data = await postQuery([
+  const data = await postScbQuery(DATA_URL, [
     { variableCode: 'Region',          valueCodes: ['00'] },
     { variableCode: 'Produktionssatt', valueCodes: PRODUCTION_CODES },
     { variableCode: 'Bransle',         valueCodes: ['17'] },
@@ -222,10 +184,8 @@ async function fetchCountryDonut(year: number): Promise<DonutDatasetResult> {
   const totals: Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const prodIdx = Math.floor(i / strides[prodDimIdx]) % sizes[prodDimIdx];
     const code = indexToProd[prodIdx];
@@ -250,7 +210,7 @@ async function fetchCountryDonut(year: number): Promise<DonutDatasetResult> {
 async function fetchElproduktionTimeSeries(): Promise<TimeSeriesNode[]> {
   const yearCodes = AVAILABLE_YEARS.map(String);
 
-  const data = await postQuery([
+  const data = await postScbQuery(DATA_URL, [
     { variableCode: 'Region',          valueCodes: ['00'] },
     { variableCode: 'Produktionssatt', valueCodes: PRODUCTION_CODES },
     { variableCode: 'Bransle',         valueCodes: ['17'] },
@@ -270,10 +230,8 @@ async function fetchElproduktionTimeSeries(): Promise<TimeSeriesNode[]> {
   const totals: Record<string, Record<string, number>> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const prodCode = indexToProd[Math.floor(i / strides[prodDimIdx]) % sizes[prodDimIdx]];
     const tidCode  = indexToTid[Math.floor(i / strides[tidDimIdx]) % sizes[tidDimIdx]];
@@ -325,5 +283,5 @@ export const elproduktion: DatasetDescriptor = {
     Municipality: ['diverging', 'histogram', 'scatter', 'boxplot'],
   },
   fetch:           fetchElproduktion,
-  fetchTimeSeries: () => fetchElproduktionTimeSeries(),
+  fetchTimeSeries: fetchElproduktionTimeSeries,
 };

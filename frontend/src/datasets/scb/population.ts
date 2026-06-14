@@ -1,4 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildStrides, buildReverseIndex, parseScbValue, postScbQuery } from '@/util/jsonstat';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, GeoHierarchyNode } from '../types';
 import { stripLanSuffix, stripOuterParens, stripCodePrefix } from '@/utils/labelFormatting';
 import { getGeoLabels } from '../geoLabels';
@@ -31,16 +32,6 @@ export interface PyramidRow {
   ageLabel: string;  // display: '0–4', '5–9', ..., '80+'
   men:   number;     // absolute count
   women: number;
-}
-
-// Subset of JSON-stat2 returned by the /metadata endpoint (no value array).
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
-  }>;
 }
 
 // ── Municipality code cache ───────────────────────────────────────────────────
@@ -132,11 +123,7 @@ function aggregateByRegion(
 ): AggregatedData {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   if (regionDimIdx === -1) {
@@ -144,21 +131,12 @@ function aggregateByRegion(
   }
 
   const regionDim = data.dimension['Region'];
-  const indexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToCode[idx as number] = code;
-  }
+  const indexToCode = buildReverseIndex(regionDim.category);
 
   const values: Record<string, number> = {};
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) {
-      continue;
-    }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) {
-      continue;
-    }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
     if (code) {
@@ -186,11 +164,7 @@ function parseMultiYearByRegion(
 ): Record<number, Record<string, number>> {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   const tidDimIdx    = dimIds.indexOf('Tid');
@@ -198,19 +172,14 @@ function parseMultiYearByRegion(
   if (tidDimIdx    === -1) { throw new Error('SCB response missing "Tid" dimension'); }
 
   const regionDim = data.dimension['Region'];
-  const indexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToCode[idx as number] = code;
-  }
+  const indexToCode = buildReverseIndex(regionDim.category);
 
   const result: Record<number, Record<string, number>> = {};
   for (const year of years) { result[year] = {}; }
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const tidIdx    = Math.floor(i / strides[tidDimIdx])    % sizes[tidDimIdx];
@@ -349,36 +318,20 @@ function stripSuffixes(raw: AggregatedData): AggregatedData {
 
 // ── Fetch functions ──────────────────────────────────────────────────────────
 
-async function postDataQuery5444(selection: object[]): Promise<JsonStat2Response> {
-  const res = await fetch(DATA_URL_5444, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ selection }),
-  });
-  if (!res.ok) {
-    throw new Error(`SCB API error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+async function postDataQuery5444(
+  selection: Array<{ variableCode: string; valueCodes: string[] }>,
+): Promise<JsonStat2Response> {
+  return postScbQuery(DATA_URL_5444, selection);
 }
 
 async function postDataQuery6574(codes: string[]): Promise<JsonStat2Response> {
-  const res = await fetch(DATA_URL_6574, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      selection: [
-        { variableCode: 'Region',       valueCodes: codes },
-        { variableCode: 'Alder',        valueCodes: ['totalt'] },
-        { variableCode: 'Kon',          valueCodes: ['1+2'] },
-        { variableCode: 'ContentsCode', valueCodes: ['000007Y7'] },
-        { variableCode: 'Tid',          valueCodes: ['2024'] },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`SCB API error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+  return postScbQuery(DATA_URL_6574, [
+    { variableCode: 'Region',       valueCodes: codes },
+    { variableCode: 'Alder',        valueCodes: ['totalt'] },
+    { variableCode: 'Kon',          valueCodes: ['1+2'] },
+    { variableCode: 'ContentsCode', valueCodes: ['000007Y7'] },
+    { variableCode: 'Tid',          valueCodes: ['2024'] },
+  ]);
 }
 
 /**
@@ -392,10 +345,7 @@ function parsePyramidResponse(
 ): PyramidRow[] {
   const dimIds  = data.id;
   const sizes   = data.size;
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const alderDimIdx = dimIds.indexOf('Alder');
   const konDimIdx   = dimIds.indexOf('Kon');
@@ -407,10 +357,8 @@ function parsePyramidResponse(
   const womenValues: number[] = new Array(PYRAMID_AGE_CODES.length).fill(0);
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
     const ageIdx  = Math.floor(i / strides[alderDimIdx]) % sizes[alderDimIdx];
     const konIdx  = Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx];
     const bandIdx = bandForResponseIdx[ageIdx];

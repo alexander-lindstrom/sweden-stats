@@ -1,3 +1,5 @@
+import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildStrides, buildReverseIndex, parseScbValue, postScbQuery } from '@/util/jsonstat';
 import {
   AdminLevel, DatasetDescriptor, ElectionDatasetResult, TimeSeriesNode,
 } from '../types';
@@ -43,32 +45,11 @@ function metaUrl(tableId: string): string {
   return `https://api.scb.se/OV0104/v2beta/api/v2/tables/${tableId}/metadata`;
 }
 
-interface JsonStat2 {
-  id:        string[];
-  size:      number[];
-  value:     (number | null)[];
-  dimension: Record<string, {
-    category: { index: Record<string, number>; label: Record<string, string> };
-  }>;
-}
-
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: { index: Record<string, number>; label: Record<string, string> };
-  }>;
-}
-
 async function postQuery(
   tableId: string,
   selection: Array<{ variableCode: string; valueCodes: string[] }>,
-): Promise<JsonStat2> {
-  const res = await fetch(dataUrl(tableId), {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ selection }),
-  });
-  if (!res.ok) { throw new Error(`SCB v2beta ${tableId}: ${res.status} ${res.statusText}`); }
-  return res.json();
+): Promise<JsonStat2Response> {
+  return postScbQuery(dataUrl(tableId), selection);
 }
 
 // ── Municipality code cache (per table) ──────────────────────────────────────
@@ -104,14 +85,10 @@ async function getMuniCodes(
 // ── JSON-stat2 parser ─────────────────────────────────────────────────────────
 
 function parseElectionResponse(
-  data: JsonStat2,
+  data: JsonStat2Response,
 ): { counts: Record<string, Record<string, number>>; labels: Record<string, string> } {
   const { id: dimIds, size: sizes, value, dimension } = data;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   const partyDimIdx  = dimIds.indexOf('Partimm');
@@ -121,11 +98,8 @@ function parseElectionResponse(
 
   const regionDim = dimension['Region'];
   const partyDim  = dimension['Partimm'];
+  const indexToRegion = buildReverseIndex(regionDim.category);
 
-  const indexToRegion: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToRegion[idx as number] = code;
-  }
   const indexToParty: Record<number, string> = {};
   for (const [code, idx] of Object.entries(partyDim.category.index)) {
     indexToParty[idx as number] = normalizePartyCode(code);
@@ -133,10 +107,8 @@ function parseElectionResponse(
 
   const counts: Record<string, Record<string, number>> = {};
   for (let i = 0; i < value.length; i++) {
-    const raw = value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(value[i]);
+    if (num === null) { continue; }
 
     const regionIdx  = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const partyIdx   = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];
@@ -308,11 +280,7 @@ async function fetchElectionTimeSeries(
   ]);
 
   const { id: dimIds, size: sizes, value, dimension } = raw;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   const partyDimIdx  = dimIds.indexOf('Partimm');
@@ -321,10 +289,7 @@ async function fetchElectionTimeSeries(
     throw new Error(`Time series: missing dimensions. Got: ${dimIds.join(', ')}`);
   }
 
-  const regionIndexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(dimension['Region'].category.index)) {
-    regionIndexToCode[idx as number] = code;
-  }
+  const regionIndexToCode = buildReverseIndex(dimension['Region'].category);
   const partyIndexToCode: Record<number, string> = {};
   for (const [code, idx] of Object.entries(dimension['Partimm'].category.index)) {
     partyIndexToCode[idx as number] = normalizePartyCode(code);
@@ -338,10 +303,8 @@ async function fetchElectionTimeSeries(
   for (const yr of yearCodes) { yearPartyCount[yr] = {}; }
 
   for (let i = 0; i < value.length; i++) {
-    const val = value[i];
-    if (val === null || val === undefined) { continue; }
-    const num = typeof val === 'number' ? val : parseFloat(val as string);
-    if (isNaN(num) || num === 0) { continue; }
+    const num = parseScbValue(value[i]);
+    if (num === null || num === 0) { continue; }
 
     const regionIdx  = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const partyIdx   = Math.floor(i / strides[partyDimIdx])  % sizes[partyDimIdx];

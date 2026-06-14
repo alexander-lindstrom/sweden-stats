@@ -1,4 +1,5 @@
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult, TimeSeriesNode } from '../types';
+import { buildStrides } from '@/util/jsonstat';
 
 // ── TAB5311 ───────────────────────────────────────────────────────────────────
 // "Betygspoäng för elever på gymnasieskolan med slutbetyg efter svensk och
@@ -42,10 +43,7 @@ async function fetchGymnasiebetygTimeSeries(): Promise<TimeSeriesNode[]> {
     dimension: Record<string, { category: { index: Record<string, number>; label: Record<string, string> } }>;
   };
 
-  const strides = new Array(data.id.length).fill(1);
-  for (let i = data.id.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * data.size[i + 1];
-  }
+  const strides = buildStrides(data.size);
 
   const konDimIdx = data.id.indexOf('Kon');
   const tidDimIdx = data.id.indexOf('Tid');

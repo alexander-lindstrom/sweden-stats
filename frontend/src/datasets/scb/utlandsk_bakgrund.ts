@@ -1,4 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildStrides, buildReverseIndex, parseScbValue, postScbQuery } from '@/util/jsonstat';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
 import { getGeoLabels } from '../geoLabels';
 import { stripCodePrefix } from '@/utils/labelFormatting';
@@ -15,17 +16,6 @@ const DATA_URL =
 
 const METADATA_URL =
   'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB6571/metadata';
-
-// ── Shared types ──────────────────────────────────────────────────────────────
-
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
-  }>;
-}
 
 // ── Code cache ────────────────────────────────────────────────────────────────
 
@@ -83,11 +73,7 @@ function computeForeignPct(
 ): { values: Record<string, number>; labels: Record<string, string> } {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   const utlDimIdx    = dimIds.indexOf('UtlBakgrund');
@@ -97,11 +83,7 @@ function computeForeignPct(
 
   const regionDim = data.dimension['Region'];
   const utlDim    = data.dimension['UtlBakgrund'];
-
-  const indexToRegion: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToRegion[idx as number] = code;
-  }
+  const indexToRegion = buildReverseIndex(regionDim.category);
 
   const utlIdx = utlDim.category.index['1'] ?? -1;  // utländsk bakgrund
   const svkIdx = utlDim.category.index['2'] ?? -1;  // svensk bakgrund
@@ -110,10 +92,8 @@ function computeForeignPct(
   const swedishCount: Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const utl       = Math.floor(i / strides[utlDimIdx])    % sizes[utlDimIdx];
@@ -155,21 +135,13 @@ function stripSuffixes(raw: { values: Record<string, number>; labels: Record<str
 // ── Data query ────────────────────────────────────────────────────────────────
 
 async function postQuery(codes: string[], year: number): Promise<JsonStat2Response> {
-  const res = await fetch(DATA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      selection: [
-        { variableCode: 'Region',       valueCodes: codes              },
-        { variableCode: 'UtlBakgrund',  valueCodes: ['1', '2']         },
-        { variableCode: 'Kon',          valueCodes: ['1+2']            },
-        { variableCode: 'ContentsCode', valueCodes: ['000007Y4']       },
-        { variableCode: 'Tid',          valueCodes: [String(year)]     },
-      ],
-    }),
-  });
-  if (!res.ok) { throw new Error(`TAB6571 data fetch failed: ${res.status}`); }
-  return res.json();
+  return postScbQuery(DATA_URL, [
+    { variableCode: 'Region',       valueCodes: codes              },
+    { variableCode: 'UtlBakgrund',  valueCodes: ['1', '2']         },
+    { variableCode: 'Kon',          valueCodes: ['1+2']            },
+    { variableCode: 'ContentsCode', valueCodes: ['000007Y4']       },
+    { variableCode: 'Tid',          valueCodes: [String(year)]     },
+  ]);
 }
 
 // ── Fetch functions ───────────────────────────────────────────────────────────

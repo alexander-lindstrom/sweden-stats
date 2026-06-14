@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { buildStrides, buildReverseIndex, parseScbValue } from '@/util/jsonstat';
 import { AdminLevel, CategoryShare, CategoricalShareResult, DatasetDescriptor, DonutDatasetResult, TimeSeriesNode } from '../types';
 
 // ── TAB5325 ───────────────────────────────────────────────────────────────────
@@ -74,12 +75,6 @@ async function fetchRaw(schoolYears: string[]): Promise<ScbResponse> {
   return res.json();
 }
 
-function buildReverseIndex(cat: { index: Record<string, number> }): Record<number, string> {
-  const map: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(cat.index)) { map[idx] = code; }
-  return map;
-}
-
 // ── Constants for gender ──────────────────────────────────────────────────────
 
 const MAN_CODE    = '1';
@@ -98,20 +93,15 @@ async function fetchAntalSnapshot(year: number): Promise<DonutDatasetResult> {
 
   const dimIds  = data.id;
   const sizes   = data.size;
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const fieldDimIdx  = dimIds.indexOf('UtbildnOmr');
   const indexToField = buildReverseIndex(data.dimension['UtbildnOmr'].category);
   const totals: Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
     const fieldCode = indexToField[Math.floor(i / strides[fieldDimIdx]) % sizes[fieldDimIdx]];
     if (!fieldCode) { continue; }
     totals[fieldCode] = (totals[fieldCode] ?? 0) + num;
@@ -140,10 +130,7 @@ async function fetchAntalTimeSeries(): Promise<TimeSeriesNode[]> {
 
   const dimIds  = data.id;
   const sizes   = data.size;
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const fieldDimIdx  = dimIds.indexOf('UtbildnOmr');
   const tidDimIdx    = dimIds.indexOf('Tid');
@@ -153,10 +140,8 @@ async function fetchAntalTimeSeries(): Promise<TimeSeriesNode[]> {
   const totals: Record<string, Record<string, number>> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const fieldCode = indexToField[Math.floor(i / strides[fieldDimIdx]) % sizes[fieldDimIdx]];
     const sy        = indexToTid  [Math.floor(i / strides[tidDimIdx])   % sizes[tidDimIdx]];
@@ -202,10 +187,7 @@ async function fetchSnapshot(year: number): Promise<CategoricalShareResult> {
 
   const dimIds = data.id;
   const sizes  = data.size;
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const fieldDimIdx = dimIds.indexOf('UtbildnOmr');
   const konDimIdx   = dimIds.indexOf('Kon');
@@ -216,10 +198,8 @@ async function fetchSnapshot(year: number): Promise<CategoricalShareResult> {
   const counts: Record<string, Record<string, number>> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const fieldCode = indexToField[Math.floor(i / strides[fieldDimIdx]) % sizes[fieldDimIdx]];
     const konCode   = indexToKon  [Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx]];
@@ -250,10 +230,7 @@ async function fetchGenderTimeSeries(): Promise<TimeSeriesNode[]> {
 
   const dimIds = data.id;
   const sizes  = data.size;
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const fieldDimIdx = dimIds.indexOf('UtbildnOmr');
   const konDimIdx   = dimIds.indexOf('Kon');
@@ -267,10 +244,8 @@ async function fetchGenderTimeSeries(): Promise<TimeSeriesNode[]> {
   const counts: Record<string, Record<string, Record<string, number>>> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const fieldCode = indexToField[Math.floor(i / strides[fieldDimIdx]) % sizes[fieldDimIdx]];
     const konCode   = indexToKon  [Math.floor(i / strides[konDimIdx])   % sizes[konDimIdx]];

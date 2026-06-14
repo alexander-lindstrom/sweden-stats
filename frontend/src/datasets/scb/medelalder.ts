@@ -1,4 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildStrides, buildReverseIndex, parseScbValue } from '@/util/jsonstat';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
 import { getGeoLabels } from '../geoLabels';
 
@@ -44,17 +45,6 @@ const AGE_BANDS: { code: string; midpoint: number }[] = [
   { code: '75-79',midpoint: 77.5 },
   { code: '80-',  midpoint: 85.0 },
 ];
-
-// ── Shared types ──────────────────────────────────────────────────────────────
-
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
-  }>;
-}
 
 // ── Municipality code cache (TAB637) ─────────────────────────────────────────
 
@@ -112,27 +102,18 @@ function aggregateByRegion(
 ): { values: Record<string, number>; labels: Record<string, string> } {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   if (regionDimIdx === -1) {throw new Error('SCB response missing "Region" dimension');}
 
   const regionDim = data.dimension['Region'];
-  const indexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToCode[idx as number] = code;
-  }
+  const indexToCode = buildReverseIndex(regionDim.category);
 
   const values: Record<string, number> = {};
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) {continue;}
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) {continue;}
+    const num = parseScbValue(data.value[i]);
+    if (num === null) {continue;}
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
     if (code) {values[code] = (values[code] ?? 0) + num;}
@@ -217,11 +198,7 @@ async function fetchBySmallArea(codes: string[]): Promise<ScalarDatasetResult> {
   const data: JsonStat2Response = await res.json();
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   const alderDimIdx  = dimIds.indexOf('Alder');
@@ -231,11 +208,7 @@ async function fetchBySmallArea(codes: string[]): Promise<ScalarDatasetResult> {
 
   const regionDim = data.dimension['Region'];
   const alderDim  = data.dimension['Alder'];
-
-  const indexToRegion: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToRegion[idx as number] = code;
-  }
+  const indexToRegion = buildReverseIndex(regionDim.category);
 
   // Map Alder index → midpoint
   const indexToMidpoint: Record<number, number> = {};
@@ -249,10 +222,8 @@ async function fetchBySmallArea(codes: string[]): Promise<ScalarDatasetResult> {
   const totalCount:  Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) {continue;}
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num) || num === 0) {continue;}
+    const num = parseScbValue(data.value[i]);
+    if (num === null || num === 0) {continue;}
 
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const alderIdx  = Math.floor(i / strides[alderDimIdx])  % sizes[alderDimIdx];

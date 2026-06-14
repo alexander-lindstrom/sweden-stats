@@ -1,4 +1,5 @@
 import { JsonStat2Response } from '@/util/scb';
+import { MetadataResponse, buildStrides, buildReverseIndex, parseScbValue } from '@/util/jsonstat';
 import { AdminLevel, DatasetDescriptor, ScalarDatasetResult } from '../types';
 import { getGeoLabels } from '../geoLabels';
 
@@ -24,17 +25,6 @@ const TAB6680_DATA_URL =
 
 const TAB6680_METADATA_URL =
   'https://api.scb.se/OV0104/v2beta/api/v2/tables/TAB6680/metadata';
-
-// ── Shared types ──────────────────────────────────────────────────────────────
-
-interface MetadataResponse {
-  dimension: Record<string, {
-    category: {
-      index: Record<string, number>;
-      label: Record<string, string>;
-    };
-  }>;
-}
 
 // ── TAB2921 code cache ────────────────────────────────────────────────────────
 
@@ -118,27 +108,18 @@ function extractByRegion(
 ): { values: Record<string, number>; labels: Record<string, string> } {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx = dimIds.indexOf('Region');
   if (regionDimIdx === -1) { throw new Error('SCB response missing Region dimension'); }
 
   const regionDim = data.dimension['Region'];
-  const indexToCode: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToCode[idx as number] = code;
-  }
+  const indexToCode = buildReverseIndex(regionDim.category);
 
   const values: Record<string, number> = {};
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
     const regionIdx = Math.floor(i / strides[regionDimIdx]) % sizes[regionDimIdx];
     const code = indexToCode[regionIdx];
     if (code) { values[code] = num; }
@@ -155,11 +136,7 @@ function computeEmploymentRate(
 ): { values: Record<string, number>; labels: Record<string, string> } {
   const dimIds = data.id;
   const sizes  = data.size;
-
-  const strides = new Array(dimIds.length).fill(1);
-  for (let i = dimIds.length - 2; i >= 0; i--) {
-    strides[i] = strides[i + 1] * sizes[i + 1];
-  }
+  const strides = buildStrides(sizes);
 
   const regionDimIdx   = dimIds.indexOf('Region');
   const contentsDimIdx = dimIds.indexOf('ContentsCode');
@@ -169,11 +146,7 @@ function computeEmploymentRate(
 
   const regionDim   = data.dimension['Region'];
   const contentsDim = data.dimension['ContentsCode'];
-
-  const indexToRegion: Record<number, string> = {};
-  for (const [code, idx] of Object.entries(regionDim.category.index)) {
-    indexToRegion[idx as number] = code;
-  }
+  const indexToRegion = buildReverseIndex(regionDim.category);
 
   const employedIdx = contentsDim.category.index['0000089X'] ?? -1;
   const totalIdx    = contentsDim.category.index['0000089Y'] ?? -1;
@@ -182,10 +155,8 @@ function computeEmploymentRate(
   const total:    Record<string, number> = {};
 
   for (let i = 0; i < data.value.length; i++) {
-    const raw = data.value[i];
-    if (raw === null || raw === undefined) { continue; }
-    const num = typeof raw === 'number' ? raw : parseFloat(raw as string);
-    if (isNaN(num)) { continue; }
+    const num = parseScbValue(data.value[i]);
+    if (num === null) { continue; }
 
     const regionIdx = Math.floor(i / strides[regionDimIdx])   % sizes[regionDimIdx];
     const cIdx      = Math.floor(i / strides[contentsDimIdx]) % sizes[contentsDimIdx];
