@@ -16,11 +16,13 @@ import { grundskolaMerit } from './kolada/grundskolaMerit';
 import { valdeltagande } from './kolada/valdeltagande';
 import { ekonomisktBistand } from './kolada/ekonomisktBistand';
 import { aldreomsorg } from './kolada/aldreomsorg';
+import { elproduktion } from './scb/elproduktion';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
   utbildningsniva, konsfordelning, gymnasiebetyg, hogskolestudenterAntal, hogskolestudenter,
   stateExpenses, kpi,
+  elproduktion,
   riksdagsval, regionval, kommunval,
   kommunalskatt, grundskolaMerit, valdeltagande, ekonomisktBistand, aldreomsorg,
 ];
