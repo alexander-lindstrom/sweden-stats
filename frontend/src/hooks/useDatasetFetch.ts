@@ -22,6 +22,8 @@ export function useDatasetFetch(
   activeParty?:      string | null,
   /** Complete merged dataset list (static registry + any extras). Defaults to DATASETS. */
   allDatasets?:      DatasetDescriptor[],
+  /** Active breakdown dimension (e.g. consumer category vs fuel type). */
+  activeBreakdownId?: string | null,
 ): DatasetFetchResult {
   const [datasetResult, setDatasetResult] = useState<DatasetResult | null>(null);
   const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
@@ -39,12 +41,12 @@ export function useDatasetFetch(
   // the async .then() will deliver it in the same event-loop tick anyway,
   // so clearing first just causes a needless blank-choropleth flash.
   useEffect(() => {
-    if (!isCached(selectedDatasetId ?? '', selectedLevel, selectedYearRef.current)) {
+    if (!isCached(selectedDatasetId ?? '', selectedLevel, selectedYearRef.current, activeBreakdownId ?? undefined)) {
       setDatasetResult(null);
       setColorScale(null);
       setMapColorFn(null);
     }
-  }, [selectedDatasetId, selectedLevel]);
+  }, [selectedDatasetId, selectedLevel, activeBreakdownId]);
 
   useEffect(() => {
     if (!selectedDatasetId) { return; }
@@ -57,7 +59,7 @@ export function useDatasetFetch(
 
     setLoading(true);
 
-    fetchCached(descriptor, selectedLevel, selectedYear)
+    fetchCached(descriptor, selectedLevel, selectedYear, activeBreakdownId ?? undefined)
       .then((result) => {
         if (gen !== fetchGenRef.current) { return; }
 
@@ -124,7 +126,7 @@ export function useDatasetFetch(
         const idx        = ADMIN_LEVELS.indexOf(selectedLevel);
         const neighbours = [ADMIN_LEVELS[idx - 1], ADMIN_LEVELS[idx + 1]]
           .filter((l): l is AdminLevel => l !== undefined);
-        preload(descriptor, neighbours, selectedYear);
+        preload(descriptor, neighbours, selectedYear, activeBreakdownId ?? undefined);
       })
       .catch((err) => {
         if (gen === fetchGenRef.current) {
@@ -132,7 +134,7 @@ export function useDatasetFetch(
           setLoading(false);
         }
       });
-  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets]);
+  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId]);
 
   return { datasetResult, colorScale, mapColorFn, loading };
 }

@@ -138,11 +138,14 @@ export interface DatasetDescriptor {
   /** Maps sunburst drill depth to AdminLevel for geographic navigation.
    *  Omit for non-geographic datasets (e.g. state expenses). */
   sunburstDepthToLevel?: AdminLevel[];
-  fetch: (level: AdminLevel, year: number) => Promise<DatasetResult>;
+  /** Switchable breakdown dimensions (e.g. consumer category vs fuel type). Shown as a Dropdown when present. */
+  breakdownOptions?: { id: string; label: string; timeSeriesLabel?: string }[];
+  defaultBreakdownId?: string;
+  fetch: (level: AdminLevel, year: number, breakdownId?: string) => Promise<DatasetResult>;
   fetchHierarchy?: (year: number) => Promise<GeoHierarchyNode>;
   /** Pass featureCode to get area-specific time series (e.g. a county or municipality).
    *  Omit for national/global aggregate. */
-  fetchTimeSeries?: (level: AdminLevel, featureCode?: string) => Promise<TimeSeriesNode[]>;
+  fetchTimeSeries?: (level: AdminLevel, featureCode?: string, breakdownId?: string) => Promise<TimeSeriesNode[]>;
 }
 
 export interface FilterCriterion {

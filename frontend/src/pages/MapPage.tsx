@@ -195,8 +195,24 @@ export default function MapPage() {
     scatterableDatasets,
   } = view;
 
+  // ── Breakdown dimension (e.g. consumer category vs fuel type) ────────
+  const [activeBreakdownId, setActiveBreakdownId] = useState<string | null>(
+    initialValues.activeBreakdownId ?? null,
+  );
+
+  // Reset breakdown when dataset changes.
+  useEffect(() => {
+    if (!activeDescriptor) { setActiveBreakdownId(null); return; }
+    const opts = activeDescriptor.breakdownOptions;
+    if (!opts) { setActiveBreakdownId(null); return; }
+    setActiveBreakdownId(prev => {
+      if (prev && opts.some(o => o.id === prev)) { return prev; }
+      return activeDescriptor.defaultBreakdownId ?? opts[0].id;
+    });
+  }, [activeDescriptor]);
+
   const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
-    selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets,
+    selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId,
   );
 
   const scalarResult        = datasetResult?.kind === 'scalar'            ? datasetResult as ScalarDatasetResult : null;
@@ -292,7 +308,7 @@ export default function MapPage() {
   } = areaFilter;
 
   const { data: timeSeriesData, loading: timeSeriesLoading } = useTimeSeriesFetch(
-    activeDescriptor, activeChartType, selectedLevel, timeSeriesFeatureCode,
+    activeDescriptor, activeChartType, selectedLevel, timeSeriesFeatureCode, activeBreakdownId,
   );
 
   const election = useElectionDerivedData({
@@ -362,13 +378,13 @@ export default function MapPage() {
     syncUrl({
       selectedLevel, selectedFeature, comparisonFeature,
       selectedDatasetId, selectedYear, activeParty,
-      activeView, activeChartType,
+      activeView, activeChartType, activeBreakdownId,
     });
   }, [
     syncUrl,
     selectedLevel, selectedFeature, comparisonFeature,
     selectedDatasetId, selectedYear, activeParty,
-    activeView, activeChartType,
+    activeView, activeChartType, activeBreakdownId,
   ]);
 
   // Color function for bivariate mode: maps (code) → 3×3 palette hex.
@@ -608,7 +624,7 @@ export default function MapPage() {
           <div className={`flex-1 flex flex-col min-h-0 min-w-0 ${isContentSized ? '' : 'overflow-hidden'}`}>
           {/* Chart type sub-selector */}
           {activeView === 'chart' && availableChartTypes.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 px-4 py-2.5 border-b border-slate-100 flex-shrink-0">
               {availableChartTypes.map(ct => (
                 <button
                   key={ct}
@@ -623,6 +639,17 @@ export default function MapPage() {
                   {CHART_TYPE_LABELS[ct]}
                 </button>
               ))}
+              {activeDescriptor?.breakdownOptions && activeDescriptor.breakdownOptions.length > 1 && (activeChartType === 'donut' || activeChartType === 'multiline') && (
+                <>
+                  <span className="w-px h-4 bg-slate-200 mx-1" />
+                  <Dropdown
+                    value={activeBreakdownId ?? activeDescriptor.defaultBreakdownId ?? activeDescriptor.breakdownOptions[0].id}
+                    onChange={setActiveBreakdownId}
+                    options={activeDescriptor.breakdownOptions.map(o => ({ value: o.id, label: o.label }))}
+                    inputSize="sm"
+                  />
+                </>
+              )}
             </div>
           )}
 
@@ -831,7 +858,8 @@ export default function MapPage() {
                       data={timeSeriesData}
                       label={timeSeriesFeatureCode
                         ? (COUNTY_NAMES[timeSeriesFeatureCode] ?? electionResult?.labels[timeSeriesFeatureCode] ?? selectedFeature?.label ?? activeDescriptor?.label)
-                        : (activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
+                        : (activeDescriptor?.breakdownOptions?.find(o => o.id === activeBreakdownId)?.timeSeriesLabel
+                            ?? activeDescriptor?.timeSeriesLabel ?? activeDescriptor?.label)}
                       unit={activeDescriptor?.timeSeriesUnit}
                       colorOverrides={partyColorOverrides}
                     />

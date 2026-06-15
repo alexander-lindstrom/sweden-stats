@@ -17,12 +17,14 @@ import { valdeltagande } from './kolada/valdeltagande';
 import { ekonomisktBistand } from './kolada/ekonomisktBistand';
 import { aldreomsorg } from './kolada/aldreomsorg';
 import { elproduktion } from './scb/elproduktion';
+import { energikonsumtion } from './scb/energikonsumtion';
+import { elbalansAbsolut, elbalansKvot } from './scb/elbalans';
 
 export const DATASETS: DatasetDescriptor[] = [
   population, medelalder, medianinkomst, utlandskBakgrund, sysselsattning,
   utbildningsniva, konsfordelning, gymnasiebetyg, hogskolestudenterAntal, hogskolestudenter,
   stateExpenses, kpi,
-  elproduktion,
+  elproduktion, energikonsumtion, elbalansAbsolut, elbalansKvot,
   riksdagsval, regionval, kommunval,
   kommunalskatt, grundskolaMerit, valdeltagande, ekonomisktBistand, aldreomsorg,
 ];

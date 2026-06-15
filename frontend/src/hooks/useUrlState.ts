@@ -19,6 +19,7 @@ export interface UrlInitialValues {
   activeParty:       string | null;
   activeView:        ViewType | null;
   activeChartType:   ChartType | null;
+  activeBreakdownId: string | null;
 }
 
 export interface UrlSyncState {
@@ -30,6 +31,7 @@ export interface UrlSyncState {
   activeParty:       string | null;
   activeView:        ViewType;
   activeChartType:   ChartType;
+  activeBreakdownId: string | null;
 }
 
 function parseInitialValues(p: URLSearchParams): UrlInitialValues {
@@ -72,11 +74,12 @@ function parseInitialValues(p: URLSearchParams): UrlInitialValues {
     : null;
 
   const activeParty = p.get('party') || null;
+  const activeBreakdownId = p.get('breakdown') || null;
 
   return {
     selectedLevel, selectedFeature, comparisonFeature,
     selectedDatasetId, selectedYear, activeParty,
-    activeView, activeChartType,
+    activeView, activeChartType, activeBreakdownId,
   };
 }
 
@@ -131,6 +134,10 @@ export function useUrlState(): { initialValues: UrlInitialValues; syncUrl: (stat
 
     if (state.activeParty) {
       params.party = state.activeParty;
+    }
+
+    if (state.activeBreakdownId) {
+      params.breakdown = state.activeBreakdownId;
     }
 
     // Omit chart type when it's the default to keep URLs clean.

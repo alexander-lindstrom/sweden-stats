@@ -22,16 +22,19 @@ const resultInFlight      = new Map<string, Promise<DatasetResult>>();
 const hierarchyInFlight   = new Map<string, Promise<GeoHierarchyNode>>();
 const timeSeriesInFlight  = new Map<string, Promise<TimeSeriesNode[]>>();
 
-function resultKey(datasetId: string, level: AdminLevel, year: number): string {
-  return `${datasetId}:${level}:${year}`;
+function resultKey(datasetId: string, level: AdminLevel, year: number, breakdownId?: string): string {
+  const base = `${datasetId}:${level}:${year}`;
+  return breakdownId ? `${base}:${breakdownId}` : base;
 }
 
 function hierarchyKey(datasetId: string, year: number): string {
   return `${datasetId}:${year}`;
 }
 
-function timeSeriesKey(datasetId: string, level: AdminLevel, featureCode?: string): string {
-  return featureCode ? `${datasetId}:${level}:${featureCode}` : `${datasetId}:${level}`;
+function timeSeriesKey(datasetId: string, level: AdminLevel, featureCode?: string, breakdownId?: string): string {
+  let key = featureCode ? `${datasetId}:${level}:${featureCode}` : `${datasetId}:${level}`;
+  if (breakdownId) { key += `:${breakdownId}`; }
+  return key;
 }
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -41,8 +44,9 @@ export function fetchCached(
   descriptor: DatasetDescriptor,
   level: AdminLevel,
   year: number,
+  breakdownId?: string,
 ): Promise<DatasetResult> {
-  const key = resultKey(descriptor.id, level, year);
+  const key = resultKey(descriptor.id, level, year, breakdownId);
   const t0  = performance.now();
 
   const cached = resultCache.get(key);
@@ -62,7 +66,7 @@ export function fetchCached(
         return idbResult;
       }
 
-      const result = await descriptor.fetch(level, year);
+      const result = await descriptor.fetch(level, year, breakdownId);
       resultCache.set(key, result);
       idbSet(key, result).catch(() => {});
       recordFetch({ key, source: 'network', durationMs: performance.now() - t0 });
@@ -115,10 +119,11 @@ export async function fetchTimeSeriesCached(
   descriptor: DatasetDescriptor,
   level: AdminLevel,
   featureCode?: string,
+  breakdownId?: string,
 ): Promise<TimeSeriesNode[] | null> {
   if (!descriptor.fetchTimeSeries) { return null; }
 
-  const key = timeSeriesKey(descriptor.id, level, featureCode);
+  const key = timeSeriesKey(descriptor.id, level, featureCode, breakdownId);
 
   const cached = timeSeriesCache.get(key);
   if (cached) { return cached; }
@@ -127,7 +132,7 @@ export async function fetchTimeSeriesCached(
   if (inflight) { return inflight; }
 
   const promise = descriptor
-    .fetchTimeSeries(level, featureCode)
+    .fetchTimeSeries(level, featureCode, breakdownId)
     .then(result => {
       timeSeriesCache.set(key, result);
       timeSeriesInFlight.delete(key);
@@ -146,17 +151,17 @@ export async function fetchTimeSeriesCached(
  * Fire-and-forget background preload for the given descriptor + levels.
  * Safe to call at any time — silently skips already-cached or in-flight keys.
  */
-export function preload(descriptor: DatasetDescriptor, levels: AdminLevel[], year: number): void {
+export function preload(descriptor: DatasetDescriptor, levels: AdminLevel[], year: number, breakdownId?: string): void {
   for (const level of levels) {
     if (!descriptor.supportedLevels.includes(level)) { continue; }
     if (descriptor.availableYears.length > 0 && !descriptor.availableYears.includes(year)) { continue; }
-    const key = resultKey(descriptor.id, level, year);
+    const key = resultKey(descriptor.id, level, year, breakdownId);
     if (resultCache.has(key) || resultInFlight.has(key)) {continue;}
-    fetchCached(descriptor, level, year).catch(() => { /* ignore background errors */ });
+    fetchCached(descriptor, level, year, breakdownId).catch(() => { /* ignore background errors */ });
   }
 }
 
 /** True if the result for this key is already in cache (instant access). */
-export function isCached(datasetId: string, level: AdminLevel, year: number): boolean {
-  return resultCache.has(resultKey(datasetId, level, year));
+export function isCached(datasetId: string, level: AdminLevel, year: number, breakdownId?: string): boolean {
+  return resultCache.has(resultKey(datasetId, level, year, breakdownId));
 }

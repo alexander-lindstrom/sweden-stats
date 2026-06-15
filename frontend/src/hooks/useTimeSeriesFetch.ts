@@ -13,6 +13,8 @@ export function useTimeSeriesFetch(
   selectedLevel:    AdminLevel,
   /** When set, fetches area-specific time series instead of national aggregate. */
   featureCode?:     string | null,
+  /** Active breakdown dimension (e.g. consumer category vs fuel type). */
+  activeBreakdownId?: string | null,
 ): TimeSeriesFetchResult {
   const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesNode[] | null>(null);
   const [loading,        setLoading]        = useState(false);
@@ -30,7 +32,7 @@ export function useTimeSeriesFetch(
     setTimeSeriesData(null);
     const gen = ++fetchGenRef.current;
     setLoading(true);
-    fetchTimeSeriesCached(activeDescriptor, selectedLevel, featureCode ?? undefined)
+    fetchTimeSeriesCached(activeDescriptor, selectedLevel, featureCode ?? undefined, activeBreakdownId ?? undefined)
       .then(result => {
         if (gen !== fetchGenRef.current) { return; }
         setTimeSeriesData(result);
@@ -41,7 +43,7 @@ export function useTimeSeriesFetch(
         console.error('Time series fetch failed:', err);
         setLoading(false);
       });
-  }, [activeChartType, activeDescriptor, selectedLevel, featureCode]);
+  }, [activeChartType, activeDescriptor, selectedLevel, featureCode, activeBreakdownId]);
 
   return { data: timeSeriesData, loading };
 }
