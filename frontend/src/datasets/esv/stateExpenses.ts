@@ -27,7 +27,8 @@ async function fetchExpensesHierarchy(year: number): Promise<GeoHierarchyNode> {
     throw new Error(`Expenses API error: ${res.status} ${res.statusText}`);
   }
   const data: RawNode = await res.json();
-  return mapNode(data);
+  // The ESV file names the root "Total Budget <year>"; the UI is Swedish.
+  return { ...mapNode(data), name: `Statens utgifter ${year}` };
 }
 
 const EMPTY_RESULT: ScalarDatasetResult = { kind: 'scalar', values: {}, labels: {}, label: 'Statens utgifter', unit: 'mnkr' };

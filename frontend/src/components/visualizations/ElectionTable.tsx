@@ -5,6 +5,7 @@ import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { useTableSort, tableRowClass, TH } from '@/hooks/useTableSort';
 import { SortIndicator } from '@/components/ui/SortIndicator';
+import { formatNumber } from '@/utils/format';
 
 interface Props {
   data: ElectionDatasetResult;
@@ -124,7 +125,7 @@ export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatur
                 {presentParties.map(p => (
                   <td key={p} className="text-right px-2 py-2 tabular-nums text-xs">
                     {(row.votes[p] ?? 0) > 0
-                      ? <span className="text-gray-700">{row.votes[p].toFixed(1)}<span className="text-gray-400 ml-0.5">%</span></span>
+                      ? <span className="text-gray-700">{formatNumber(row.votes[p], 1)}<span className="text-gray-400 ml-0.5">%</span></span>
                       : <span className="text-gray-300">—</span>
                     }
                   </td>
@@ -150,7 +151,7 @@ export const ElectionTable: React.FC<Props> = ({ data, selectedFeature, onFeatur
               <div key={p} className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: PARTY_COLORS[p] ?? '#ccc' }} />
                 <span className="text-slate-300">{PARTY_LABELS[p] ?? p}</span>
-                <span className="ml-auto tabular-nums text-slate-100 pl-4">{share.toFixed(1)}%</span>
+                <span className="ml-auto tabular-nums text-slate-100 pl-4">{formatNumber(share, 1)}%</span>
               </div>
             );
           })}

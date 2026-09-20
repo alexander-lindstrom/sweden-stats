@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { UI } from '@/theme';
 import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
+import { formatNumber } from '@/utils/format';
 
 const STAT_YEAR     = AREA_STATS_YEAR;
 const PYRAMID_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
@@ -32,10 +33,7 @@ function StatMini({ label, value, mean, unit }: {
 }) {
   const delta = value !== null && mean !== null ? value - mean : null;
 
-  const fmtDelta = (d: number) =>
-    Math.abs(d) < 100
-      ? Math.abs(d).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-      : Math.round(Math.abs(d)).toLocaleString('sv-SE');
+  const fmtDelta = (d: number) => formatNumber(Math.abs(d));
 
   return (
     <div className={`${UI.card} min-w-0`}>
@@ -44,7 +42,7 @@ function StatMini({ label, value, mean, unit }: {
         <div className="text-sm text-slate-300">—</div>
       ) : (
         <>
-          <div className={`${UI.statValue} truncate`}>{value.toLocaleString('sv-SE')}</div>
+          <div className={`${UI.statValue} truncate`}>{formatNumber(value)}</div>
           {unit && <div className={UI.statUnit}>{unit}</div>}
           {delta !== null && (
             <div className={`text-[10px] tabular-nums mt-1 leading-tight ${

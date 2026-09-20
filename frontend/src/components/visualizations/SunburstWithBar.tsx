@@ -5,6 +5,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { CT } from './chartTokens';
 import { drawChartFrame } from './chartFrame';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 interface Props {
   root: GeoHierarchyNode;
@@ -39,12 +40,6 @@ function findNode(node: GeoHierarchyNode, code: string, path: GeoHierarchyNode[]
     if (result) { return result; }
   }
   return null;
-}
-
-function fmtShort(v: number): string {
-  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
-  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
-  return v.toLocaleString('sv-SE');
 }
 
 export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureSelect, onComparisonSelect, depthToLevel, onSelectionLevelChange, initialCode }) => {
@@ -225,7 +220,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       .attr('text-anchor', 'middle').attr('dy', drilled ? '0.6em' : '1em')
       .attr('font-size', valFontSize).attr('fill', '#6b7280')
       .attr('pointer-events', 'none')
-      .text(`${fmtShort(focus.value)} ${unit}`);
+      .text(formatWithUnit(focus.value, unit, true));
     if (drilled) {
       g.append('text')
         .attr('text-anchor', 'middle').attr('dy', '2.2em')
@@ -347,12 +342,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
     // X-axis.
     g.append('g')
       .attr('transform', `translate(0,${vOffset + effH})`)
-      .call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(innerW / 55))).tickFormat(n => {
-        const v = n.valueOf();
-        return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
-             : v >= 1_000     ? `${(v / 1_000).toFixed(0)}k`
-             : String(v);
-      }))
+      .call(d3.axisBottom(xScale).ticks(Math.max(2, Math.floor(innerW / 55))).tickFormat(n => formatCompact(n.valueOf())))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
       .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));
@@ -376,7 +366,7 @@ export const SunburstWithBar: React.FC<Props> = ({ root, unit, label, onFeatureS
       <svg ref={barRef} className="flex-1 min-w-0" />
       <Tooltip ref={tooltipRef} visible={tt.visible}>
         <div className="font-medium">{tt.name}</div>
-        <div className="text-gray-400 mt-0.5">{fmtShort(tt.value)} {unit}</div>
+        <div className="text-gray-400 mt-0.5">{formatWithUnit(tt.value, unit)}</div>
       </Tooltip>
     </div>
   );

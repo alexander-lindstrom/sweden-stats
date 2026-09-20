@@ -39,6 +39,7 @@ import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cleanCountyLabel } from "@/utils/labelFormatting";
+import { formatWithUnit } from '@/utils/format';
 
 // Maximum zoom applied when fitting a feature's extent into view.
 // Prevents tiny features (a small DeSO) from zooming in absurdly close.
@@ -751,7 +752,7 @@ const MapView: React.FC<MapViewProps> = ({
             )}
             {hoveredFeature.tooltip === null && hoveredFeature.value !== null && (
               <div className="text-gray-300">
-                {hoveredFeature.value.toLocaleString('sv-SE')} {unit}
+                {formatWithUnit(hoveredFeature.value, unit)}
               </div>
             )}
           </>

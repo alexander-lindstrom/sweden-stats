@@ -3,12 +3,12 @@ import * as d3 from 'd3';
 import { TimeSeriesNode } from '@/datasets/types';
 import useResizeObserver from '@/hooks/useResizeObserver';
 import { CT } from './chartTokens';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 const MARGIN    = { top: 12, right: 100, bottom: 44, left: 62 };
 const parseDate = d3.timeParse('%Y-%m-%d');
 const fmtYear   = d3.timeFormat('%Y');
 const fmtTip    = d3.timeFormat('%b %Y');
-const fmtVal    = d3.format(',.1f');
 
 interface Props {
   data:            TimeSeriesNode[];
@@ -141,7 +141,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
 
     // ── Y axis ────────────────────────────────────────────────────────────────
     g.append('g')
-      .call(d3.axisLeft(yScale).ticks(6).tickSize(0))
+      .call(d3.axisLeft(yScale).ticks(6).tickSize(0).tickFormat(n => formatCompact(n.valueOf())))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
         .attr('fill', CT.tickText).attr('font-size', 11).attr('dx', '-2'));
@@ -271,7 +271,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
           `<div style="display:flex;align-items:center;gap:6px;padding:1px 0;">` +
             `<span style="width:8px;height:8px;border-radius:50%;background:${r.color};flex-shrink:0;"></span>` +
             `<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;">${r.label}</span>` +
-            `<span style="font-variant-numeric:tabular-nums;margin-left:8px;">${fmtVal(r.value)}${unit ? ` ${unit}` : ''}</span>` +
+            `<span style="font-variant-numeric:tabular-nums;margin-left:8px;">${formatWithUnit(r.value, unit ?? '')}</span>` +
           `</div>`,
         ).join('');
 

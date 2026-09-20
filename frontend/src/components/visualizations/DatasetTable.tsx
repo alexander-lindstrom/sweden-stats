@@ -4,6 +4,7 @@ import { ScalarDatasetResult } from '@/datasets/types';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { useTableSort, tableRowClass, TH } from '@/hooks/useTableSort';
 import { SortIndicator } from '@/components/ui/SortIndicator';
+import { formatNumber } from '@/utils/format';
 
 interface DatasetTableProps {
   data: ScalarDatasetResult;
@@ -111,7 +112,7 @@ export const DatasetTable: React.FC<DatasetTableProps> = ({ data, selectedFeatur
                 <td className="text-right pr-4 py-2 text-gray-400 tabular-nums text-xs">{virtualRow.index + 1}</td>
                 <td className="py-2 text-gray-800">{row.name}</td>
                 <td className="text-right pr-4 py-2 text-gray-700 tabular-nums">
-                  {row.value.toLocaleString('sv-SE')}
+                  {formatNumber(row.value)}
                   <span className="text-gray-400 ml-1 text-xs">{data.unit}</span>
                 </td>
               </tr>

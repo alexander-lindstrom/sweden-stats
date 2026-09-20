@@ -11,6 +11,7 @@ import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 import { ProfileSection } from '@/components/profile/ProfileSection';
 import { UI } from '@/theme';
 import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
+import { formatNumber, formatSigned } from '@/utils/format';
 
 const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
 
@@ -105,7 +106,7 @@ function StatRow({ label, stat, accent = false }: { label: string; stat: StatDat
         <>
           <div className="flex items-baseline gap-1.5">
             <span className="text-2xl font-bold text-slate-900 tabular-nums tracking-tight">
-              {stat.value.toLocaleString('sv-SE')}
+              {formatNumber(stat.value)}
             </span>
             <span className="text-xs text-slate-500 font-medium">{stat.unit}</span>
           </div>
@@ -243,7 +244,7 @@ function RadarChart({ axes, comparisonAxes }: { axes: RadarAxis[]; comparisonAxe
     const [vx, vy] = pt(axis.percentile, hovered);
     const lines: Array<{ text: string; bold?: boolean }> = [];
     if (axis.value != null) {
-      lines.push({ text: `${axis.value.toLocaleString('sv-SE')} ${axis.unit ?? ''}`.trim(), bold: true });
+      lines.push({ text: `${formatNumber(axis.value)} ${axis.unit ?? ''}`.trim(), bold: true });
     }
     lines.push({ text: `Percentil: ${Math.round(axis.percentile * 100)}%` });
     if (axis.rank != null && axis.total != null) {
@@ -815,12 +816,11 @@ function ComparisonStatRow({
     : null;
 
   const fmtVal = (v: number | null, unit: string) =>
-    v !== null ? `${v.toLocaleString('sv-SE')} ${unit}`.trim() : '—';
+    v !== null ? `${formatNumber(v)} ${unit}`.trim() : '—';
 
   const fmtDelta = (d: number | null, unit: string) => {
     if (d === null) { return null; }
-    const sign = d > 0 ? '+' : '';
-    return `${sign}${d.toLocaleString('sv-SE')} ${unit}`.trim();
+    return `${formatSigned(d)} ${unit}`.trim();
   };
 
   const deltaStr = fmtDelta(delta, a.unit);
@@ -836,7 +836,7 @@ function ComparisonStatRow({
           <div className="flex items-baseline gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 self-center" />
             <span className="text-base font-bold text-slate-900 tabular-nums truncate">
-              {a.value !== null ? a.value.toLocaleString('sv-SE') : '—'}
+              {a.value !== null ? formatNumber(a.value) : '—'}
             </span>
             <span className="text-[10px] text-slate-500 flex-shrink-0">{a.unit}</span>
           </div>
@@ -858,7 +858,7 @@ function ComparisonStatRow({
             <>
               <div className="flex items-baseline gap-1 justify-end">
                 <span className="text-base font-bold text-slate-900 tabular-nums truncate">
-                  {b.value !== null ? b.value.toLocaleString('sv-SE') : '—'}
+                  {b.value !== null ? formatNumber(b.value) : '—'}
                 </span>
                 <span className="text-[10px] text-slate-500 flex-shrink-0">{b.unit}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 self-center" />

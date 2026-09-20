@@ -6,6 +6,7 @@ import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens 
 import { findScrollParent } from '@/utils/scrollUtils';
 import { CT } from './chartTokens';
 import { drawChartFrame } from './chartFrame';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 interface Hovered { name: string; value: number; x: number; y: number; }
 
@@ -25,13 +26,7 @@ const BAR_RADIUS = 2;
 const COLOR_BELOW = CT.divergingLow;
 const COLOR_ABOVE = CT.divergingHigh;
 
-function fmtVal(v: number): string {
-  const abs = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (abs >= 1_000_000) { return `${sign}${(abs / 1_000_000).toFixed(1)}M`; }
-  if (abs >= 1_000)     { return `${sign}${(abs / 1_000).toFixed(0)}k`; }
-  return v.toFixed(1);
-}
+const fmtVal = (v: number): string => formatCompact(v);
 
 export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
   const { containerRef, svgRef, dimensions } = useChartBase();
@@ -245,7 +240,7 @@ export const DivergingBarChart: React.FC<Props> = ({ data, selectedFeature, onFe
           style={{ left: hovered.x + 14, top: hovered.y - 10 }}
         >
           <div className="font-semibold">{hovered.name}</div>
-          <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
+          <div className="text-gray-300">{formatWithUnit(hovered.value, data.unit)}</div>
         </div>
       )}
     </div>
