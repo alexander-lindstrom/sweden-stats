@@ -55,13 +55,12 @@ Vector tile layers (Region, Municipality, RegSO, DeSO) are served by a local Geo
 **Routing** (`frontend/src/App.tsx`):
 - `/` → redirects to `/map`
 - `/map` → `MapPage` — the whole app: sidebar, map / chart / table / profile views, selection panel. State is mirrored to the URL (`hooks/useUrlState.ts`).
-- `/test` → `PopulationDataViewer` — dev scratch view on the RTK Query stack, not linked from the UI.
 
-**Data layer** (`frontend/src/datasets/`): one descriptor per dataset (`registry.ts` lists them, `types.ts` defines `DatasetDescriptor`). A descriptor declares supported levels, views and chart types and fetches its own data — SCB v2beta and Kolada directly from the browser, ESV via the FastAPI backend. Results are cached in memory and IndexedDB (`datasets/cache.ts`). The RTK Query slice in `api/` only serves `/test`.
+**Data layer** (`frontend/src/datasets/`): one descriptor per dataset (`registry.ts` lists them, `types.ts` defines `DatasetDescriptor`). A descriptor declares supported levels, views and chart types and fetches its own data — SCB v2beta and Kolada directly from the browser, ESV via the FastAPI backend. Results are cached in memory and IndexedDB (`datasets/cache.ts`). There is no Redux or RTK Query; `util/scb.ts` and `util/jsonstat.ts` hold the SCB JSON-stat2 types and helpers.
 
 Path alias `@/` resolves to `frontend/src/`.
 
-**State management**: React state in `MapPage`, split across hooks — `useNavigationState` (level, selection, drill stack), `useDatasetState` (dataset, year, party), `useViewState` (view, chart type, bivariate/scatter), `useDatasetFetch` (data + colour scale). Redux only backs the `/test` route.
+**State management**: React state in `MapPage`, split across hooks — `useNavigationState` (level, selection, drill stack), `useDatasetState` (dataset, year, party), `useViewState` (view, chart type, bivariate/scatter), `useDatasetFetch` (data + colour scale).
 
 **Charts** (`frontend/src/components/visualizations/`): D3 charts — ranked bar, histogram, diverging, box plot, scatter, multi-line time series, sunburst + bar (state expenses), share bar, donut, population pyramid. Shared colour tokens in `chartTokens.ts`, frame helper in `chartFrame.ts`.
 
