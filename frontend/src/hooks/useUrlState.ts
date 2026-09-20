@@ -140,8 +140,9 @@ export function useUrlState(): { initialValues: UrlInitialValues; syncUrl: (stat
       params.breakdown = state.activeBreakdownId;
     }
 
-    // Omit chart type when it's the default to keep URLs clean.
-    if (state.activeChartType !== 'bar') {
+    // Chart type only matters in chart view; the snap-to-available effect would
+    // otherwise write chart=diverging while the user is looking at the map.
+    if (state.activeView === 'chart' && state.activeChartType !== 'bar') {
       params.chart = state.activeChartType;
     }
 
