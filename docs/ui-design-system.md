@@ -10,7 +10,7 @@ The project uses a coherent stack that is worth committing to rather than replac
 - **Lucide React** — icons
 - **class-variance-authority + tailwind-merge** — variant management and class merging
 
-`card.tsx`, `button.tsx`, and `badge.tsx` in `src/components/ui/` are already shadcn components. The Tailwind config already has the full shadcn CSS variable setup (`--primary`, `--border`, `--ring`, etc.). The foundation is in place — the gap is not using it consistently.
+`button.tsx` in `src/components/ui/` is a shadcn component (`card.tsx` and `badge.tsx` were removed as unused). The Tailwind config has the shadcn CSS variable setup (`--primary`, `--border`, `--ring`, etc.) and `src/index.css` defines those variables with the app's slate/blue palette. The foundation is in place — the gap is not using it consistently.
 
 **Don't switch to Mantine or similar.** A full component library brings its own styling system (CSS modules), fights with Tailwind, and imposes a recognisable aesthetic. The current stack gives full visual control, which matters for a data app where the UI should recede.
 
@@ -51,9 +51,9 @@ There are three different ways to render a select control:
 
 - **`Dropdown.tsx`** — Radix Select wrapper. Keyboard accessible, styleable, supports portal. Used in sidebar and FilterPanel.
 - **`SelectInput.tsx`** — native `<select>` wrapper with a custom chevron. Works fine but no keyboard portal, OS-native popup.
-- **Raw `<select>` elements** — in `MapControls.tsx` (lines 75 and 106), unstyled or inconsistently styled.
+- **Raw `<select>` elements** — were in `MapControls.tsx`, since removed as dead code.
 
-**Fix:** `Dropdown.tsx` (Radix) should be the single pattern. Replace `SelectInput.tsx` usages and the raw selects in `MapControls.tsx`. The native `<select>` wrapper can be deleted once that's done.
+**Fix:** `Dropdown.tsx` (Radix) should be the single pattern. Replace `SelectInput.tsx` usages. The native `<select>` wrapper can be deleted once that's done.
 
 ---
 
