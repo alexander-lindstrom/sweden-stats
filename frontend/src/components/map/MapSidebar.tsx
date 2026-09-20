@@ -112,10 +112,36 @@ function buildGroupOrder(datasets: DatasetDescriptor[]): GroupEntry[] {
   return order;
 }
 
+function SegmentedControl({ items, selectedDatasetId, onDatasetChange }: {
+  items: DatasetDescriptor[];
+  selectedDatasetId: string | null;
+  onDatasetChange: (id: string) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      {items.map(ds => (
+        <button
+          key={ds.id}
+          onClick={() => onDatasetChange(ds.id)}
+          className={[
+            'flex-1 text-xs py-1 rounded-md text-center transition-colors font-medium',
+            selectedDatasetId === ds.id
+              ? 'bg-blue-500 text-white'
+              : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
+          ].join(' ')}
+        >
+          {ds.shortLabel ?? ds.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function renderGroupEntry(
   entry: GroupEntry,
   selectedDatasetId: string | null,
   onDatasetChange: (id: string) => void,
+  categoryLabel: string,
 ) {
   if (entry.kind === 'single') {
     return (
@@ -131,6 +157,16 @@ function renderGroupEntry(
   const isGroupActive = items.some(d => d.id === selectedDatasetId);
   const groupLabel = items.find(d => d.groupLabel)?.groupLabel ?? key;
 
+  // A group named like its category ("Val" inside VAL) would repeat the header;
+  // render its sub-selector directly instead of a redundant nav row.
+  if (groupLabel === categoryLabel) {
+    return (
+      <li key={key} className="border-b border-slate-100 last:border-0 px-3.5 py-2.5">
+        <SegmentedControl items={items} selectedDatasetId={selectedDatasetId} onDatasetChange={onDatasetChange} />
+      </li>
+    );
+  }
+
   return (
     <li key={key} className="border-b border-slate-100 last:border-0">
       <NavItem
@@ -143,21 +179,8 @@ function renderGroupEntry(
         {groupLabel}
       </NavItem>
       {isGroupActive && (
-        <div className="flex gap-1 px-3.5 pb-2.5 pt-1">
-          {items.map(ds => (
-            <button
-              key={ds.id}
-              onClick={() => onDatasetChange(ds.id)}
-              className={[
-                'flex-1 text-xs py-1 rounded-md text-center transition-colors font-medium',
-                selectedDatasetId === ds.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
-              ].join(' ')}
-            >
-              {ds.shortLabel ?? ds.label}
-            </button>
-          ))}
+        <div className="px-3.5 pb-2.5 pt-1">
+          <SegmentedControl items={items} selectedDatasetId={selectedDatasetId} onDatasetChange={onDatasetChange} />
         </div>
       )}
     </li>
@@ -279,7 +302,7 @@ export function MapSidebar({
             return (
               <SidebarItem key={cat} value={cat} label={label}>
                 <ul>
-                  {entries.map(entry => renderGroupEntry(entry, selectedDatasetId, onDatasetChange))}
+                  {entries.map(entry => renderGroupEntry(entry, selectedDatasetId, onDatasetChange, label))}
                 </ul>
               </SidebarItem>
             );
