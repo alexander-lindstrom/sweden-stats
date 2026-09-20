@@ -98,3 +98,72 @@ export function useAreaStats(
 
   return state;
 }
+
+// ── Derived per-area stats (shared by the selection panel and the profile) ──
+
+export interface StatData {
+  value:      number | null;
+  unit:       string;
+  rank:       number | null;
+  total:      number | null;
+  /** Fraction of peer areas with a strictly lower value (0 = lowest, 1 = highest). */
+  percentile: number | null;
+}
+
+export function toStat(result: ScalarDatasetResult, code: string): StatData {
+  const value = result.values[code] ?? null;
+  const all   = Object.values(result.values).filter(Number.isFinite) as number[];
+  const rank  = value !== null ? all.filter(v => v > value).length + 1 : null;
+  const percentile =
+    value !== null && all.length > 1
+      ? all.filter(v => v < value).length / (all.length - 1)
+      : null;
+  return { value, unit: result.unit, rank, total: all.length, percentile };
+}
+
+export interface PanelStats {
+  population: StatData;
+  income:     StatData | null;
+  age:        StatData | null;
+  foreignBg:  StatData | null;
+  employment: StatData | null;
+}
+
+type AreaStatsData = Pick<AreaStatsResult, 'population' | 'income' | 'age' | 'foreignBg' | 'employment'>;
+
+export function toPanelStats(results: AreaStatsData, code: string): PanelStats | null {
+  if (!results.population) { return null; }
+  return {
+    population: toStat(results.population, code),
+    income:     results.income     ? toStat(results.income, code)     : null,
+    age:        results.age        ? toStat(results.age, code)        : null,
+    foreignBg:  results.foreignBg  ? toStat(results.foreignBg, code)  : null,
+    employment: results.employment ? toStat(results.employment, code) : null,
+  };
+}
+
+export interface RadarAxis {
+  label:      string;
+  percentile: number;
+  value?:     number | null;
+  unit?:      string;
+  rank?:      number | null;
+  total?:     number | null;
+}
+
+/** Radar axes in a fixed order so two areas' polygons line up axis for axis. */
+export function buildRadarAxes(stats: PanelStats | null): RadarAxis[] {
+  if (!stats) { return []; }
+  const entries: Array<[string, StatData | null]> = [
+    ['Befolkning', stats.population],
+    ['Inkomst',    stats.income],
+    ['Ålder',      stats.age],
+    ['Utländsk',   stats.foreignBg],
+    ['Syssels.',   stats.employment],
+  ];
+  return entries.flatMap(([label, s]) =>
+    s && s.percentile !== null
+      ? [{ label, percentile: s.percentile, value: s.value, unit: s.unit, rank: s.rank, total: s.total }]
+      : [],
+  );
+}

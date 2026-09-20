@@ -9,12 +9,12 @@ interface SectionLabelProps {
  * Canonical eyebrow / section label.
  * Use this wherever a small-caps label appears above a control, stat, or
  * section of content. Replaces the ad-hoc strings like
- * "text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400"
+ * "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
  * that were scattered across components.
  */
 export function SectionLabel({ children, className }: SectionLabelProps) {
   return (
-    <span className={cn('text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400', className)}>
+    <span className={cn('text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500', className)}>
       {children}
     </span>
   );

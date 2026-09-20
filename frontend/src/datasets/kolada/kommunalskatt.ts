@@ -13,7 +13,7 @@ export const kommunalskatt: DatasetDescriptor = {
   id:              'kommunalskatt',
   kpiId:           'N00901',
   label:           'Kommunalskatt',
-  category:        'kolada',
+  category:        'ekonomi',
   source:          'Kolada',
   availableYears:  Array.from({ length: 25 }, (_, i) => 2000 + i),
   supportedLevels: ['Municipality'],

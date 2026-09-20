@@ -6,6 +6,7 @@ import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens 
 import { findScrollParent } from '@/utils/scrollUtils';
 import { CT } from './chartTokens';
 import { drawChartFrame } from './chartFrame';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 interface Hovered { code: string; name: string; value: number; x: number; y: number; }
 
@@ -168,16 +169,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
       .call(
         d3.axisBottom(xScale)
           .ticks(Math.max(2, Math.floor(innerW / 55)))
-          .tickFormat(n => {
-            const v = n.valueOf();
-            if (v >= 1_000_000) {
-              return `${(v / 1_000_000).toFixed(1)}M`;
-            }
-            if (v >= 1_000) {
-              return `${(v / 1_000).toFixed(0)}k`;
-            }
-            return String(v);
-          })
+          .tickFormat(n => formatCompact(n.valueOf()))
       )
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
@@ -217,7 +209,7 @@ export const RankedBarChart: React.FC<RankedBarChartProps> = ({ data, colorScale
           style={{ left: hovered.x + 14, top: hovered.y - 10 }}
         >
           <div className="font-semibold">{hovered.name}</div>
-          <div className="text-gray-300">{hovered.value.toLocaleString('sv-SE')} {data.unit}</div>
+          <div className="text-gray-300">{formatWithUnit(hovered.value, data.unit)}</div>
           {rowMeta?.[hovered.code] && (
             <div className="text-gray-400 mt-0.5">{rowMeta[hovered.code]}</div>
           )}

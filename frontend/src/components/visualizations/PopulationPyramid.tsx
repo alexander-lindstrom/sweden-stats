@@ -4,6 +4,7 @@ import { CT } from './chartTokens';
 import { UI } from '@/theme';
 import type { PyramidRow } from '@/datasets/scb/population';
 import { useChartBase } from '@/hooks/useChartBase';
+import { formatNumber } from '@/utils/format';
 
 export interface PopulationPyramidProps {
   data: PyramidRow[];
@@ -246,10 +247,10 @@ export function PopulationPyramid({ data }: PopulationPyramidProps) {
         >
           <div className="font-semibold">{tooltip.ageLabel}</div>
           <div className="text-blue-300">
-            Män: {tooltip.men.toLocaleString('sv-SE')} ({(tooltip.men / tooltip.total * 100).toFixed(1)}%)
+            Män: {formatNumber(tooltip.men)} ({formatNumber(tooltip.men / tooltip.total * 100, 1)}%)
           </div>
           <div className="text-rose-300">
-            Kvinnor: {tooltip.women.toLocaleString('sv-SE')} ({(tooltip.women / tooltip.total * 100).toFixed(1)}%)
+            Kvinnor: {formatNumber(tooltip.women)} ({formatNumber(tooltip.women / tooltip.total * 100, 1)}%)
           </div>
           {(() => {
             const diff    = tooltip.women - tooltip.men;
@@ -257,7 +258,7 @@ export function PopulationPyramid({ data }: PopulationPyramidProps) {
             const label   = diff > 0 ? 'fler Kvinnor' : 'fler Män';
             return (
               <div className={`mt-0.5 ${diff > 0 ? 'text-rose-300' : 'text-blue-300'}`}>
-                +{diffPct.toFixed(1)}% {label}
+                +{formatNumber(diffPct, 1)}% {label}
               </div>
             );
           })()}

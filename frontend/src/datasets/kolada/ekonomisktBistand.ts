@@ -13,7 +13,7 @@ export const ekonomisktBistand: DatasetDescriptor = {
   id:              'ekonomiskt-bistand',
   kpiId:           'N31807',
   label:           'Ekonomiskt bistånd',
-  category:        'kolada',
+  category:        'valfard',
   source:          'Kolada',
   availableYears:  Array.from({ length: 24 }, (_, i) => 2000 + i),
   supportedLevels: ['Region', 'Municipality'],

@@ -5,6 +5,7 @@ import { COUNTY_NAMES } from '@/datasets/adminLevels';
 import { useChartBase } from '@/hooks/useChartBase';
 import { CT } from './chartTokens';
 import { drawChartFrame } from './chartFrame';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 interface Props {
   data: ScalarDatasetResult;
@@ -80,11 +81,7 @@ function buildStats(data: ScalarDatasetResult, selCode: string | null): BoxStats
     .sort((a, b) => b.median - a.median);
 }
 
-function fmtVal(v: number, unit: string): string {
-  if (unit === '%' || Math.abs(v) < 100) { return d3.format('.1f')(v) + (unit ? ` ${unit}` : ''); }
-  if (Math.abs(v) >= 1_000_000) { return d3.format('.2s')(v) + (unit ? ` ${unit}` : ''); }
-  return d3.format(',.0f')(v) + (unit ? ` ${unit}` : '');
-}
+const fmtVal = (v: number, unit: string): string => formatWithUnit(v, unit);
 
 export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) => {
   const { containerRef, svgRef, dimensions } = useChartBase();
@@ -155,7 +152,7 @@ export const BoxPlot: React.FC<Props> = ({ data, colorScale, selectedFeature }) 
     g.append('g')
       .attr('transform', `translate(0,${innerH})`)
       .call(d3.axisBottom(xScale).ticks(5)
-        .tickFormat(n => fmtVal(n.valueOf(), data.unit).replace(` ${data.unit}`, '')))
+        .tickFormat(n => formatCompact(n.valueOf())))
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
       .call(ax => ax.selectAll('text').attr('fill', CT.tickText).attr('font-size', 11));

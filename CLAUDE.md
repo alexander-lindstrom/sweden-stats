@@ -12,7 +12,7 @@ The project is currently in a learning/exploratory phase (OpenLayers, GeoServer,
 
 ## Project Overview
 
-Sweden Data Visualizer — interactive visualizations of public Swedish data (SCB, ESV) using a React frontend and a FastAPI backend.
+Rikskartan (repo: sweden-stats, live at datamedmera.se) — interactive visualizations of public Swedish data (SCB, Kolada, ESV) using a React frontend and a FastAPI backend. Use the name "Rikskartan" in UI copy and docs.
 
 ## Development Commands
 
@@ -53,24 +53,20 @@ Vector tile layers (Region, Municipality, RegSO, DeSO) are served by a local Geo
 ### Frontend Structure
 
 **Routing** (`frontend/src/App.tsx`):
-- `/` → `LandingPage`
-- `/category/economy` → `EconomicIndicators` (tabbed: KPI + State Expenses)
-- `/category/map` → `MapView`
-- `/category/test` → `PopulationDataViewer`
+- `/` → redirects to `/map`
+- `/map` → `MapPage` — the whole app: sidebar, map / chart / table / profile views, selection panel. State is mirrored to the URL (`hooks/useUrlState.ts`).
 
-**API Layer** — two patterns coexist:
-1. **RTK Query** (`frontend/src/api/BaseApi.ts`, `ScbApi.ts`): Redux store-backed, used for population statistics (direct to SCB v2beta API).
-2. **Plain fetch** (`frontend/src/api/backend/`): Used for state expenses/revenue, hitting the FastAPI backend at `localhost:3001`.
+**Data layer** (`frontend/src/datasets/`): one descriptor per dataset (`registry.ts` lists them, `types.ts` defines `DatasetDescriptor`). A descriptor declares supported levels, views and chart types and fetches its own data — SCB v2beta and Kolada directly from the browser, ESV via the FastAPI backend. Results are cached in memory and IndexedDB (`datasets/cache.ts`). There is no Redux or RTK Query; `util/scb.ts` and `util/jsonstat.ts` hold the SCB JSON-stat2 types and helpers.
 
 Path alias `@/` resolves to `frontend/src/`.
 
-**State Management**: Redux Toolkit (`frontend/src/app/store.ts`) with a single RTK Query API slice.
+**State management**: React state in `MapPage`, split across hooks — `useNavigationState` (level, selection, drill stack), `useDatasetState` (dataset, year, party), `useViewState` (view, chart type, bivariate/scatter), `useDatasetFetch` (data + colour scale).
 
-**Charts** (`frontend/src/components/charts/sunBurstWithBar/`): D3-based sunburst + bar chart pair used in the State Expenses dashboard. Clicking arcs/bars drills down the hierarchy; a root button resets to top level.
+**Charts** (`frontend/src/components/visualizations/`): D3 charts — ranked bar, histogram, diverging, box plot, scatter, multi-line time series, sunburst + bar (state expenses), share bar, donut, population pyramid. Shared colour tokens in `chartTokens.ts`, frame helper in `chartFrame.ts`.
 
-**Map** (`frontend/src/components/map/`): OpenLayers map with switchable base layers (Esri tiles) and Swedish administrative boundary overlays as MVT vector tiles from GeoServer. Admin levels: Region (län), Municipality (kommuner), RegSO, DeSO.
+**Map** (`frontend/src/components/map/`): OpenLayers map with switchable base layers (Esri tiles) and Swedish administrative boundary overlays as MVT vector tiles from GeoServer. Admin levels: Region (län), Municipality (kommuner), RegSO, DeSO. `MapView` renders the map, `MapSidebar` the level/dataset nav, `MapLegend` the classed or gradient legend, `SelectionPanel` the detail panel.
 
-**KPI** (`frontend/src/components/Kpi/`): Fetches CPI data from SCB (KPICOI80MN table) via the SCB v2beta API directly, transforms it, and renders as a line chart.
+**KPI**: `datasets/scb/kpi.ts` fetches CPI (KPICOI80MN) from SCB v2beta and renders it through the multi-line chart.
 
 ### Backend Structure
 
@@ -96,6 +92,9 @@ Use `<SectionLabel>` (`src/components/ui/SectionLabel.tsx`) for every small-caps
 - **Cursor-tracking tooltips** (D3 charts): use `UI.tooltip` from `src/theme.ts` as the className, `fixed` positioned.
 - **Absolute-positioned tooltips** (within a `relative` container): write the classes inline but always use `bg-gray-900` as the background. Never use `bg-slate-800`.
 - The existing `Tooltip` component (`src/components/ui/Tooltip.tsx`, forwardRef) is for D3 charts that need a permanently-mounted ref target.
+
+### Number formatting
+Every number that reaches the screen goes through `src/utils/format.ts` (`formatNumber`, `formatCompact`, `formatWithUnit`, `formatPercent`, `formatSigned`), which is sv-SE only. Do not call `toLocaleString`, `toFixed` or `d3.format` for display text or axis ticks.
 
 ### Buttons
 `Button` (`src/components/ui/button.tsx`, shadcn) with `variant="ghost"` or `variant="outline"` is preferred over raw `<button className="...border...hover:...">` for non-navigation actions. Nav items with a left-border active style can remain bespoke. Audit button usages when touching a component.

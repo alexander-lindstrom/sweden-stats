@@ -5,13 +5,40 @@ import { DATASETS } from '@/datasets/registry';
 import { fetchCached, isCached, preload } from '@/datasets/cache';
 import { ADMIN_LEVELS } from '@/datasets/adminLevels';
 import { PARTY_COLORS } from '@/datasets/parties';
+import { describeFetchError } from '@/datasets/fetchErrors';
+import { showToast } from '@/components/ui/toast';
+
+/** Describes the active colour scale so the legend can draw it. */
+export type ColorLegendSpec =
+  | { kind: 'classes';  breaks: number[]; colors: string[] }
+  | { kind: 'gradient'; domain: [number, number]; center?: number; scale: (value: number) => string };
 
 interface DatasetFetchResult {
   datasetResult: DatasetResult | null;
-  colorScale:    d3.ScaleSequential<string> | null;
+  colorScale:    ((value: number) => string) | null;
+  colorLegend:   ColorLegendSpec | null;
   /** Non-null for election datasets in winner mode: maps geo code → winning party color. */
   mapColorFn:    ((code: string) => string) | null;
   loading:       boolean;
+}
+
+/**
+ * Equal-count classes: each colour covers the same number of areas, so skewed
+ * count data (three large counties, eighteen small ones) still shows variation
+ * instead of collapsing into one pale class.
+ */
+function buildQuantileScale(vals: number[]): { scale: (v: number) => string; breaks: number[]; colors: string[] } {
+  const distinct = new Set(vals).size;
+  const k        = Math.max(2, Math.min(vals.length <= 40 ? 5 : 7, distinct));
+  const colors   = d3.range(k).map(i => d3.interpolateYlOrBr(0.15 + (i / (k - 1)) * 0.85));
+  const scale    = d3.scaleQuantile<string>().domain(vals).range(colors);
+  return { scale: (v: number) => scale(v), breaks: scale.quantiles(), colors };
+}
+
+function divergingInterpolator(t: number): string {
+  return t <= 0.5
+    ? d3.interpolateRgb('#3b82f6', '#f5f5f0')(t * 2)
+    : d3.interpolateRgb('#f5f5f0', '#e05c5c')((t - 0.5) * 2);
 }
 
 export function useDatasetFetch(
@@ -26,9 +53,13 @@ export function useDatasetFetch(
   activeBreakdownId?: string | null,
 ): DatasetFetchResult {
   const [datasetResult, setDatasetResult] = useState<DatasetResult | null>(null);
-  const [colorScale,    setColorScale]    = useState<d3.ScaleSequential<string> | null>(null);
+  const [colorScale,    setColorScale]    = useState<((value: number) => string) | null>(null);
+  const [colorLegend,   setColorLegend]   = useState<ColorLegendSpec | null>(null);
   const [mapColorFn,    setMapColorFn]    = useState<((code: string) => string) | null>(null);
   const [loading,       setLoading]       = useState(false);
+  // Bumped by the "Försök igen" toast action; failures are never cached, so
+  // re-running the effect is a real retry.
+  const [retryToken,    setRetryToken]    = useState(0);
   const fetchGenRef    = useRef(0);
   // Ref so the clearing effect can read the current year without adding it to
   // its deps (year changes intentionally keep old data visible until new data arrives).
@@ -44,6 +75,7 @@ export function useDatasetFetch(
     if (!isCached(selectedDatasetId ?? '', selectedLevel, selectedYearRef.current, activeBreakdownId ?? undefined)) {
       setDatasetResult(null);
       setColorScale(null);
+      setColorLegend(null);
       setMapColorFn(null);
     }
   }, [selectedDatasetId, selectedLevel, activeBreakdownId]);
@@ -78,45 +110,47 @@ export function useDatasetFetch(
               .domain([0, maxShare])
               .clamp(true);
             setColorScale(() => scale);
+            setColorLegend({ kind: 'gradient', domain: [0, maxShare], scale });
             setMapColorFn(null);
           } else {
             // Winner mode: color each area by the winning party.
             const winnerByGeo = result.winnerByGeo;
             setColorScale(null);
+            setColorLegend(null);
             // '#c8bfb2' is a warm beige — visually distinct from the Övriga gray (#AAAAAA)
             // and all party colors, so areas with no election data are clearly "no data".
             setMapColorFn(() => (code: string) => PARTY_COLORS[winnerByGeo[code]] ?? '#c8bfb2');
           }
         } else if (result.kind === 'scalar') {
-          // Scalar: sequential or diverging color scale.
+          // Scalar: quantile classes, or a diverging gradient around a centre value.
           const vals = Object.values(result.values).filter(Number.isFinite);
           setMapColorFn(null);
           if (vals.length > 0) {
-            let scale: d3.ScaleSequential<string>;
             if (descriptor.colorScaleType === 'diverging' && descriptor.divergingCenter !== undefined) {
+              // Each half spans its own side of the data, so a ratio that can't go
+              // below 0 doesn't get a legend running to −7, and the below-centre
+              // areas use the full blue range instead of one sliver.
               const center = descriptor.divergingCenter;
-              const extent = Math.max(center - Math.min(...vals), Math.max(...vals) - center);
-              scale = d3
-                .scaleSequential((t: number) =>
-                  t <= 0.5
-                    ? d3.interpolateRgb('#3b82f6', '#f5f5f0')(t * 2)
-                    : d3.interpolateRgb('#f5f5f0', '#e05c5c')((t - 0.5) * 2),
-                )
-                .domain([center - extent, center + extent])
+              const lo     = Math.min(center, ...vals);
+              const hi     = Math.max(center, ...vals);
+              const scale  = d3.scaleDiverging(divergingInterpolator)
+                .domain([lo, center, hi])
                 .clamp(true);
+              setColorScale(() => scale);
+              setColorLegend({ kind: 'gradient', domain: [lo, hi], center, scale });
             } else {
-              scale = d3
-                .scaleSequential(t => d3.interpolateYlOrBr(0.15 + t * 0.85))
-                .domain([Math.min(...vals), Math.max(...vals)])
-                .clamp(true);
+              const { scale, breaks, colors } = buildQuantileScale(vals);
+              setColorScale(() => scale);
+              setColorLegend({ kind: 'classes', breaks, colors });
             }
-            setColorScale(() => scale);
           } else {
             setColorScale(null);
+            setColorLegend(null);
           }
         } else {
           // Non-scalar, non-election (donut, categorical-share): no map color scale needed.
           setColorScale(null);
+          setColorLegend(null);
           setMapColorFn(null);
         }
 
@@ -132,9 +166,12 @@ export function useDatasetFetch(
         if (gen === fetchGenRef.current) {
           console.error('Dataset fetch failed:', err);
           setLoading(false);
+          showToast(describeFetchError(descriptor.label, descriptor.source, err), {
+            action: { label: 'Försök igen', onClick: () => setRetryToken(t => t + 1) },
+          });
         }
       });
-  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId]);
+  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId, retryToken]);
 
-  return { datasetResult, colorScale, mapColorFn, loading };
+  return { datasetResult, colorScale, colorLegend, mapColorFn, loading };
 }

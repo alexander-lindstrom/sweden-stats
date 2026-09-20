@@ -39,6 +39,7 @@ import { MapBrowserEvent } from "ol";
 import { AdminLevel } from "@/datasets/types";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cleanCountyLabel } from "@/utils/labelFormatting";
+import { formatWithUnit } from '@/utils/format';
 
 // Maximum zoom applied when fitting a feature's extent into view.
 // Prevents tiny features (a small DeSO) from zooming in absurdly close.
@@ -174,9 +175,8 @@ const MapView: React.FC<MapViewProps> = ({
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<OlMap | null>(null);
-  const baseLayerRef     = useRef<TileLayer<XYZ>>(
-    new TileLayer({ visible: false })
-  );
+  // One tile layer per source in the selected base map stack; empty for 'None'.
+  const baseLayersRef    = useRef<TileLayer<XYZ>[]>([]);
   const fillLayerRef     = useRef<VectorTileLayer | null>(null);
   const boundaryLayerRef = useRef<VectorTileLayer | null>(null);
   // Outgoing layers are kept visible during level transitions until the first
@@ -464,7 +464,7 @@ const MapView: React.FC<MapViewProps> = ({
 
     const map = new OlMap({
       target: mapRef.current,
-      layers: [baseLayerRef.current],
+      layers: baseLayersRef.current,
       view: new View({ center: SWEDEN_CENTER, zoom: 5.5 }),
       controls: defaultControls({ zoom: false }),
     });
@@ -728,18 +728,17 @@ const MapView: React.FC<MapViewProps> = ({
     const map = mapInstanceRef.current;
     if (!map) {return;}
 
-    map.removeLayer(baseLayerRef.current);
-    if (selectedBase === 'None') {
-      baseLayerRef.current = new TileLayer({ visible: false });
-    } else {
-      baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });
-    }
-    baseLayerRef.current.setZIndex(0);
-    map.addLayer(baseLayerRef.current);
+    for (const layer of baseLayersRef.current) { map.removeLayer(layer); }
+    baseLayersRef.current = selectedBase === 'None'
+      ? []
+      : baseMaps[selectedBase].map(source => new TileLayer({ source, zIndex: 0 }));
+    for (const layer of baseLayersRef.current) { map.addLayer(layer); }
   }, [selectedBase]);
 
   return (
-    <div className="relative w-full h-full" style={{ backgroundColor: '#b8d4e4' }}>
+    // Water/background. Kept light and low-saturation so saturated party colours
+    // (Moderaterna's official light blue in particular) stay distinct from the sea.
+    <div className="relative w-full h-full" style={{ backgroundColor: '#cfd8df' }}>
       <div ref={mapRef} className="w-full h-full" />
 
       <Tooltip ref={tooltipRef} visible={hoveredFeature !== null}>
@@ -751,7 +750,7 @@ const MapView: React.FC<MapViewProps> = ({
             )}
             {hoveredFeature.tooltip === null && hoveredFeature.value !== null && (
               <div className="text-gray-300">
-                {hoveredFeature.value.toLocaleString('sv-SE')} {unit}
+                {formatWithUnit(hoveredFeature.value, unit)}
               </div>
             )}
           </>

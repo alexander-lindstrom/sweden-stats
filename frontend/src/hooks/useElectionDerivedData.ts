@@ -4,6 +4,7 @@ import type {
   DatasetDescriptor, DatasetResult, ElectionDatasetResult,
 } from '@/datasets/types';
 import { PARTY_CODES, PARTY_COLORS, PARTY_LABELS } from '@/datasets/parties';
+import { formatNumber } from '@/utils/format';
 
 export interface ElectionDerivedData {
   partyShareData: CategoricalShareResult | null;
@@ -95,14 +96,14 @@ export function useElectionDerivedData({
       return Object.fromEntries(
         Object.entries(electionResult.partyVotes).map(([code, votes]) => {
           const share = votes[activeParty] ?? 0;
-          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${share.toFixed(1)}%`];
+          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${formatNumber(share, 1)}%`];
         }),
       );
     }
     return Object.fromEntries(
       Object.entries(electionResult.winnerByGeo).map(([code, winner]) => {
         const share = electionResult.partyVotes[code]?.[winner] ?? 0;
-        return [code, `${PARTY_LABELS[winner] ?? winner} — ${share.toFixed(1)}%`];
+        return [code, `${PARTY_LABELS[winner] ?? winner} — ${formatNumber(share, 1)}%`];
       }),
     );
   }, [electionResult, activeParty]);
@@ -169,14 +170,14 @@ export function useElectionDerivedData({
       return Object.fromEntries(
         Object.entries(subElectionResult.partyVotes).map(([code, votes]) => {
           const share = votes[activeParty] ?? 0;
-          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${share.toFixed(1)}%`];
+          return [code, `${PARTY_LABELS[activeParty] ?? activeParty} — ${formatNumber(share, 1)}%`];
         }),
       );
     }
     return Object.fromEntries(
       Object.entries(subElectionResult.winnerByGeo).map(([code, winner]) => {
         const share = subElectionResult.partyVotes[code]?.[winner] ?? 0;
-        return [code, `${PARTY_LABELS[winner] ?? winner} — ${share.toFixed(1)}%`];
+        return [code, `${PARTY_LABELS[winner] ?? winner} — ${formatNumber(share, 1)}%`];
       }),
     );
   }, [subElectionResult, activeParty]);

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown, LibraryBig, SlidersHorizontal } from 'lucide-react';
-import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
@@ -15,9 +14,6 @@ interface MapSidebarProps {
   onLevelChange:      (level: AdminLevel) => void;
   selectedDatasetId:  string | null;
   onDatasetChange:    (id: string) => void;
-  activeDescriptor:   DatasetDescriptor | null;
-  displayYear:        number;
-  onYearChange:       (year: number) => void;
   selectedBase:       BaseMapKey;
   onBaseChange:       (base: BaseMapKey) => void;
   onReset:            () => void;
@@ -116,10 +112,36 @@ function buildGroupOrder(datasets: DatasetDescriptor[]): GroupEntry[] {
   return order;
 }
 
+function SegmentedControl({ items, selectedDatasetId, onDatasetChange }: {
+  items: DatasetDescriptor[];
+  selectedDatasetId: string | null;
+  onDatasetChange: (id: string) => void;
+}) {
+  return (
+    <div className="flex gap-1">
+      {items.map(ds => (
+        <button
+          key={ds.id}
+          onClick={() => onDatasetChange(ds.id)}
+          className={[
+            'flex-1 text-xs py-1 rounded-md text-center transition-colors font-medium',
+            selectedDatasetId === ds.id
+              ? 'bg-blue-500 text-white'
+              : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
+          ].join(' ')}
+        >
+          {ds.shortLabel ?? ds.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function renderGroupEntry(
   entry: GroupEntry,
   selectedDatasetId: string | null,
   onDatasetChange: (id: string) => void,
+  categoryLabel: string,
 ) {
   if (entry.kind === 'single') {
     return (
@@ -135,6 +157,16 @@ function renderGroupEntry(
   const isGroupActive = items.some(d => d.id === selectedDatasetId);
   const groupLabel = items.find(d => d.groupLabel)?.groupLabel ?? key;
 
+  // A group named like its category ("Val" inside VAL) would repeat the header;
+  // render its sub-selector directly instead of a redundant nav row.
+  if (groupLabel === categoryLabel) {
+    return (
+      <li key={key} className="border-b border-slate-100 last:border-0 px-3.5 py-2.5">
+        <SegmentedControl items={items} selectedDatasetId={selectedDatasetId} onDatasetChange={onDatasetChange} />
+      </li>
+    );
+  }
+
   return (
     <li key={key} className="border-b border-slate-100 last:border-0">
       <NavItem
@@ -147,21 +179,8 @@ function renderGroupEntry(
         {groupLabel}
       </NavItem>
       {isGroupActive && (
-        <div className="flex gap-1 px-3.5 pb-2.5 pt-1">
-          {items.map(ds => (
-            <button
-              key={ds.id}
-              onClick={() => onDatasetChange(ds.id)}
-              className={[
-                'flex-1 text-xs py-1 rounded-md text-center transition-colors font-medium',
-                selectedDatasetId === ds.id
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50',
-              ].join(' ')}
-            >
-              {ds.shortLabel ?? ds.label}
-            </button>
-          ))}
+        <div className="px-3.5 pb-2.5 pt-1">
+          <SegmentedControl items={items} selectedDatasetId={selectedDatasetId} onDatasetChange={onDatasetChange} />
         </div>
       )}
     </li>
@@ -175,9 +194,6 @@ export function MapSidebar({
   onLevelChange,
   selectedDatasetId,
   onDatasetChange,
-  activeDescriptor,
-  displayYear,
-  onYearChange,
   selectedBase,
   onBaseChange,
   onReset,
@@ -229,10 +245,9 @@ export function MapSidebar({
   // Settings accordion state (filter + basemap) — both start closed
   const [openSettings, setOpenSettings] = useState<string[]>([]);
 
-  const showYearSlider =
-    activeDescriptor &&
-    activeDescriptor.availableYears.length > 1 &&
-    !['RegSO', 'DeSO'].includes(selectedLevel);
+  // Only criteria with a threshold actually filter anything; the badge counts those.
+  const activeCriteriaCount = filterCriteria.filter(c => Number.isFinite(c.absoluteThreshold)).length;
+  const filterActive        = filterEnabled && activeCriteriaCount > 0;
 
   return (
     <aside className={[
@@ -278,7 +293,7 @@ export function MapSidebar({
         </ul>
       </div>
 
-      {/* ── Zone 2: Datasets + ÅR (scrollable) ──────────────────────────────── */}
+      {/* ── Zone 2: Datasets (scrollable) ───────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
         <Accordion.Root
           type="multiple"
@@ -291,26 +306,12 @@ export function MapSidebar({
             return (
               <SidebarItem key={cat} value={cat} label={label}>
                 <ul>
-                  {entries.map(entry => renderGroupEntry(entry, selectedDatasetId, onDatasetChange))}
+                  {entries.map(entry => renderGroupEntry(entry, selectedDatasetId, onDatasetChange, label))}
                 </ul>
               </SidebarItem>
             );
           })}
         </Accordion.Root>
-
-        {showYearSlider && (
-          <div className="border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel className="font-bold text-slate-500">År</SectionLabel>
-              <span className="text-sm font-semibold text-slate-700 tabular-nums">{displayYear}</span>
-            </div>
-            <YearSlider
-              years={activeDescriptor!.availableYears.map(String)}
-              selectedYear={String(displayYear)}
-              onYearChange={y => onYearChange(Number(y))}
-            />
-          </div>
-        )}
 
         {/* Browse Kolada catalog — only meaningful at Region/Municipality level */}
         {(selectedLevel === 'Region' || selectedLevel === 'Municipality') && (
@@ -334,26 +335,26 @@ export function MapSidebar({
             onClick={onOpenFilterPanel}
             className={[
               'w-full flex items-center gap-2 text-xs transition-colors group',
-              filterEnabled && filterCriteria.length > 0
+              filterActive
                 ? 'text-blue-600 hover:text-blue-700'
                 : 'text-slate-400 hover:text-blue-600',
             ].join(' ')}
           >
             <SlidersHorizontal className={[
               'w-3.5 h-3.5 flex-shrink-0',
-              filterEnabled && filterCriteria.length > 0
+              filterActive
                 ? 'text-blue-500'
                 : 'group-hover:text-blue-500',
             ].join(' ')} />
             <span>Filter</span>
-            {filterCriteria.length > 0 && (
+            {activeCriteriaCount > 0 && (
               <span className={[
-                'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
+                'ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
                 filterEnabled
                   ? 'bg-blue-100 text-blue-600'
                   : 'bg-slate-200 text-slate-500',
               ].join(' ')}>
-                {filterCriteria.length}
+                {activeCriteriaCount}
               </span>
             )}
           </button>

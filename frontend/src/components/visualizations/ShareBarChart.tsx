@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { CategoricalShareResult } from '@/datasets/types';
 import { useChartBase } from '@/hooks/useChartBase';
 import { CT } from './chartTokens';
+import { formatNumber } from '@/utils/format';
 
 interface Props {
   data:          CategoricalShareResult;
@@ -187,7 +188,7 @@ export const ShareBarChart: React.FC<Props> = ({
                 <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: cat.color }} />
                 <span className="text-slate-300">{cat.tooltipLabel ?? cat.label}</span>
                 <span className="ml-auto tabular-nums text-slate-100 pl-3">
-                  {(tooltipRowData.shares[cat.code] ?? 0).toFixed(1)}%
+                  {formatNumber(tooltipRowData.shares[cat.code] ?? 0, 1)}%
                 </span>
               </div>
             ))}

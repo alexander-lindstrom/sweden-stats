@@ -41,7 +41,7 @@ export default function PerfOverlay() {
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] rounded-lg bg-black/85 backdrop-blur-sm shadow-xl overflow-hidden min-w-64">
-      <div className="px-3 py-1.5 text-[10px] font-mono text-white/40 border-b border-white/10">
+      <div className="px-3 py-1.5 text-[11px] font-mono text-white/40 border-b border-white/10">
         perf · last {entries.length} fetches · {statsLabel}
       </div>
       <ul className="divide-y divide-white/5">
@@ -49,7 +49,7 @@ export default function PerfOverlay() {
           const { label, className } = SOURCE_STYLES[entry.source];
           return (
             <li key={i} className="flex items-center gap-2 px-3 py-1.5">
-              <span className={`${className} rounded px-1.5 py-0.5 text-[10px] font-mono text-white font-semibold shrink-0`}>
+              <span className={`${className} rounded px-1.5 py-0.5 text-[11px] font-mono text-white font-semibold shrink-0`}>
                 {label}
               </span>
               <span className="flex-1 text-[11px] font-mono text-white/70 truncate">

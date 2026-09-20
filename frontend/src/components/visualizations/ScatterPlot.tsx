@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { ScalarDatasetResult } from '@/datasets/types';
+import { COUNTY_NAMES } from '@/datasets/adminLevels';
 import { useChartBase } from '@/hooks/useChartBase';
 import { CT } from './chartTokens';
+import { formatCompact, formatWithUnit } from '@/utils/format';
 
 interface Props {
   xData: ScalarDatasetResult;
@@ -45,13 +47,6 @@ function countyColor(code: string): string {
   return PALETTE[(idx >= 0 ? idx : 0) % PALETTE.length];
 }
 
-function fmt(v: number, unit: string): string {
-  if (unit === '%' || Math.abs(v) < 100) { return d3.format('.1f')(v); }
-  if (Math.abs(v) >= 1_000_000) { return `${(v / 1_000_000).toFixed(1)}M`; }
-  if (Math.abs(v) >= 1_000)     { return `${Math.round(v / 1_000)}k`; }
-  return String(Math.round(v));
-}
-
 export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, onFeatureSelect, comparisonFeature, onComparisonSelect }) => {
   const { containerRef, svgRef, dimensions } = useChartBase();
   const [hovered, setHovered] = useState<Hovered | null>(null);
@@ -60,6 +55,17 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
   onFeatureSelectRef.current  = onFeatureSelect;
   const onComparisonSelectRef = useRef(onComparisonSelect);
   onComparisonSelectRef.current = onComparisonSelect;
+
+  // Counties present in the plot, for the colour legend.
+  const counties = useMemo(() => {
+    const present = new Set<string>();
+    for (const code of Object.keys(xData.values)) {
+      if (yData.values[code] !== undefined) { present.add(code.slice(0, 2)); }
+    }
+    return [...present]
+      .filter(c => COUNTY_NAMES[c])
+      .sort((a, b) => COUNTY_NAMES[a].localeCompare(COUNTY_NAMES[b], 'sv'));
+  }, [xData.values, yData.values]);
 
   useEffect(() => {
     if (!svgRef.current || !dimensions) { return; }
@@ -103,8 +109,8 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
     let yAxisDef: d3.Axis<d3.NumberValue>;
     let xTickVals: number[];
     let yTickVals: number[];
-    const xTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), xData.unit);
-    const yTickFmt = (n: d3.NumberValue) => fmt(n.valueOf(), yData.unit);
+    const xTickFmt = (n: d3.NumberValue) => formatCompact(n.valueOf());
+    const yTickFmt = (n: d3.NumberValue) => formatCompact(n.valueOf());
 
     // For log scales filter to 1×/2×/5× per decade — avoids crowding.
     const sparseLogTicks = (ticks: number[]) => ticks.filter(v => {
@@ -298,7 +304,19 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
   }, [xData, yData, dimensions, selectedFeature, comparisonFeature, svgRef]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
+    <div className="w-full h-full flex flex-col">
+      {/* Point colour = county. Mirrors the MultiLineChart legend row. */}
+      {counties.length > 1 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 flex-shrink-0">
+          {counties.map(c => (
+            <span key={c} className="flex items-center gap-1.5 text-[11px] text-slate-600 whitespace-nowrap">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: countyColor(c) }} />
+              {COUNTY_NAMES[c]}
+            </span>
+          ))}
+        </div>
+      )}
+      <div ref={containerRef} className="relative flex-1 min-h-0">
       <svg ref={svgRef} className="w-full h-full" />
       {hovered && (
         <div
@@ -307,13 +325,14 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
         >
           <div className="font-semibold mb-0.5">{hovered.point.label}</div>
           <div className="text-gray-300">
-            {xData.label}: <span className="text-white">{fmt(hovered.point.x, xData.unit)}{xData.unit ? ` ${xData.unit}` : ''}</span>
+            {xData.label}: <span className="text-white">{formatWithUnit(hovered.point.x, xData.unit)}</span>
           </div>
           <div className="text-gray-300">
-            {yData.label}: <span className="text-white">{fmt(hovered.point.y, yData.unit)}{yData.unit ? ` ${yData.unit}` : ''}</span>
+            {yData.label}: <span className="text-white">{formatWithUnit(hovered.point.y, yData.unit)}</span>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

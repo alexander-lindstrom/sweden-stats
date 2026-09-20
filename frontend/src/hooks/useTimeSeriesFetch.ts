@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AdminLevel, ChartType, DatasetDescriptor, TimeSeriesNode } from '@/datasets/types';
 import { fetchTimeSeriesCached } from '@/datasets/cache';
+import { describeFetchError } from '@/datasets/fetchErrors';
+import { showToast } from '@/components/ui/toast';
 
 interface TimeSeriesFetchResult {
   data:    TimeSeriesNode[] | null;
@@ -42,6 +44,7 @@ export function useTimeSeriesFetch(
         if (gen !== fetchGenRef.current) { return; }
         console.error('Time series fetch failed:', err);
         setLoading(false);
+        showToast(describeFetchError(`tidsserien för ${activeDescriptor.label}`, activeDescriptor.source, err));
       });
   }, [activeChartType, activeDescriptor, selectedLevel, featureCode, activeBreakdownId]);
 

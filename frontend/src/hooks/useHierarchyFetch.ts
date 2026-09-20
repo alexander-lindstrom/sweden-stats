@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChartType, DatasetDescriptor, GeoHierarchyNode } from '@/datasets/types';
 import { fetchHierarchyCached } from '@/datasets/cache';
+import { describeFetchError } from '@/datasets/fetchErrors';
+import { showToast } from '@/components/ui/toast';
 
 interface HierarchyFetchResult {
   data:    GeoHierarchyNode | null;
@@ -35,6 +37,7 @@ export function useHierarchyFetch(
         if (gen !== fetchGenRef.current) { return; }
         console.error('Hierarchy fetch failed:', err);
         setLoading(false);
+        showToast(describeFetchError(activeDescriptor.label, activeDescriptor.source, err));
       });
   }, [activeChartType, activeDescriptor, selectedYear]);
 

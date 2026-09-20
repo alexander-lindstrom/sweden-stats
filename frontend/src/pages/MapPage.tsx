@@ -1,11 +1,12 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CircleHelp } from 'lucide-react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
 import { KoladaBrowsePanel } from '@/components/map/KoladaBrowsePanel';
 import { FilterBrowsePanel } from '@/components/map/FilterBrowsePanel';
 import { usePinnedKolada } from '@/hooks/usePinnedKolada';
-import { SelectionPanel } from '@/components/map/SelectionPanel';
+import { SelectionPanel, type ActiveStatSource } from '@/components/map/SelectionPanel';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 
@@ -19,7 +20,7 @@ const ShareBarChart  = lazy(() => import('@/components/visualizations/ShareBarCh
 const DonutChart     = lazy(() => import('@/components/visualizations/DonutChart').then(m => ({ default: m.DonutChart })));
 const ScatterPlot    = lazy(() => import('@/components/visualizations/ScatterPlot').then(m => ({ default: m.ScatterPlot })));
 const BoxPlot        = lazy(() => import('@/components/visualizations/BoxPlot').then(m => ({ default: m.BoxPlot })));
-import { FeatureSearch } from '@/components/ui/FeatureSearch';
+import YearSlider from '@/components/common/YearSlider';
 import {
   AdminLevel, ViewType, ScalarDatasetResult, FilterCriterion,
   CHART_TYPE_LABELS,
@@ -27,7 +28,7 @@ import {
 } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
-import { COUNTY_NAMES } from '@/datasets/adminLevels';
+import { COUNTY_NAMES, LEVEL_LABELS } from '@/datasets/adminLevels';
 import { PARTY_CODES, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
@@ -43,6 +44,7 @@ import { useAreaFilterDerivedData } from '@/hooks/useAreaFilterDerivedData';
 import { useElectionDerivedData } from '@/hooks/useElectionDerivedData';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
+import { Toaster } from '@/components/ui/Toaster';
 import { Spinner } from '@/components/ui/Spinner';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
@@ -114,6 +116,9 @@ export default function MapPage() {
   const [mapResetToken,       setMapResetToken]       = useState(0);
   const [selectedBase,        setSelectedBase]        = useState<BaseMapKey>('None');
   const [fillOpacity,         setFillOpacity]         = useState(1.0);
+  const [shortcutsOpen,       setShortcutsOpen]       = useState(false);
+  /** "Jämför" was pressed: the next selection anywhere becomes the comparison area. */
+  const [comparePickMode,     setComparePickMode]     = useState(false);
 
   // ── Filter state ───────────────────────────────────────────────────────
   /** Whether threshold filter mode is active. */
@@ -138,7 +143,6 @@ export default function MapPage() {
     drillStack, setDrillStack,
     selectedLan, setSelectedLan,
     selectedMuni, setSelectedMuni,
-    munLabels,
     pendingSelectionRef,
     userDismissedPanel,
     breadcrumbAncestors,
@@ -147,6 +151,25 @@ export default function MapPage() {
     handleDrillDown,
     handleBreadcrumbGoto,
   } = nav;
+
+  // Comparison pick mode routes the next ordinary click to the comparison slot,
+  // so mouse and touch users get the same result as shift-click.
+  const pickComparison = useCallback((feature: SelectedFeature | null) => {
+    handleComparisonSelect(feature);
+    setComparePickMode(false);
+  }, [handleComparisonSelect]);
+  const selectFeature = comparePickMode ? pickComparison : handleFeatureSelect;
+
+  useEffect(() => {
+    if (!selectedFeature) { setComparePickMode(false); }
+  }, [selectedFeature]);
+
+  useEffect(() => {
+    if (!shortcutsOpen) { return; }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShortcutsOpen(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shortcutsOpen]);
 
   // ── Dataset (year, party, descriptor) ─────────────────────────────────
   const ds = useDatasetState(
@@ -195,6 +218,15 @@ export default function MapPage() {
     scatterableDatasets,
   } = view;
 
+  // The profile view relies on the panel for search and the numbers, so make
+  // sure it is visible when the user switches there.
+  useEffect(() => {
+    if (activeView === 'profile') {
+      userDismissedPanel.current = false;
+      setIsPanelOpen(true);
+    }
+  }, [activeView, userDismissedPanel]);
+
   // ── Breakdown dimension (e.g. consumer category vs fuel type) ────────
   const [activeBreakdownId, setActiveBreakdownId] = useState<string | null>(
     initialValues.activeBreakdownId ?? null,
@@ -211,7 +243,7 @@ export default function MapPage() {
     });
   }, [activeDescriptor]);
 
-  const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
+  const { datasetResult, colorScale, colorLegend, mapColorFn, loading } = useDatasetFetch(
     selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId,
   );
 
@@ -345,6 +377,15 @@ export default function MapPage() {
     setMapResetToken(t => t + 1);
   };
 
+  // Breadcrumb root: deselect and zoom out, but keep dataset, view, level and filters.
+  const handleClearSelection = () => {
+    setDrillStack([]);
+    setSelectedFeature(null);
+    setComparisonFeature(null);
+    userDismissedPanel.current = false;
+    setMapResetToken(t => t + 1);
+  };
+
   // When admin level changes: reset dataset if unavailable, clear comparison/filters/selection.
   // lastProcessedLevelRef tracks the last level this effect ran for:
   //   - null  → initial mount: run dataset/level sync but skip state clearing to preserve URL state
@@ -373,6 +414,13 @@ export default function MapPage() {
     }
   }, [selectedLevel, resetDatasetForLevel, pendingSelectionRef, setComparisonFeature, setSelectedFeature, setSelectionLevel]);
 
+  // Browser tab reflects what is on screen — useful in history and when several tabs are open.
+  useEffect(() => {
+    const parts = [selectedFeature?.label, activeDescriptor?.label, LEVEL_LABELS[selectedLevel], String(selectedYear)]
+      .filter((p): p is string => !!p);
+    document.title = `${parts.join(' · ')} – Rikskartan`;
+  }, [selectedFeature, activeDescriptor, selectedLevel, selectedYear]);
+
   // Sync settled state → URL after every relevant state change.
   useEffect(() => {
     syncUrl({
@@ -387,29 +435,31 @@ export default function MapPage() {
     activeView, activeChartType, activeBreakdownId,
   ]);
 
+  // The dataset being explored, surfaced as the panel's first stat row. Only when
+  // the panel's selection level matches the map level (sunburst drill can differ).
+  const activeStatSource = useMemo((): ActiveStatSource | null => {
+    if (!activeDescriptor || selectionLevel !== selectedLevel) { return null; }
+    if (scalarResult) {
+      return { datasetId: activeDescriptor.id, label: activeDescriptor.label, year: selectedYear, result: scalarResult };
+    }
+    // Party choropleth: the per-party share is the number on the map.
+    if (activeParty && partyRankingResult && activeChartType !== 'party-ranking') {
+      return { datasetId: activeDescriptor.id, label: PARTY_LABELS[activeParty] ?? activeParty, year: selectedYear, result: partyRankingResult };
+    }
+    return null;
+  }, [activeDescriptor, selectionLevel, selectedLevel, scalarResult, activeParty, partyRankingResult, activeChartType, selectedYear]);
+
   // Color function for bivariate mode: maps (code) → 3×3 palette hex.
   const bivariateFn = useMemo(() => {
     if (!bivariateMode || !scalarResult || !bivariateYScalar) { return null; }
     return buildBivariateColorFn(scalarResult.values, bivariateYScalar.values);
   }, [bivariateMode, scalarResult, bivariateYScalar]);
 
-  // ── Profile search items ──────────────────────────────────────────────────
-  // Reuses searchItems; falls back to munLabels so the profile search is always populated.
-  const profileSearchItems = useMemo(() => {
-    if (activeView !== 'profile') { return []; }
-    if (searchItems.length > 0) { return searchItems; }
-    if (selectedLevel === 'Region') {
-      return Object.entries(COUNTY_NAMES)
-        .map(([code, label]) => ({ code, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
-    }
-    if (selectedLevel === 'Municipality' && munLabels) {
-      return Object.entries(munLabels)
-        .map(([code, label]) => ({ code, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
-    }
-    return [];
-  }, [activeView, selectedLevel, searchItems, munLabels]);
+  // Year slider lives in the context strip so it stays visible with the sidebar collapsed.
+  const showYearSlider =
+    !!activeDescriptor &&
+    activeDescriptor.availableYears.length > 1 &&
+    !['RegSO', 'DeSO'].includes(selectedLevel);
 
   // Content-sized charts should shrink the render area to content height instead of filling.
   // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.
@@ -428,6 +478,7 @@ export default function MapPage() {
   return (
     <main className="flex h-screen overflow-hidden bg-white">
       <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
+      <Toaster />
 
       {/* Sidebar backdrop — visible below lg where sidebar is an overlay */}
       {mobileSidebarOpen && (
@@ -442,9 +493,6 @@ export default function MapPage() {
         onLevelChange={(l) => { setSelectedLevel(l); setMobileSidebarOpen(false); }}
         selectedDatasetId={selectedDatasetId}
         onDatasetChange={(id) => { setSelectedDatasetId(id); setMobileSidebarOpen(false); }}
-        activeDescriptor={activeDescriptor}
-        displayYear={displayYear}
-        onYearChange={handleYearChange}
         selectedBase={selectedBase}
         onBaseChange={setSelectedBase}
         onReset={handleReset}
@@ -478,7 +526,7 @@ export default function MapPage() {
           {/* Sidebar toggle — md+ only */}
           <button
             onClick={() => setDesktopSidebarOpen(o => !o)}
-            title={desktopSidebarOpen ? 'Dölj sidopanel' : 'Visa sidopanel'}
+            title={desktopSidebarOpen ? 'Dölj meny' : 'Visa meny'}
             className={[
               'hidden md:flex self-center mr-2 items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
               desktopSidebarOpen
@@ -490,7 +538,7 @@ export default function MapPage() {
               <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
               <line x1="5.5" y1="1.5" x2="5.5" y2="14.5" />
             </svg>
-            <span className="hidden lg:inline">{desktopSidebarOpen ? 'Dölj' : 'Meny'}</span>
+            <span className="hidden lg:inline">Meny</span>
           </button>
 
           {/* View tabs */}
@@ -548,7 +596,7 @@ export default function MapPage() {
             <div className="hidden md:flex items-center self-center pl-3 border-l border-slate-200">
               <button
                 onClick={() => setBivariateMode(m => !m)}
-                title={bivariateMode ? 'Stäng 2D-läge' : 'Visa två variabler på kartan (bivariat)'}
+                title={bivariateMode ? 'Visa en variabel' : 'Visa två variabler på kartan (bivariat)'}
                 className={[
                   'flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
                   bivariateMode
@@ -556,10 +604,51 @@ export default function MapPage() {
                     : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
                 ].join(' ')}
               >
-                2D
+                Två variabler
               </button>
             </div>
           )}
+
+          {/* Interaction help */}
+          <div className="relative self-center ml-3">
+            <button
+              onClick={() => setShortcutsOpen(o => !o)}
+              aria-label="Så här navigerar du"
+              aria-expanded={shortcutsOpen}
+              title="Så här navigerar du"
+              className={[
+                'flex items-center justify-center w-7 h-7 rounded-lg transition-colors border',
+                shortcutsOpen
+                  ? 'bg-blue-50 border-blue-200 text-blue-600'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+              ].join(' ')}
+            >
+              <CircleHelp className="w-4 h-4" strokeWidth={1.75} />
+            </button>
+            {shortcutsOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShortcutsOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                  <SectionLabel className="block mb-2">Så här navigerar du</SectionLabel>
+                  <dl className="space-y-1.5 text-xs">
+                    {[
+                      ['Klick',                    'Välj område'],
+                      ['Skift + klick',            'Jämför med det valda området'],
+                      ['Dubbelklick på delområde', 'Gå ner en nivå'],
+                      ['Esc',                      'Gå upp en nivå, eller avmarkera'],
+                      ['Skift + Enter i sökfältet', 'Lägg till träffen som jämförelse'],
+                      ['Reglaget År',              'Byt år utan att tappa urvalet'],
+                    ].map(([key, what]) => (
+                      <div key={key} className="flex items-baseline gap-2">
+                        <dt className="flex-shrink-0 font-mono text-[11px] text-slate-700 bg-slate-100 rounded px-1.5 py-0.5 whitespace-nowrap">{key}</dt>
+                        <dd className="text-slate-500">{what}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* Panel toggle */}
           <button
@@ -568,7 +657,7 @@ export default function MapPage() {
               userDismissedPanel.current = !opening;
               setIsPanelOpen(opening);
             }}
-            title={isPanelOpen ? 'Dölj panel' : 'Visa detaljpanel'}
+            title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
             className={[
               'self-center ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
               isPanelOpen
@@ -582,23 +671,27 @@ export default function MapPage() {
             </svg>
             <span className="hidden sm:inline">
               {isPanelOpen
-                ? 'Dölj'
+                ? 'Panel'
                 : selectedFeature
                   ? comparisonFeature
                     ? `${selectedFeature.label} +1`
                     : selectedFeature.label
-                  : 'Detaljer'}
+                  : 'Panel'}
             </span>
           </button>
         </div>
 
-        {/* Context strip — breadcrumb navigation, only when a feature is selected on the map */}
-        {activeView === 'map' && selectedFeature && (
-          <div className="h-8 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-1 overflow-x-auto">
-            <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
-              Sverige
-            </button>
-            {breadcrumbAncestors.map(entry => (
+        {/* Context strip — always visible: where am I (breadcrumb) + what am I looking at (dataset · level · year) */}
+        <div className="h-9 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-2">
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+            {selectedFeature ? (
+              <button onClick={handleClearSelection} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap" title="Avmarkera och zooma ut">
+                Sverige
+              </button>
+            ) : (
+              <span className="text-slate-700 font-medium whitespace-nowrap">Sverige</span>
+            )}
+            {selectedFeature && breadcrumbAncestors.map(entry => (
               <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
                 <span className="text-slate-300 mx-0.5">›</span>
                 <button
@@ -610,14 +703,40 @@ export default function MapPage() {
                 </button>
               </span>
             ))}
-            <span className="flex items-center gap-1">
-              <span className="text-slate-300 mx-0.5">›</span>
-              <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
-                {selectedFeature.label}
+            {selectedFeature && (
+              <span className="flex items-center gap-1">
+                <span className="text-slate-300 mx-0.5">›</span>
+                <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
+                  {selectedFeature.label}
+                </span>
               </span>
-            </span>
+            )}
           </div>
-        )}
+
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {activeDescriptor && (
+              <span className="hidden sm:inline text-slate-500 whitespace-nowrap">
+                <span className="text-slate-700 font-medium">{activeDescriptor.label}</span>
+                {' · '}{LEVEL_LABELS[selectedLevel]}
+                {!showYearSlider && ` · ${displayYear}`}
+              </span>
+            )}
+            {showYearSlider && activeDescriptor && (
+              <div className="flex items-center gap-2 sm:pl-3 sm:border-l sm:border-slate-200">
+                <SectionLabel className="hidden md:inline">År</SectionLabel>
+                <div className="w-28 sm:w-40">
+                  <YearSlider
+                    compact
+                    years={activeDescriptor.availableYears.map(String)}
+                    selectedYear={String(displayYear)}
+                    onYearChange={y => handleYearChange(Number(y))}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-slate-700 tabular-nums w-8 text-right">{displayYear}</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Main view area */}
         <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
@@ -710,20 +829,6 @@ export default function MapPage() {
             </div>
           )}
 
-          {/* Profile area search */}
-          {activeView === 'profile' &&
-           selectedLevel !== 'Country' &&
-           profileSearchItems.length > 0 && (
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <div className="w-64">
-                <FeatureSearch
-                  items={profileSearchItems}
-                  onSelect={handleFeatureSelect}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Y-axis dataset selector for bivariate map */}
           {activeView === 'map' && bivariateMode && bivariateDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-violet-50/60 flex-shrink-0">
@@ -769,7 +874,7 @@ export default function MapPage() {
                     subTooltipData={subElectionTooltip}
                     resetToken={mapResetToken}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
+                    onFeatureSelect={selectFeature}
                     onDrillDown={handleDrillDown}
                     comparisonFeature={comparisonFeature}
                     onComparisonSelect={handleComparisonSelect}
@@ -789,14 +894,14 @@ export default function MapPage() {
               )}
               {activeView === 'map' && !bivariateFn && legendData && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
-                  <MapLegend data={legendData} scale={colorScale} year={selectedYear} source={activeDescriptor?.source} />
+                  <MapLegend data={legendData} legend={colorLegend} year={selectedYear} source={activeDescriptor?.source} />
                 </div>
               )}
 
               <Suspense fallback={<Spinner />}>
                 {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
                   <div className="w-full p-6">
-                    <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
+                    <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                   </div>
                 )}
                 {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
@@ -806,7 +911,7 @@ export default function MapPage() {
                 )}
                 {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
                   <div className="w-full p-6">
-                    <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
+                    <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                   </div>
                 )}
                 {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
@@ -815,7 +920,7 @@ export default function MapPage() {
                       data={partyShareData}
                       sort="none"
                       selectedCode={selectedFeature?.code ?? null}
-                      onSelect={handleFeatureSelect}
+                      onSelect={selectFeature}
                     />
                   </div>
                 )}
@@ -873,7 +978,7 @@ export default function MapPage() {
                       colorFn={rankingColorFn}
                       rowMeta={rankingRowMeta}
                       selectedFeature={selectedFeature}
-                      onFeatureSelect={handleFeatureSelect}
+                      onFeatureSelect={selectFeature}
                       comparisonFeature={comparisonFeature}
                       onComparisonSelect={handleComparisonSelect}
                     />
@@ -885,7 +990,7 @@ export default function MapPage() {
                       xData={scalarResult}
                       yData={scatterYScalar}
                       selectedFeature={selectedFeature}
-                      onFeatureSelect={handleFeatureSelect}
+                      onFeatureSelect={selectFeature}
                       comparisonFeature={comparisonFeature}
                       onComparisonSelect={handleComparisonSelect}
                     />
@@ -912,12 +1017,12 @@ export default function MapPage() {
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
               {activeView === 'table' && electionResult && (
                 <div className="w-full h-full p-6">
-                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
+                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} />
                 </div>
               )}
               {activeView === 'table' && !datasetResult && (
@@ -927,7 +1032,7 @@ export default function MapPage() {
               )}
 
               {activeView === 'profile' && (
-                <FeatureProfile selectedFeature={selectedFeature} adminLevel={selectionLevel} />
+                <FeatureProfile selectedFeature={selectedFeature} comparisonFeature={comparisonFeature} adminLevel={selectionLevel} />
               )}
             </div>
           </div>
@@ -942,6 +1047,11 @@ export default function MapPage() {
           <SelectionPanel
             selectedFeature={selectedFeature}
             adminLevel={selectionLevel}
+            activeStat={activeStatSource}
+            onOpenProfile={selectedLevel !== 'Country' && activeView !== 'profile' ? () => setActiveView('profile') : undefined}
+            comparePickMode={comparePickMode}
+            onCompareRequest={() => setComparePickMode(true)}
+            onCancelCompare={() => setComparePickMode(false)}
             isOpen={isPanelOpen}
             onClose={() => { userDismissedPanel.current = true; setIsPanelOpen(false); }}
             comparisonFeature={comparisonFeature}
@@ -953,7 +1063,7 @@ export default function MapPage() {
               // in election results at Country level).
               if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
               else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
-              handleFeatureSelect(item);
+              selectFeature(item);
             }}
             onSearchComparisonSelect={(item) => {
               if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import useResizeObserver from '@/hooks/useResizeObserver';
+import { formatNumber } from '@/utils/format';
 
 export interface DonutItem {
   code:  string;
@@ -140,11 +141,11 @@ export function DonutChart({
             )}
             {showCount && (
               <span className="tabular-nums text-slate-400 flex-shrink-0">
-                {item.value.toLocaleString('sv-SE')}
+                {formatNumber(item.value)}
               </span>
             )}
             <span className={`tabular-nums text-slate-700 flex-shrink-0 ${effectiveLegendPos !== 'right' && !showCount ? 'ml-auto' : ''}`}>
-              {share.toFixed(1)}%
+              {formatNumber(share, 1)}%
             </span>
           </div>
         );
@@ -169,8 +170,8 @@ export function DonutChart({
           <div className="font-semibold text-slate-100">{tooltip.item.label}</div>
           <div className="text-slate-300 mt-0.5">
             {valueIsShare
-              ? `${tooltip.share.toFixed(1)}%`
-              : `${tooltip.item.value.toLocaleString('sv-SE')} (${tooltip.share.toFixed(1)}%)`
+              ? `${formatNumber(tooltip.share, 1)}%`
+              : `${formatNumber(tooltip.item.value)} (${formatNumber(tooltip.share, 1)}%)`
             }
           </div>
         </div>

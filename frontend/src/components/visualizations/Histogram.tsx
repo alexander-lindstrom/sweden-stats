@@ -4,6 +4,7 @@ import { ScalarDatasetResult } from '@/datasets/types';
 import { useChartBase } from '@/hooks/useChartBase';
 import { stripCommonPrefix, stripLanSuffix, stripOrphanParens, stripOuterParens } from '@/utils/labelFormatting';
 import { CT } from './chartTokens';
+import { formatCompact } from '@/utils/format';
 
 interface HistogramProps {
   data: ScalarDatasetResult;
@@ -18,12 +19,6 @@ interface Hovered {
 
 const MARGIN   = { top: 16, right: 24, bottom: 36, left: 52 };
 const NUM_BINS = 15;
-
-function formatValue(v: number): string {
-  if (v >= 1_000_000) {return `${(v / 1_000_000).toFixed(1)}M`;}
-  if (v >= 1_000)     {return `${(v / 1_000).toFixed(0)}k`;}
-  return String(Math.round(v));
-}
 
 export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
   const { containerRef, svgRef, dimensions } = useChartBase();
@@ -140,7 +135,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
       .call(
         d3.axisBottom(xScale)
           .ticks(6)
-          .tickFormat(n => formatValue(n.valueOf()))
+          .tickFormat(n => formatCompact(n.valueOf()))
       )
       .call(ax => ax.select('.domain').remove())
       .call(ax => ax.selectAll('line').attr('stroke', CT.gridLine))
@@ -187,7 +182,7 @@ export const Histogram: React.FC<HistogramProps> = ({ data, colorScale }) => {
           style={{ left: hovered.x + 14, top: hovered.y - 10 }}
         >
           <div className="font-semibold">
-            {formatValue(hovered.x0)} – {formatValue(hovered.x1)} {data.unit}
+            {formatCompact(hovered.x0)} – {formatCompact(hovered.x1)} {data.unit}
           </div>
           <div className="text-gray-400 mb-1">{hovered.count} områden</div>
           {hovered.names.map((n, i) => (
