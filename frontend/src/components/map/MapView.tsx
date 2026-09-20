@@ -175,9 +175,8 @@ const MapView: React.FC<MapViewProps> = ({
 }) => {
   const mapRef           = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef   = useRef<OlMap | null>(null);
-  const baseLayerRef     = useRef<TileLayer<XYZ>>(
-    new TileLayer({ visible: false })
-  );
+  // One tile layer per source in the selected base map stack; empty for 'None'.
+  const baseLayersRef    = useRef<TileLayer<XYZ>[]>([]);
   const fillLayerRef     = useRef<VectorTileLayer | null>(null);
   const boundaryLayerRef = useRef<VectorTileLayer | null>(null);
   // Outgoing layers are kept visible during level transitions until the first
@@ -465,7 +464,7 @@ const MapView: React.FC<MapViewProps> = ({
 
     const map = new OlMap({
       target: mapRef.current,
-      layers: [baseLayerRef.current],
+      layers: baseLayersRef.current,
       view: new View({ center: SWEDEN_CENTER, zoom: 5.5 }),
       controls: defaultControls({ zoom: false }),
     });
@@ -729,14 +728,11 @@ const MapView: React.FC<MapViewProps> = ({
     const map = mapInstanceRef.current;
     if (!map) {return;}
 
-    map.removeLayer(baseLayerRef.current);
-    if (selectedBase === 'None') {
-      baseLayerRef.current = new TileLayer({ visible: false });
-    } else {
-      baseLayerRef.current = new TileLayer({ source: baseMaps[selectedBase] });
-    }
-    baseLayerRef.current.setZIndex(0);
-    map.addLayer(baseLayerRef.current);
+    for (const layer of baseLayersRef.current) { map.removeLayer(layer); }
+    baseLayersRef.current = selectedBase === 'None'
+      ? []
+      : baseMaps[selectedBase].map(source => new TileLayer({ source, zIndex: 0 }));
+    for (const layer of baseLayersRef.current) { map.addLayer(layer); }
   }, [selectedBase]);
 
   return (
