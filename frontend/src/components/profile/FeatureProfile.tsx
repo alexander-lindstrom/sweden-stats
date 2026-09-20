@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import type { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
-import { fetchAgeGenderBreakdown, type PyramidRow } from '@/datasets/scb/population';
 import { PopulationPyramid } from '@/components/visualizations/PopulationPyramid';
 import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 import { ProfileSection } from './ProfileSection';
@@ -13,13 +11,12 @@ import { SectionLabel } from '@/components/ui/SectionLabel';
 import { UI } from '@/theme';
 import { useAreaStats, AREA_STATS_YEAR, toPanelStats, buildRadarAxes } from '@/hooks/useAreaStats';
 import {
-  usePopulationSparkline, useRiksdagsvalVotes,
-  ELECTION_YEAR, ELECTION_LEVELS, SPARKLINE_LEVELS,
+  usePopulationSparkline, useRiksdagsvalVotes, useAgePyramid,
+  ELECTION_YEAR, ELECTION_LEVELS, SPARKLINE_LEVELS, PYRAMID_LEVELS,
 } from '@/hooks/useAreaExtras';
-import { formatNumber } from '@/utils/format';
+import { formatNumber, formatSigned } from '@/utils/format';
 
-const STAT_YEAR      = AREA_STATS_YEAR;
-const PYRAMID_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
+const STAT_YEAR = AREA_STATS_YEAR;
 
 const PEER_LABEL: Record<AdminLevel, string> = {
   Country:      'länder',
@@ -28,6 +25,34 @@ const PEER_LABEL: Record<AdminLevel, string> = {
   RegSO:        'RegSO-områden',
   DeSO:         'DeSO-områden',
 };
+
+// ── Area colour coding ────────────────────────────────────────────────────────
+// The selected area is blue and the comparison area orange everywhere: header,
+// stat rows, chart legends and card titles. Same convention as the selection
+// panel, the radar and the sparkline.
+
+type AreaRole = 'primary' | 'comparison';
+
+const ROLE_DOT: Record<AreaRole, string> = {
+  primary:    'bg-blue-500',
+  comparison: 'bg-orange-500',
+};
+
+function AreaDot({ role, className = '' }: { role: AreaRole; className?: string }) {
+  return <span className={`w-2 h-2 rounded-full flex-shrink-0 ${ROLE_DOT[role]} ${className}`} />;
+}
+
+/** Colour dot + name, so every card says which area it shows. */
+function AreaTag({ role, children, className = '' }: { role: AreaRole; children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex items-center gap-1.5 min-w-0 ${className}`}>
+      <AreaDot role={role} />
+      <div className="truncate min-w-0">{children}</div>
+    </div>
+  );
+}
+
+// ── Key stats ─────────────────────────────────────────────────────────────────
 
 interface StatVal { value: number; mean: number | null; }
 
@@ -40,6 +65,12 @@ function toStatVal(result: ScalarDatasetResult | null, code: string): StatVal | 
   return { value: v as number, mean };
 }
 
+function valueOf(result: ScalarDatasetResult | null, code: string): number | null {
+  const v = result?.values[code];
+  return Number.isFinite(v) ? (v as number) : null;
+}
+
+/** Single-area stat: the value against the mean of all peer areas. */
 function StatMini({ label, value, mean, unit }: {
   label: string;
   value: number | null;
@@ -76,6 +107,52 @@ function StatMini({ label, value, mean, unit }: {
   );
 }
 
+function StatValueRow({ role, value, loading = false }: { role: AreaRole; value: number | null; loading?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <AreaDot role={role} />
+      <span className="text-base font-bold tabular-nums text-slate-900 truncate">
+        {loading ? '…' : value === null ? '—' : formatNumber(value)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Two-area stat: both values with their colour dots and the difference
+ * (selected minus comparison). Replaces the peer-mean delta in compare mode;
+ * the percentile radar below still covers "how does each rank".
+ */
+function StatCompareMini({ label, unit, a, b, bLoading }: {
+  label:    string;
+  unit:     string;
+  a:        number | null;
+  b:        number | null;
+  bLoading: boolean;
+}) {
+  const delta      = a !== null && b !== null ? a - b : null;
+  const deltaColor = delta === null || delta === 0
+    ? UI.deltaNeutral
+    : delta > 0 ? 'text-blue-600' : 'text-orange-600';
+
+  return (
+    <div className={`${UI.card} min-w-0`}>
+      <SectionLabel className="mb-1.5 block whitespace-normal leading-tight">{label}</SectionLabel>
+      <div className="space-y-1">
+        <StatValueRow role="primary"    value={a} />
+        <StatValueRow role="comparison" value={b} loading={bLoading} />
+      </div>
+      <div className={`text-[11px] tabular-nums mt-1.5 leading-tight ${deltaColor}`}>
+        {delta === null
+          ? (bLoading ? '…' : '—')
+          : `Skillnad ${formatSigned(delta)} ${unit}`.trim()}
+      </div>
+    </div>
+  );
+}
+
+// ── Chart helpers ─────────────────────────────────────────────────────────────
+
 function SeriesLegend({ primary, comparison }: { primary: string; comparison: string }) {
   return (
     <div className="flex items-center gap-3 mt-2 justify-center">
@@ -91,9 +168,29 @@ function SeriesLegend({ primary, comparison }: { primary: string; comparison: st
   );
 }
 
+function PyramidCard({ role, label, tagged, pyramid }: {
+  role:    AreaRole;
+  label:   string;
+  /** Show the colour dot; only meaningful when two pyramids sit side by side. */
+  tagged:  boolean;
+  pyramid: { rows: Parameters<typeof PopulationPyramid>[0]['data']; loading: boolean };
+}) {
+  return (
+    <ProfileCard title={tagged ? <AreaTag role={role}>{label}</AreaTag> : label} subtitle={`${STAT_YEAR}`}>
+      {pyramid.loading
+        ? <Spinner />
+        : pyramid.rows.length > 0
+          ? <PopulationPyramid data={pyramid.rows} />
+          : <p className="text-sm text-slate-400">Ingen pyramiddata tillgänglig.</p>}
+    </ProfileCard>
+  );
+}
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
 interface Props {
   selectedFeature:    { code: string; label: string } | null;
-  /** Second area (shift-click / Jämför). Overlaid on the radar, trend and election charts. */
+  /** Second area (shift-click / Jämför). Every section then shows both areas. */
   comparisonFeature?: { code: string; label: string } | null;
   adminLevel:         AdminLevel;
 }
@@ -107,35 +204,12 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
   const primary = useAreaStats(selectedFeature,   adminLevel, STAT_YEAR);
   const comp    = useAreaStats(comparisonFeature, adminLevel, STAT_YEAR);
 
-  const spark     = usePopulationSparkline(selectedFeature,   adminLevel);
-  const compSpark = usePopulationSparkline(comparisonFeature, adminLevel);
-  const votes     = useRiksdagsvalVotes(selectedFeature,   adminLevel);
-  const compVotes = useRiksdagsvalVotes(comparisonFeature, adminLevel);
-
-  const [pyramid,        setPyramid]        = useState<PyramidRow[]>([]);
-  const [pyramidLoading, setPyramidLoading] = useState(false);
-  const fetchIdRef = useRef(0);
-
-  useEffect(() => {
-    if (!selectedFeature || !PYRAMID_LEVELS.includes(adminLevel)) {
-      setPyramid([]);
-      return;
-    }
-
-    const id   = ++fetchIdRef.current;
-    const code = selectedFeature.code;
-
-    setPyramid([]);
-    setPyramidLoading(true);
-
-    fetchAgeGenderBreakdown(adminLevel, code, STAT_YEAR)
-      .then(rows => {
-        if (id !== fetchIdRef.current) { return; }
-        setPyramid(rows);
-        setPyramidLoading(false);
-      })
-      .catch(() => { if (id === fetchIdRef.current) { setPyramidLoading(false); } });
-  }, [selectedFeature, adminLevel]);
+  const spark       = usePopulationSparkline(selectedFeature,   adminLevel);
+  const compSpark   = usePopulationSparkline(comparisonFeature, adminLevel);
+  const votes       = useRiksdagsvalVotes(selectedFeature,   adminLevel);
+  const compVotes   = useRiksdagsvalVotes(comparisonFeature, adminLevel);
+  const pyramid     = useAgePyramid(selectedFeature,   adminLevel, STAT_YEAR);
+  const compPyramid = useAgePyramid(comparisonFeature, adminLevel, STAT_YEAR);
 
   if (!selectedFeature) {
     return (
@@ -149,6 +223,7 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
 
   const code        = selectedFeature.code;
   const isComparing = !!comparisonFeature;
+  const compCode    = comparisonFeature?.code ?? '';
 
   const population   = toStatVal(primary.population, code);
   const income       = toStatVal(primary.income,     code);
@@ -157,11 +232,15 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
   const utlandsk     = toStatVal(primary.foreignBg,  code);
 
   const stats         = toPanelStats(primary, code);
-  const compStats     = comparisonFeature ? toPanelStats(comp, comparisonFeature.code) : null;
+  const compStats     = comparisonFeature ? toPanelStats(comp, compCode) : null;
   const radarAxes     = buildRadarAxes(stats);
   const compRadarAxes = buildRadarAxes(compStats);
   const showRadar     = !primary.loading && radarAxes.length >= 3;
   const showElection  = ELECTION_LEVELS.includes(adminLevel);
+
+  const heading = (label: string) => (
+    <h2 className="text-xl font-bold text-slate-900 truncate">{label}</h2>
+  );
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-6 space-y-8">
@@ -170,18 +249,26 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
         <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${LEVEL_BADGE[adminLevel]}`}>
           {LEVEL_LABELS[adminLevel]}
         </span>
-        <h2 className="text-xl font-bold text-slate-900 truncate">{selectedFeature.label}</h2>
-        {isComparing && (
+        {isComparing ? (
           <>
+            <AreaTag role="primary">{heading(selectedFeature.label)}</AreaTag>
             <span className="text-slate-300 text-sm">vs</span>
-            <h2 className="text-xl font-bold text-orange-600 truncate">{comparisonFeature!.label}</h2>
+            <AreaTag role="comparison">{heading(comparisonFeature!.label)}</AreaTag>
           </>
-        )}
+        ) : heading(selectedFeature.label)}
       </div>
 
       <ProfileSection title={`Nyckeltal ${STAT_YEAR}`}>
         {primary.loading ? (
           <Spinner />
+        ) : isComparing ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            <StatCompareMini label="Befolkning" unit={primary.population?.unit ?? ''} a={population?.value ?? null} b={valueOf(comp.population, compCode)} bLoading={comp.loading} />
+            {income     && <StatCompareMini label="Medianinkomst"     unit={primary.income?.unit     ?? ''} a={income.value}     b={valueOf(comp.income,     compCode)} bLoading={comp.loading} />}
+            {age        && <StatCompareMini label="Medelålder"        unit={primary.age?.unit        ?? ''} a={age.value}        b={valueOf(comp.age,        compCode)} bLoading={comp.loading} />}
+            {employment && <StatCompareMini label="Sysselsättning"    unit={primary.employment?.unit ?? ''} a={employment.value} b={valueOf(comp.employment, compCode)} bLoading={comp.loading} />}
+            {utlandsk   && <StatCompareMini label="Utländsk bakgrund" unit={primary.foreignBg?.unit  ?? ''} a={utlandsk.value}   b={valueOf(comp.foreignBg,  compCode)} bLoading={comp.loading} />}
+          </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             <StatMini label="Befolkning"        value={population?.value ?? null} mean={population?.mean ?? null} unit={primary.population?.unit ?? ''} />
@@ -218,11 +305,11 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
                 {isComparing && !votes.loading && !compVotes.loading && (
                   <div className="space-y-3">
                     <div>
-                      <div className="text-[11px] font-semibold text-blue-600 mb-1 truncate">{selectedFeature.label}</div>
+                      <AreaTag role="primary" className="text-[11px] font-semibold text-slate-700 mb-1">{selectedFeature.label}</AreaTag>
                       {votes.votes ? <ElectionDonut votes={votes.votes} /> : <p className="text-xs text-slate-400">Ingen data</p>}
                     </div>
                     <div>
-                      <div className="text-[11px] font-semibold text-orange-600 mb-1 truncate">{comparisonFeature!.label}</div>
+                      <AreaTag role="comparison" className="text-[11px] font-semibold text-slate-700 mb-1">{comparisonFeature!.label}</AreaTag>
                       {compVotes.votes ? <ElectionDonut votes={compVotes.votes} /> : <p className="text-xs text-slate-400">Ingen data</p>}
                     </div>
                   </div>
@@ -263,15 +350,12 @@ export function FeatureProfile({ selectedFeature, comparisonFeature = null, admi
 
       {PYRAMID_LEVELS.includes(adminLevel) && (
         <ProfileSection title="Ålderspyramid">
-          {pyramidLoading ? <Spinner /> :
-            pyramid.length > 0
-              ? (
-                <ProfileCard title={selectedFeature.label} subtitle={`${STAT_YEAR}`}>
-                  <PopulationPyramid data={pyramid} />
-                </ProfileCard>
-              )
-              : <p className="text-sm text-slate-400">Ingen pyramiddata tillgänglig.</p>
-          }
+          <div className={isComparing ? 'grid grid-cols-1 md:grid-cols-2 gap-4' : undefined}>
+            <PyramidCard role="primary" label={selectedFeature.label} tagged={isComparing} pyramid={pyramid} />
+            {isComparing && (
+              <PyramidCard role="comparison" label={comparisonFeature!.label} tagged pyramid={compPyramid} />
+            )}
+          </div>
         </ProfileSection>
       )}
     </div>
