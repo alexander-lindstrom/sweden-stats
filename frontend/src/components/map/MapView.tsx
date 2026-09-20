@@ -740,7 +740,9 @@ const MapView: React.FC<MapViewProps> = ({
   }, [selectedBase]);
 
   return (
-    <div className="relative w-full h-full" style={{ backgroundColor: '#b8d4e4' }}>
+    // Water/background. Kept light and low-saturation so saturated party colours
+    // (Moderaterna's official light blue in particular) stay distinct from the sea.
+    <div className="relative w-full h-full" style={{ backgroundColor: '#cfd8df' }}>
       <div ref={mapRef} className="w-full h-full" />
 
       <Tooltip ref={tooltipRef} visible={hoveredFeature !== null}>
