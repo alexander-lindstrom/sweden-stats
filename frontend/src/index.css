@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens consumed by tailwind.config.ts (bg-background, text-primary,
+ * border-border, ring-ring, …). Values are the slate/blue palette the app
+ * actually uses, expressed as HSL triplets so Tailwind's <alpha-value> works.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;          /* slate-900 */
+
+    --muted: 210 40% 96%;               /* slate-100 */
+    --muted-foreground: 215 16% 47%;    /* slate-500 */
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --card: 210 40% 98%;                /* slate-50 */
+    --card-foreground: 222 47% 11%;
+
+    --border: 214 32% 91%;              /* slate-200 */
+    --input: 214 32% 91%;
+
+    --primary: 221 83% 53%;             /* blue-600 — the accent used throughout */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --accent: 214 95% 93%;              /* blue-100 */
+    --accent-foreground: 226 71% 40%;   /* blue-800 */
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --ring: 221 83% 53%;
+
+    --radius: 0.5rem;
+  }
+}
+
 html, body {
   @apply bg-background text-foreground min-h-screen;
   font-family: system-ui, sans-serif;
