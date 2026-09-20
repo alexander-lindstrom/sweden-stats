@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as Switch from '@radix-ui/react-switch';
 import { X } from 'lucide-react';
 import { Dropdown } from '@/components/ui/Dropdown';
@@ -48,7 +48,7 @@ function CriterionRow({ criterion, sortedVals, filterableDatasets, onUpdate, onR
           <Dropdown
             inputSize="sm"
             value={criterion.datasetId}
-            onChange={id => onUpdate({ ...criterion, datasetId: id, absoluteThreshold: NaN })}
+            onChange={id => onUpdate({ ...criterion, datasetId: id, absoluteThreshold: NaN, defaultPending: true })}
             options={datasetOptions}
           />
 
@@ -147,10 +147,36 @@ export function FilterBrowsePanel({
     onCriteriaChange(criteria.filter((_, i) => i !== index));
   };
 
+  // A new criterion should do something immediately: switch the filter on and,
+  // as soon as the dataset's values are known, start at the median.
   const handleAdd = () => {
     const defaultId = filterableDatasets[0]?.id ?? '';
-    onCriteriaChange([...criteria, { datasetId: defaultId, absoluteThreshold: NaN, direction: 'above' }]);
+    const sv        = sortedValues[defaultId];
+    const threshold = sv && sv.length > 0 ? valueAtPercentile(50, sv) : NaN;
+    onCriteriaChange([...criteria, { datasetId: defaultId, absoluteThreshold: threshold, direction: 'above', defaultPending: !Number.isFinite(threshold) }]);
+    if (!filterEnabled) { onFilterEnabledChange(true); }
   };
+
+  useEffect(() => {
+    if (!criteria.some(c => c.defaultPending)) { return; }
+    let changed = false;
+    const next = criteria.map(c => {
+      if (!c.defaultPending) { return c; }
+      const sv = sortedValues[c.datasetId];
+      if (!sv || sv.length === 0) { return c; }
+      changed = true;
+      return { ...c, absoluteThreshold: valueAtPercentile(50, sv), defaultPending: false };
+    });
+    if (changed) { onCriteriaChange(next); }
+  }, [criteria, sortedValues, onCriteriaChange]);
+
+  // Escape closes the panel, like any modal.
+  useEffect(() => {
+    if (!open) { return; }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { onClose(); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   if (!open) { return null; }
 
@@ -173,9 +199,9 @@ export function FilterBrowsePanel({
   }
 
   return (
-    // Backdrop
+    // Backdrop — light enough that the map is still readable while the filter is adjusted.
     <div
-      className="fixed inset-0 z-50 bg-black/30 flex items-start justify-center pt-16 px-4 pb-8"
+      className="fixed inset-0 z-50 bg-black/10 flex items-start justify-center pt-16 px-4 pb-8"
       onClick={onClose}
     >
       {/* Panel */}

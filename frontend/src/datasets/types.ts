@@ -154,6 +154,8 @@ export interface FilterCriterion {
   /** Absolute threshold value. NaN = not yet set (criterion is inactive — no filtering). */
   absoluteThreshold: number;
   direction: 'above' | 'below';
+  /** Set on a fresh criterion; the panel fills in the median once values arrive, then clears it. */
+  defaultPending?: boolean;
 }
 
 /** Returns which views are available for a descriptor at a given level. */

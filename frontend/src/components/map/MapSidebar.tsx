@@ -245,6 +245,10 @@ export function MapSidebar({
   // Settings accordion state (filter + basemap) — both start closed
   const [openSettings, setOpenSettings] = useState<string[]>([]);
 
+  // Only criteria with a threshold actually filter anything; the badge counts those.
+  const activeCriteriaCount = filterCriteria.filter(c => Number.isFinite(c.absoluteThreshold)).length;
+  const filterActive        = filterEnabled && activeCriteriaCount > 0;
+
   return (
     <aside className={[
       desktopOpen
@@ -331,26 +335,26 @@ export function MapSidebar({
             onClick={onOpenFilterPanel}
             className={[
               'w-full flex items-center gap-2 text-xs transition-colors group',
-              filterEnabled && filterCriteria.length > 0
+              filterActive
                 ? 'text-blue-600 hover:text-blue-700'
                 : 'text-slate-400 hover:text-blue-600',
             ].join(' ')}
           >
             <SlidersHorizontal className={[
               'w-3.5 h-3.5 flex-shrink-0',
-              filterEnabled && filterCriteria.length > 0
+              filterActive
                 ? 'text-blue-500'
                 : 'group-hover:text-blue-500',
             ].join(' ')} />
             <span>Filter</span>
-            {filterCriteria.length > 0 && (
+            {activeCriteriaCount > 0 && (
               <span className={[
                 'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
                 filterEnabled
                   ? 'bg-blue-100 text-blue-600'
                   : 'bg-slate-200 text-slate-500',
               ].join(' ')}>
-                {filterCriteria.length}
+                {activeCriteriaCount}
               </span>
             )}
           </button>
