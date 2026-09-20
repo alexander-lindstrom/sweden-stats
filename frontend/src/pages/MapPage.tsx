@@ -211,7 +211,7 @@ export default function MapPage() {
     });
   }, [activeDescriptor]);
 
-  const { datasetResult, colorScale, mapColorFn, loading } = useDatasetFetch(
+  const { datasetResult, colorScale, colorLegend, mapColorFn, loading } = useDatasetFetch(
     selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId,
   );
 
@@ -803,7 +803,7 @@ export default function MapPage() {
               )}
               {activeView === 'map' && !bivariateFn && legendData && (
                 <div className="absolute bottom-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow-sm border border-slate-200/60 p-2.5 pointer-events-none">
-                  <MapLegend data={legendData} scale={colorScale} year={selectedYear} source={activeDescriptor?.source} />
+                  <MapLegend data={legendData} legend={colorLegend} year={selectedYear} source={activeDescriptor?.source} />
                 </div>
               )}
 
