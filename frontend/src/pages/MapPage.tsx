@@ -5,7 +5,7 @@ import { MapSidebar } from '@/components/map/MapSidebar';
 import { KoladaBrowsePanel } from '@/components/map/KoladaBrowsePanel';
 import { FilterBrowsePanel } from '@/components/map/FilterBrowsePanel';
 import { usePinnedKolada } from '@/hooks/usePinnedKolada';
-import { SelectionPanel } from '@/components/map/SelectionPanel';
+import { SelectionPanel, type ActiveStatSource } from '@/components/map/SelectionPanel';
 import { DatasetTable } from '@/components/visualizations/DatasetTable';
 import { ElectionTable } from '@/components/visualizations/ElectionTable';
 
@@ -386,6 +386,20 @@ export default function MapPage() {
     selectedDatasetId, selectedYear, activeParty,
     activeView, activeChartType, activeBreakdownId,
   ]);
+
+  // The dataset being explored, surfaced as the panel's first stat row. Only when
+  // the panel's selection level matches the map level (sunburst drill can differ).
+  const activeStatSource = useMemo((): ActiveStatSource | null => {
+    if (!activeDescriptor || selectionLevel !== selectedLevel) { return null; }
+    if (scalarResult) {
+      return { datasetId: activeDescriptor.id, label: activeDescriptor.label, year: selectedYear, result: scalarResult };
+    }
+    // Party choropleth: the per-party share is the number on the map.
+    if (activeParty && partyRankingResult && activeChartType !== 'party-ranking') {
+      return { datasetId: activeDescriptor.id, label: PARTY_LABELS[activeParty] ?? activeParty, year: selectedYear, result: partyRankingResult };
+    }
+    return null;
+  }, [activeDescriptor, selectionLevel, selectedLevel, scalarResult, activeParty, partyRankingResult, activeChartType, selectedYear]);
 
   // Color function for bivariate mode: maps (code) → 3×3 palette hex.
   const bivariateFn = useMemo(() => {
@@ -942,6 +956,7 @@ export default function MapPage() {
           <SelectionPanel
             selectedFeature={selectedFeature}
             adminLevel={selectionLevel}
+            activeStat={activeStatSource}
             isOpen={isPanelOpen}
             onClose={() => { userDismissedPanel.current = true; setIsPanelOpen(false); }}
             comparisonFeature={comparisonFeature}

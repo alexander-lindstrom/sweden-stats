@@ -95,10 +95,10 @@ function PercentileBar({ percentile, rank, total }: { percentile: number; rank?:
   );
 }
 
-function StatRow({ label, stat }: { label: string; stat: StatData }) {
+function StatRow({ label, stat, accent = false }: { label: string; stat: StatData; accent?: boolean }) {
   return (
-    <div>
-      <SectionLabel className="mb-0.5 block">{label}</SectionLabel>
+    <div className={accent ? 'rounded-lg bg-blue-50/70 border border-blue-100 px-2.5 py-2' : undefined}>
+      <SectionLabel className={`mb-0.5 block ${accent ? 'text-blue-600' : ''}`}>{label}</SectionLabel>
       {stat.value === null ? (
         <div className="text-sm text-slate-400">—</div>
       ) : (
@@ -333,6 +333,22 @@ function RadarChart({ axes, comparisonAxes }: { axes: RadarAxis[]; comparisonAxe
 
 // ── Main component ────────────────────────────────────────────────────────────
 
+/** Scalar result for the dataset currently being explored, shown as the first stat row. */
+export interface ActiveStatSource {
+  datasetId: string;
+  label:     string;
+  year:      number;
+  result:    ScalarDatasetResult;
+}
+
+interface StatRowDef {
+  key:     string;
+  label:   string;
+  a:       StatData;
+  b:       StatData | null;
+  accent?: boolean;
+}
+
 export interface SelectionPanelProps {
   selectedFeature: { code: string; label: string } | null;
   adminLevel: AdminLevel;
@@ -345,6 +361,8 @@ export interface SelectionPanelProps {
   searchItems?:              FeatureSearchItem[];
   onSearchSelect?:           (f: FeatureSearchItem) => void;
   onSearchComparisonSelect?: (f: FeatureSearchItem) => void;
+  /** The dataset currently shown on the map/chart. Rendered as the first key stat. */
+  activeStat?:               ActiveStatSource | null;
 }
 
 interface PanelStats {
@@ -355,13 +373,43 @@ interface PanelStats {
   employment:  StatData | null;
 }
 
-export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect }: SelectionPanelProps) {
+export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect, activeStat }: SelectionPanelProps) {
   // ── Stats (via shared hook) ───────────────────────────────────────────────
   const primaryAreaStats = useAreaStats(selectedFeature,         adminLevel, STAT_YEAR);
   const compAreaStats    = useAreaStats(comparisonFeature ?? null, adminLevel, STAT_YEAR);
 
   const stats     = selectedFeature   ? toPanelStats(primaryAreaStats, selectedFeature.code)   : null;
   const compStats = comparisonFeature ? toPanelStats(compAreaStats,    comparisonFeature.code)  : null;
+
+  // ── Stat rows: active dataset first, then the fixed five ──────────────────
+  // The active dataset is already fetched, so it renders before the fixed stats
+  // arrive. A fixed row is dropped when it duplicates the active dataset.
+  const activeStatData     = activeStat && selectedFeature   ? toStat(activeStat.result, selectedFeature.code)   : null;
+  const compActiveStatData = activeStat && comparisonFeature ? toStat(activeStat.result, comparisonFeature.code) : null;
+
+  const statRows: StatRowDef[] = [];
+  if (activeStat && activeStatData) {
+    statRows.push({
+      key:    'active',
+      label:  activeStat.year !== STAT_YEAR ? `${activeStat.label} · ${activeStat.year}` : activeStat.label,
+      a:      activeStatData,
+      b:      compActiveStatData,
+      accent: true,
+    });
+  }
+  if (stats) {
+    const fixed: Array<{ id: string; label: string; a: StatData | null; b: StatData | null | undefined }> = [
+      { id: 'population',        label: 'Befolkning',        a: stats.population, b: compStats?.population },
+      { id: 'medianinkomst',     label: 'Medianinkomst',     a: stats.income,     b: compStats?.income     },
+      { id: 'medelalder',        label: 'Medelålder',        a: stats.age,        b: compStats?.age        },
+      { id: 'utlandsk_bakgrund', label: 'Utländsk bakgrund', a: stats.foreignBg,  b: compStats?.foreignBg  },
+      { id: 'sysselsattning',    label: 'Sysselsättning',    a: stats.employment, b: compStats?.employment },
+    ];
+    for (const r of fixed) {
+      if (!r.a || r.id === activeStat?.datasetId) { continue; }
+      statRows.push({ key: r.id, label: r.label, a: r.a, b: r.b ?? null });
+    }
+  }
 
   // ── Sparkline state ───────────────────────────────────────────────────────
   const [sparkline,     setSparkline]     = useState<Array<{ year: number; value: number }>>([]);
@@ -654,25 +702,17 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
 
             {/* Key stats */}
             <ProfileSection title={`Nyckeltal ${STAT_YEAR}`}>
-              {(primaryAreaStats.loading || (isComparing && compAreaStats.loading)) && <Spinner />}
-              {!primaryAreaStats.loading && !stats && (
-                <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
-              )}
-              {!primaryAreaStats.loading && stats && !isComparing && (
+              {statRows.length > 0 && !isComparing && (
                 <div className="space-y-3">
-                  <StatRow label="Befolkning"       stat={stats.population} />
-                  {stats.income     && <StatRow label="Medianinkomst"    stat={stats.income}     />}
-                  {stats.age        && <StatRow label="Medelålder"       stat={stats.age}        />}
-                  {stats.foreignBg  && <StatRow label="Utländsk bakgrund" stat={stats.foreignBg} />}
-                  {stats.employment && <StatRow label="Sysselsättning"   stat={stats.employment} />}
+                  {statRows.map(r => <StatRow key={r.key} label={r.label} stat={r.a} accent={r.accent} />)}
                 </div>
               )}
-              {!primaryAreaStats.loading && stats && isComparing && (
-                <ComparisonStatsTable
-                  primary={stats}
-                  comparison={compStats}
-                  compLoading={compAreaStats.loading}
-                />
+              {statRows.length > 0 && isComparing && (
+                <ComparisonStatsTable rows={statRows} compLoading={compAreaStats.loading} />
+              )}
+              {(primaryAreaStats.loading || (isComparing && compAreaStats.loading)) && <Spinner />}
+              {!primaryAreaStats.loading && statRows.length === 0 && (
+                <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
               )}
             </ProfileSection>
 
@@ -747,36 +787,28 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
 // ── Comparison stats table ─────────────────────────────────────────────────────
 
 interface ComparisonStatsTableProps {
-  primary:    PanelStats;
-  comparison: PanelStats | null;
+  rows:        StatRowDef[];
   compLoading: boolean;
 }
 
-function ComparisonStatsTable({ primary, comparison, compLoading }: ComparisonStatsTableProps) {
-  const rows: Array<{ label: string; a: StatData; b: StatData | null | undefined }> = [
-    { label: 'Befolkning',        a: primary.population,  b: comparison?.population },
-    ...(primary.income     ? [{ label: 'Medianinkomst',    a: primary.income,     b: comparison?.income     }] : []),
-    ...(primary.age        ? [{ label: 'Medelålder',       a: primary.age,        b: comparison?.age        }] : []),
-    ...(primary.foreignBg  ? [{ label: 'Utländsk bakgr.', a: primary.foreignBg,  b: comparison?.foreignBg  }] : []),
-    ...(primary.employment ? [{ label: 'Sysselsättning',  a: primary.employment, b: comparison?.employment }] : []),
-  ];
-
+function ComparisonStatsTable({ rows, compLoading }: ComparisonStatsTableProps) {
   return (
     <div className="space-y-2.5">
-      {rows.map(({ label, a, b }) => (
-        <ComparisonStatRow key={label} label={label} a={a} b={b ?? null} compLoading={compLoading} />
+      {rows.map(r => (
+        <ComparisonStatRow key={r.key} label={r.label} a={r.a} b={r.b} compLoading={compLoading} accent={r.accent} />
       ))}
     </div>
   );
 }
 
 function ComparisonStatRow({
-  label, a, b, compLoading,
+  label, a, b, compLoading, accent = false,
 }: {
   label: string;
   a: StatData;
   b: StatData | null;
   compLoading: boolean;
+  accent?: boolean;
 }) {
   const delta = a.value !== null && b?.value !== null && b?.value !== undefined
     ? a.value - b.value
@@ -795,8 +827,8 @@ function ComparisonStatRow({
   const deltaColor = delta === null ? '' : delta > 0 ? 'text-blue-600' : delta < 0 ? 'text-orange-600' : 'text-slate-400';
 
   return (
-    <div>
-      <SectionLabel className="mb-1 block">{label}</SectionLabel>
+    <div className={accent ? 'rounded-lg bg-blue-50/70 border border-blue-100 px-2.5 py-2' : undefined}>
+      <SectionLabel className={`mb-1 block ${accent ? 'text-blue-600' : ''}`}>{label}</SectionLabel>
       {/* sm: 2-column (A | B); lg: 3-column (A | delta | B) */}
       <div className="grid grid-cols-2 lg:grid-cols-[1fr_auto_1fr] gap-x-2 items-start lg:items-baseline">
         {/* Area A */}
