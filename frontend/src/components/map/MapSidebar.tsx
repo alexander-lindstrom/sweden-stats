@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { ChevronDown, LibraryBig, SlidersHorizontal } from 'lucide-react';
-import YearSlider from '@/components/common/YearSlider';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { BaseMapKey, baseMaps, baseMapLabels } from '@/components/map/BaseMaps';
@@ -15,9 +14,6 @@ interface MapSidebarProps {
   onLevelChange:      (level: AdminLevel) => void;
   selectedDatasetId:  string | null;
   onDatasetChange:    (id: string) => void;
-  activeDescriptor:   DatasetDescriptor | null;
-  displayYear:        number;
-  onYearChange:       (year: number) => void;
   selectedBase:       BaseMapKey;
   onBaseChange:       (base: BaseMapKey) => void;
   onReset:            () => void;
@@ -175,9 +171,6 @@ export function MapSidebar({
   onLevelChange,
   selectedDatasetId,
   onDatasetChange,
-  activeDescriptor,
-  displayYear,
-  onYearChange,
   selectedBase,
   onBaseChange,
   onReset,
@@ -229,11 +222,6 @@ export function MapSidebar({
   // Settings accordion state (filter + basemap) — both start closed
   const [openSettings, setOpenSettings] = useState<string[]>([]);
 
-  const showYearSlider =
-    activeDescriptor &&
-    activeDescriptor.availableYears.length > 1 &&
-    !['RegSO', 'DeSO'].includes(selectedLevel);
-
   return (
     <aside className={[
       desktopOpen
@@ -278,7 +266,7 @@ export function MapSidebar({
         </ul>
       </div>
 
-      {/* ── Zone 2: Datasets + ÅR (scrollable) ──────────────────────────────── */}
+      {/* ── Zone 2: Datasets (scrollable) ───────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto min-h-0">
         <Accordion.Root
           type="multiple"
@@ -297,20 +285,6 @@ export function MapSidebar({
             );
           })}
         </Accordion.Root>
-
-        {showYearSlider && (
-          <div className="border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center justify-between mb-3">
-              <SectionLabel className="font-bold text-slate-500">År</SectionLabel>
-              <span className="text-sm font-semibold text-slate-700 tabular-nums">{displayYear}</span>
-            </div>
-            <YearSlider
-              years={activeDescriptor!.availableYears.map(String)}
-              selectedYear={String(displayYear)}
-              onYearChange={y => onYearChange(Number(y))}
-            />
-          </div>
-        )}
 
         {/* Browse Kolada catalog — only meaningful at Region/Municipality level */}
         {(selectedLevel === 'Region' || selectedLevel === 'Municipality') && (

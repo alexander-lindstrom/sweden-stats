@@ -20,6 +20,7 @@ const DonutChart     = lazy(() => import('@/components/visualizations/DonutChart
 const ScatterPlot    = lazy(() => import('@/components/visualizations/ScatterPlot').then(m => ({ default: m.ScatterPlot })));
 const BoxPlot        = lazy(() => import('@/components/visualizations/BoxPlot').then(m => ({ default: m.BoxPlot })));
 import { FeatureSearch } from '@/components/ui/FeatureSearch';
+import YearSlider from '@/components/common/YearSlider';
 import {
   AdminLevel, ViewType, ScalarDatasetResult, FilterCriterion,
   CHART_TYPE_LABELS,
@@ -27,7 +28,7 @@ import {
 } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 import { preload } from '@/datasets/cache';
-import { COUNTY_NAMES } from '@/datasets/adminLevels';
+import { COUNTY_NAMES, LEVEL_LABELS } from '@/datasets/adminLevels';
 import { PARTY_CODES, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
@@ -373,6 +374,13 @@ export default function MapPage() {
     }
   }, [selectedLevel, resetDatasetForLevel, pendingSelectionRef, setComparisonFeature, setSelectedFeature, setSelectionLevel]);
 
+  // Browser tab reflects what is on screen — useful in history and when several tabs are open.
+  useEffect(() => {
+    const parts = [selectedFeature?.label, activeDescriptor?.label, LEVEL_LABELS[selectedLevel], String(selectedYear)]
+      .filter((p): p is string => !!p);
+    document.title = `${parts.join(' · ')} – Rikskartan`;
+  }, [selectedFeature, activeDescriptor, selectedLevel, selectedYear]);
+
   // Sync settled state → URL after every relevant state change.
   useEffect(() => {
     syncUrl({
@@ -425,6 +433,12 @@ export default function MapPage() {
     return [];
   }, [activeView, selectedLevel, searchItems, munLabels]);
 
+  // Year slider lives in the context strip so it stays visible with the sidebar collapsed.
+  const showYearSlider =
+    !!activeDescriptor &&
+    activeDescriptor.availableYears.length > 1 &&
+    !['RegSO', 'DeSO'].includes(selectedLevel);
+
   // Content-sized charts should shrink the render area to content height instead of filling.
   // Fill charts (sunburst, multiline, scatter) and the map still need the full-height flex container.
   // Charts whose SVG height is data-driven (not container-driven) get a content-sized render area —
@@ -456,9 +470,6 @@ export default function MapPage() {
         onLevelChange={(l) => { setSelectedLevel(l); setMobileSidebarOpen(false); }}
         selectedDatasetId={selectedDatasetId}
         onDatasetChange={(id) => { setSelectedDatasetId(id); setMobileSidebarOpen(false); }}
-        activeDescriptor={activeDescriptor}
-        displayYear={displayYear}
-        onYearChange={handleYearChange}
         selectedBase={selectedBase}
         onBaseChange={setSelectedBase}
         onReset={handleReset}
@@ -606,13 +617,17 @@ export default function MapPage() {
           </button>
         </div>
 
-        {/* Context strip — breadcrumb navigation, only when a feature is selected on the map */}
-        {activeView === 'map' && selectedFeature && (
-          <div className="h-8 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-1 overflow-x-auto">
-            <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
-              Sverige
-            </button>
-            {breadcrumbAncestors.map(entry => (
+        {/* Context strip — always visible: where am I (breadcrumb) + what am I looking at (dataset · level · year) */}
+        <div className="h-9 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-2">
+          <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
+            {selectedFeature ? (
+              <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
+                Sverige
+              </button>
+            ) : (
+              <span className="text-slate-700 font-medium whitespace-nowrap">Sverige</span>
+            )}
+            {selectedFeature && breadcrumbAncestors.map(entry => (
               <span key={`${entry.level}-${entry.code}`} className="flex items-center gap-1">
                 <span className="text-slate-300 mx-0.5">›</span>
                 <button
@@ -624,14 +639,40 @@ export default function MapPage() {
                 </button>
               </span>
             ))}
-            <span className="flex items-center gap-1">
-              <span className="text-slate-300 mx-0.5">›</span>
-              <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
-                {selectedFeature.label}
+            {selectedFeature && (
+              <span className="flex items-center gap-1">
+                <span className="text-slate-300 mx-0.5">›</span>
+                <span className="text-slate-700 font-medium whitespace-nowrap max-w-[10rem] truncate" title={selectedFeature.label}>
+                  {selectedFeature.label}
+                </span>
               </span>
-            </span>
+            )}
           </div>
-        )}
+
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {activeDescriptor && (
+              <span className="hidden sm:inline text-slate-500 whitespace-nowrap">
+                <span className="text-slate-700 font-medium">{activeDescriptor.label}</span>
+                {' · '}{LEVEL_LABELS[selectedLevel]}
+                {!showYearSlider && ` · ${displayYear}`}
+              </span>
+            )}
+            {showYearSlider && activeDescriptor && (
+              <div className="flex items-center gap-2 sm:pl-3 sm:border-l sm:border-slate-200">
+                <SectionLabel className="hidden md:inline">År</SectionLabel>
+                <div className="w-28 sm:w-40">
+                  <YearSlider
+                    compact
+                    years={activeDescriptor.availableYears.map(String)}
+                    selectedYear={String(displayYear)}
+                    onYearChange={y => handleYearChange(Number(y))}
+                  />
+                </div>
+                <span className="text-xs font-semibold text-slate-700 tabular-nums w-8 text-right">{displayYear}</span>
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Main view area */}
         <div className={`flex-1 flex min-h-0 relative ${isContentSized ? 'overflow-y-auto overflow-x-hidden' : 'overflow-hidden'}`}>
