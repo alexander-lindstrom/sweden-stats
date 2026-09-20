@@ -346,6 +346,15 @@ export default function MapPage() {
     setMapResetToken(t => t + 1);
   };
 
+  // Breadcrumb root: deselect and zoom out, but keep dataset, view, level and filters.
+  const handleClearSelection = () => {
+    setDrillStack([]);
+    setSelectedFeature(null);
+    setComparisonFeature(null);
+    userDismissedPanel.current = false;
+    setMapResetToken(t => t + 1);
+  };
+
   // When admin level changes: reset dataset if unavailable, clear comparison/filters/selection.
   // lastProcessedLevelRef tracks the last level this effect ran for:
   //   - null  → initial mount: run dataset/level sync but skip state clearing to preserve URL state
@@ -621,7 +630,7 @@ export default function MapPage() {
         <div className="h-9 flex items-center px-3 border-b border-slate-100 bg-white flex-shrink-0 text-xs gap-2">
           <div className="flex items-center gap-1 flex-1 min-w-0 overflow-x-auto">
             {selectedFeature ? (
-              <button onClick={handleReset} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap">
+              <button onClick={handleClearSelection} className="text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap" title="Avmarkera och zooma ut">
                 Sverige
               </button>
             ) : (
