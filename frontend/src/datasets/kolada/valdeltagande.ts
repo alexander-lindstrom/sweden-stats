@@ -17,7 +17,7 @@ export const valdeltagande: DatasetDescriptor = {
   id:              'valdeltagande-kommunal',
   kpiId:           'N05401',
   label:           'Valdeltagande (kommunalval)',
-  category:        'kolada',
+  category:        'val',
   source:          'Kolada',
   availableYears:  ELECTION_YEARS,
   supportedLevels: ['Region', 'Municipality'],

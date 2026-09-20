@@ -8,7 +8,8 @@ export const DATASET_CATEGORY_LABELS: Record<DatasetCategory, string> = {
   ekonomi:    'Ekonomi',
   energi:     'Energi',
   valfard:    'Välfärd',
-  kolada:     'Kolada',
+  /** Only user-pinned KPIs from the Kolada catalogue land here; presets are filed by topic. */
+  kolada:     'Egna (Kolada)',
 };
 
 export const DATASET_CATEGORY_ORDER: DatasetCategory[] = [

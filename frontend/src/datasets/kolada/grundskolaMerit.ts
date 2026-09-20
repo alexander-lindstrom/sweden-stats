@@ -16,7 +16,7 @@ export const grundskolaMerit: DatasetDescriptor = {
   id:              'grundskola-merit',
   kpiId:           'N15507',
   label:           'Meritvärde åk 9',
-  category:        'kolada',
+  category:        'utbildning',
   source:          'Kolada',
   availableYears:  Array.from({ length: 9 }, (_, i) => 2015 + i),
   supportedLevels: ['Municipality'],
