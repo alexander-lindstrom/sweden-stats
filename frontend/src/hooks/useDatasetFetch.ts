@@ -122,13 +122,17 @@ export function useDatasetFetch(
           setMapColorFn(null);
           if (vals.length > 0) {
             if (descriptor.colorScaleType === 'diverging' && descriptor.divergingCenter !== undefined) {
+              // Each half spans its own side of the data, so a ratio that can't go
+              // below 0 doesn't get a legend running to −7, and the below-centre
+              // areas use the full blue range instead of one sliver.
               const center = descriptor.divergingCenter;
-              const extent = Math.max(center - Math.min(...vals), Math.max(...vals) - center);
-              const scale  = d3.scaleSequential(divergingInterpolator)
-                .domain([center - extent, center + extent])
+              const lo     = Math.min(center, ...vals);
+              const hi     = Math.max(center, ...vals);
+              const scale  = d3.scaleDiverging(divergingInterpolator)
+                .domain([lo, center, hi])
                 .clamp(true);
               setColorScale(() => scale);
-              setColorLegend({ kind: 'gradient', domain: [center - extent, center + extent], center, scale });
+              setColorLegend({ kind: 'gradient', domain: [lo, hi], center, scale });
             } else {
               const { scale, breaks, colors } = buildQuantileScale(vals);
               setColorScale(() => scale);
