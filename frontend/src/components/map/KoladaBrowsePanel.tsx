@@ -60,9 +60,9 @@ function KpiRow({
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] font-mono text-slate-400">{kpi.id}</span>
+          <span className="text-[11px] font-mono text-slate-400">{kpi.id}</span>
           {kpi.operating_area && (
-            <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+            <span className="text-[11px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
               {kpi.operating_area}
             </span>
           )}
@@ -71,7 +71,7 @@ function KpiRow({
 
       <div className="flex-shrink-0 pt-0.5">
         {isPreset ? (
-          <span className="text-[10px] text-slate-400 italic">ingår redan</span>
+          <span className="text-[11px] text-slate-500 italic">ingår redan</span>
         ) : isPinned ? (
           <button
             onClick={() => onUnpin(kpi.id)}
@@ -109,7 +109,7 @@ function PinnedRow({
     <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 last:border-0 group">
       <div className="flex-1 min-w-0">
         <span className="text-sm text-slate-700 truncate block">{cfg.label}</span>
-        <span className="text-[10px] font-mono text-slate-400">{cfg.kpiId}</span>
+        <span className="text-[11px] font-mono text-slate-400">{cfg.kpiId}</span>
       </div>
       <button
         onClick={() => onUnpin(cfg.kpiId)}
@@ -277,7 +277,7 @@ export function KoladaBrowsePanel({
             <div>
               <div className="px-4 pt-3 pb-1 flex items-center justify-between">
                 <SectionLabel className="font-bold text-slate-500">Resultat</SectionLabel>
-                <span className="text-[10px] text-slate-400">{results.length} träffar</span>
+                <span className="text-[11px] text-slate-500">{results.length} träffar</span>
               </div>
               {results.map(kpi => (
                 <KpiRow

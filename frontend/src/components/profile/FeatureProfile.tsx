@@ -45,7 +45,7 @@ function StatMini({ label, value, mean, unit }: {
           <div className={`${UI.statValue} truncate`}>{formatNumber(value)}</div>
           {unit && <div className={UI.statUnit}>{unit}</div>}
           {delta !== null && (
-            <div className={`text-[10px] tabular-nums mt-1 leading-tight ${
+            <div className={`text-[11px] tabular-nums mt-1 leading-tight ${
               delta > 0 ? UI.deltaPositive : delta < 0 ? UI.deltaNegative : UI.deltaNeutral
             }`}>
               {delta > 0

@@ -89,7 +89,7 @@ function PercentileBar({ percentile, rank, total }: { percentile: number; rank?:
         />
       </div>
       {showTip && rank != null && total != null && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 px-2 py-1 bg-gray-900 text-white text-[10px] rounded whitespace-nowrap pointer-events-none z-10 shadow-md">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 px-2 py-1 bg-gray-900 text-white text-[11px] rounded whitespace-nowrap pointer-events-none z-10 shadow-md">
           #{rank} av {total}
         </div>
       )}
@@ -715,12 +715,12 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                   />
                   {isComparing && (
                     <div className="flex items-center gap-3 mt-1.5 justify-center">
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <span className="flex items-center gap-1 text-[11px] text-slate-500">
                         <span className="w-2 h-0.5 rounded bg-blue-500 inline-block" />
                         {selectedFeature.label}
                       </span>
                       {compRadarAxes.length > 0 && (
-                        <span className="flex items-center gap-1 text-[10px] text-slate-500">
+                        <span className="flex items-center gap-1 text-[11px] text-slate-500">
                           <span className="w-2 h-0.5 rounded bg-orange-500 inline-block" />
                           {comparisonFeature!.label}
                         </span>
@@ -786,13 +786,13 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
                 {isComparing && !electionLoading && !compElectionLoading && (
                   <div className="grid grid-cols-2 gap-2">
                     <ChartCard>
-                      <div className="text-[10px] font-semibold text-slate-400 mb-1.5 truncate">{selectedFeature.label}</div>
+                      <div className="text-[11px] font-semibold text-slate-400 mb-1.5 truncate">{selectedFeature.label}</div>
                       {electionVotes
                         ? <ElectionDonut votes={electionVotes} />
                         : <p className="text-xs text-slate-400">Ingen data</p>}
                     </ChartCard>
                     <ChartCard>
-                      <div className="text-[10px] font-semibold text-orange-400 mb-1.5 truncate">{comparisonFeature!.label}</div>
+                      <div className="text-[11px] font-semibold text-orange-400 mb-1.5 truncate">{comparisonFeature!.label}</div>
                       {compElectionVotes
                         ? <ElectionDonut votes={compElectionVotes} />
                         : <p className="text-xs text-slate-400">Ingen data</p>}
@@ -868,10 +868,10 @@ function ComparisonStatRow({
             <span className="text-base font-bold text-slate-900 tabular-nums truncate">
               {a.value !== null ? formatNumber(a.value) : '—'}
             </span>
-            <span className="text-[10px] text-slate-500 flex-shrink-0">{a.unit}</span>
+            <span className="text-[11px] text-slate-500 flex-shrink-0">{a.unit}</span>
           </div>
           {a.rank !== null && a.total !== null && (
-            <div className="text-[10px] text-slate-400 tabular-nums pl-2.5">#{a.rank}/{a.total}</div>
+            <div className="text-[11px] text-slate-500 tabular-nums pl-2.5">#{a.rank}/{a.total}</div>
           )}
         </div>
 
@@ -890,11 +890,11 @@ function ComparisonStatRow({
                 <span className="text-base font-bold text-slate-900 tabular-nums truncate">
                   {b.value !== null ? formatNumber(b.value) : '—'}
                 </span>
-                <span className="text-[10px] text-slate-500 flex-shrink-0">{b.unit}</span>
+                <span className="text-[11px] text-slate-500 flex-shrink-0">{b.unit}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 self-center" />
               </div>
               {b.rank !== null && b.total !== null && (
-                <div className="text-[10px] text-slate-400 tabular-nums pr-2.5">#{b.rank}/{b.total}</div>
+                <div className="text-[11px] text-slate-500 tabular-nums pr-2.5">#{b.rank}/{b.total}</div>
               )}
             </>
           ) : (

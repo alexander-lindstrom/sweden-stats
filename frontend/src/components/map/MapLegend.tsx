@@ -57,7 +57,7 @@ function ClassedLegend({ breaks, colors, unit }: { breaks: number[]; colors: str
             className="w-3.5 h-3.5 rounded-sm flex-shrink-0 border border-black/10"
             style={{ backgroundColor: r.color }}
           />
-          <span className="text-[10px] text-slate-600 tabular-nums whitespace-nowrap">
+          <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
             {r.text}{unit && i === 0 ? ` ${unit}` : ''}
           </span>
         </div>
@@ -99,18 +99,18 @@ function GradientLegend({ domain, center, scale, unit }: {
         <rect x={0} y={0} width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT} fill={`url(#${gradientId})`} rx={3} />
       </svg>
       <div className="relative" style={{ height: GRADIENT_HEIGHT, minWidth: '3rem' }}>
-        <span className="absolute top-0 left-0 -translate-y-[40%] text-[10px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
+        <span className="absolute top-0 left-0 -translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
           {fmt(maxVal)}{unit ? ` ${unit}` : ''}
         </span>
         {showMid && (
           <span
-            className="absolute left-0 -translate-y-1/2 text-[10px] text-slate-400 tabular-nums whitespace-nowrap"
+            className="absolute left-0 -translate-y-1/2 text-[11px] text-slate-500 tabular-nums whitespace-nowrap"
             style={{ top: `${midPct}%` }}
           >
             {fmt(midVal)}
           </span>
         )}
-        <span className="absolute bottom-0 left-0 translate-y-[40%] text-[10px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
+        <span className="absolute bottom-0 left-0 translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
           {fmt(minVal)}
         </span>
       </div>
@@ -132,7 +132,7 @@ export const MapLegend: React.FC<MapLegendProps> = ({ data, legend, year, source
           {parties.map(p => (
             <div key={p} className="flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: PARTY_COLORS[p] }} />
-              <span className="text-[10px] text-slate-600">{PARTY_LABELS[p] ?? p}</span>
+              <span className="text-[11px] text-slate-600">{PARTY_LABELS[p] ?? p}</span>
             </div>
           ))}
         </div>

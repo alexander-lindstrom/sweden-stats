@@ -349,7 +349,7 @@ export function MapSidebar({
             <span>Filter</span>
             {activeCriteriaCount > 0 && (
               <span className={[
-                'ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
+                'ml-auto text-[11px] font-semibold px-1.5 py-0.5 rounded-full tabular-nums',
                 filterEnabled
                   ? 'bg-blue-100 text-blue-600'
                   : 'bg-slate-200 text-slate-500',

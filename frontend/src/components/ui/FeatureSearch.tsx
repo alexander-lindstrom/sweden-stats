@@ -113,13 +113,13 @@ export function FeatureSearch({
                 ].join(' ')}
               >
                 <span className="flex-1 truncate">{item.label}</span>
-                <span className="text-[10px] text-slate-400 flex-shrink-0 font-mono">{item.code}</span>
+                <span className="text-[11px] text-slate-500 flex-shrink-0 font-mono">{item.code}</span>
               </button>
             </li>
           ))}
           {onComparisonSelect && (
             <li className="px-3 py-1 border-t border-slate-100">
-              <span className="text-[10px] text-slate-400">Shift+klicka eller Shift+Enter för jämförelse</span>
+              <span className="text-[11px] text-slate-500">Shift+klicka eller Shift+Enter för jämförelse</span>
             </li>
           )}
         </ul>

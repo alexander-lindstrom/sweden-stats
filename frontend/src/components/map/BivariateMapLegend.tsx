@@ -17,7 +17,7 @@ export default function BivariateMapLegend({ xLabel, yLabel }: BivariateMapLegen
 
       {/* Y variable name — sits above the grid, offset to align with grid not the axis label col */}
       <div className="flex items-center gap-1" style={{ paddingLeft: Y_AXIS_W + GAP }}>
-        <span className="text-[10px] text-slate-400">↑</span>
+        <span className="text-[11px] text-slate-500">↑</span>
         <span className="text-[11px] text-slate-600 leading-snug">{yLabel}</span>
       </div>
 
@@ -25,8 +25,8 @@ export default function BivariateMapLegend({ xLabel, yLabel }: BivariateMapLegen
       <div className="flex items-stretch" style={{ gap: GAP }}>
         {/* Y-axis low/high */}
         <div className="flex flex-col justify-between items-end" style={{ width: Y_AXIS_W }}>
-          <span className="text-[10px] text-slate-400 leading-none">hög</span>
-          <span className="text-[10px] text-slate-400 leading-none">låg</span>
+          <span className="text-[11px] text-slate-500 leading-none">hög</span>
+          <span className="text-[11px] text-slate-500 leading-none">låg</span>
         </div>
 
         {/* 3×3 grid — rows top-to-bottom = y=high first */}
@@ -44,13 +44,13 @@ export default function BivariateMapLegend({ xLabel, yLabel }: BivariateMapLegen
 
       {/* X-axis low/high labels — aligned under the grid */}
       <div className="flex justify-between" style={{ paddingLeft: Y_AXIS_W + GAP, width: Y_AXIS_W + GAP + GRID_PX }}>
-        <span className="text-[10px] text-slate-400 leading-none">låg</span>
-        <span className="text-[10px] text-slate-400 leading-none">hög</span>
+        <span className="text-[11px] text-slate-500 leading-none">låg</span>
+        <span className="text-[11px] text-slate-500 leading-none">hög</span>
       </div>
 
       {/* X variable name — below the grid, offset to align */}
       <div className="flex items-center gap-1" style={{ paddingLeft: Y_AXIS_W + GAP }}>
-        <span className="text-[10px] text-slate-400">→</span>
+        <span className="text-[11px] text-slate-500">→</span>
         <span className="text-[11px] text-slate-600 leading-snug">{xLabel}</span>
       </div>
 
