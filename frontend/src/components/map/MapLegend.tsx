@@ -83,7 +83,10 @@ function GradientLegend({ domain, center, scale, unit }: {
   const span      = maxVal - minVal || 1;
   const midVal    = center ?? (minVal + maxVal) / 2;
   const midPct    = (1 - (midVal - minVal) / span) * 100;
-  const showMid   = midPct > 14 && midPct < 86;
+  // The centre is the reference reader of a diverging scale, so it always
+  // shows; an end label that would collide with it is dropped instead.
+  const showMax   = midPct > 14;
+  const showMin   = midPct < 86;
   const gradientId = 'legend-gradient';
 
   return (
@@ -99,20 +102,22 @@ function GradientLegend({ domain, center, scale, unit }: {
         <rect x={0} y={0} width={GRADIENT_WIDTH} height={GRADIENT_HEIGHT} fill={`url(#${gradientId})`} rx={3} />
       </svg>
       <div className="relative" style={{ height: GRADIENT_HEIGHT, minWidth: '3rem' }}>
-        <span className="absolute top-0 left-0 -translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
-          {fmt(maxVal)}{unit ? ` ${unit}` : ''}
-        </span>
-        {showMid && (
-          <span
-            className="absolute left-0 -translate-y-1/2 text-[11px] text-slate-500 tabular-nums whitespace-nowrap"
-            style={{ top: `${midPct}%` }}
-          >
-            {fmt(midVal)}
+        {showMax && (
+          <span className="absolute top-0 left-0 -translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
+            {fmt(maxVal)}{unit ? ` ${unit}` : ''}
           </span>
         )}
-        <span className="absolute bottom-0 left-0 translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
-          {fmt(minVal)}
+        <span
+          className={`absolute left-0 -translate-y-1/2 text-[11px] tabular-nums whitespace-nowrap ${center !== undefined ? 'font-medium text-slate-600' : 'text-slate-500'}`}
+          style={{ top: `${midPct}%` }}
+        >
+          {fmt(midVal)}{center !== undefined && !showMax && unit ? ` ${unit}` : ''}
         </span>
+        {showMin && (
+          <span className="absolute bottom-0 left-0 translate-y-[40%] text-[11px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
+            {fmt(minVal)}
+          </span>
+        )}
       </div>
     </div>
   );
