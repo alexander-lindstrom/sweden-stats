@@ -37,7 +37,7 @@ function StatMini({ label, value, mean, unit }: {
 
   return (
     <div className={`${UI.card} min-w-0`}>
-      <SectionLabel className="mb-1 block truncate">{label}</SectionLabel>
+      <SectionLabel className="mb-1 block whitespace-normal leading-tight">{label}</SectionLabel>
       {value === null ? (
         <div className="text-sm text-slate-300">—</div>
       ) : (

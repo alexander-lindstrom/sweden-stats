@@ -5,7 +5,11 @@ import useResizeObserver from '@/hooks/useResizeObserver';
 import { CT } from './chartTokens';
 import { formatCompact, formatWithUnit } from '@/utils/format';
 
-const MARGIN    = { top: 12, right: 100, bottom: 44, left: 62 };
+const MARGIN    = { top: 12, bottom: 44, left: 62 };
+// End-of-line labels: approximate glyph width at font-size 10, and the bounds
+// of the right margin that is sized to fit the longest visible series label.
+const LABEL_CHAR_W  = 5.6;
+const RIGHT_MARGIN  = { min: 60, max: 150 };
 const parseDate = d3.timeParse('%Y-%m-%d');
 const fmtYear   = d3.timeFormat('%Y');
 const fmtTip    = d3.timeFormat('%b %Y');
@@ -90,7 +94,9 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
     if (!dims || parsedSeries.length === 0) { return; }
 
     const { width, height } = dims;
-    const adjW = width  - MARGIN.left - MARGIN.right;
+    const longestLabel = Math.max(0, ...parsedSeries.map(s => s.label.length));
+    const rightMargin  = Math.min(RIGHT_MARGIN.max, Math.max(RIGHT_MARGIN.min, Math.round(longestLabel * LABEL_CHAR_W) + 12));
+    const adjW = width  - MARGIN.left - rightMargin;
     const adjH = height - MARGIN.top  - MARGIN.bottom;
     if (adjW <= 0 || adjH <= 0) { return; }
 
@@ -178,8 +184,9 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
     });
 
     // ── End-of-line labels ────────────────────────────────────────────────────
-    const LABEL_MAX = 15;
-    const truncate  = (s: string) => s.length > LABEL_MAX ? s.slice(0, LABEL_MAX - 1) + '…' : s;
+    // Only truncate when a label would exceed the (already widened) margin.
+    const labelMax = Math.floor((rightMargin - 12) / LABEL_CHAR_W);
+    const truncate = (s: string) => s.length > labelMax ? s.slice(0, labelMax - 1) + '…' : s;
     // Build positions from each series' last point.
     const labelPos = parsedSeries
       .filter(s => s.pts.length > 0)
