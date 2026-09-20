@@ -10,6 +10,9 @@ const MARGIN    = { top: 12, bottom: 44, left: 62 };
 // of the right margin that is sized to fit the longest visible series label.
 const LABEL_CHAR_W  = 5.6;
 const RIGHT_MARGIN  = { min: 60, max: 150 };
+// Series with at most this many points are drawn with straight segments and a
+// marker per observation (e.g. one point per election year).
+const SPARSE_MAX_POINTS = 40;
 const parseDate = d3.timeParse('%Y-%m-%d');
 const fmtYear   = d3.timeFormat('%Y');
 const fmtTip    = d3.timeFormat('%b %Y');
@@ -152,7 +155,9 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
       .call(ax => ax.selectAll<SVGTextElement, unknown>('text')
         .attr('fill', CT.tickText).attr('font-size', 11).attr('dx', '-2'));
 
-    if (label) {
+    // The y axis names the measure; the area (label) is shown as the chart title instead.
+    const axisLabel = unit ?? label;
+    if (axisLabel) {
       g.append('text')
         .attr('transform', 'rotate(-90)')
         .attr('x', -adjH / 2)
@@ -160,26 +165,41 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
         .attr('text-anchor', 'middle')
         .attr('font-size', 11)
         .attr('fill', CT.tickText)
-        .text(label);
+        .text(axisLabel);
     }
 
     // ── Lines ─────────────────────────────────────────────────────────────────
-    const line = d3.line<{ parsed: Date; value: number }>()
-      .x(p => xScale(p.parsed))
-      .y(p => yScale(p.value))
-      .curve(d3.curveMonotoneX);
-
-    const linesG = g.append('g').attr('clip-path', `url(#${clipId})`);
-    // Store DOM elements for hover dimming.
-    const lineEls = new Map<string, SVGPathElement>();
+    // Sparse series get straight segments plus a marker per observation so the
+    // eye isn't led to invented values between election years; dense series
+    // (monthly KPI) stay smooth and unmarked.
+    const linesG  = g.append('g').attr('clip-path', `url(#${clipId})`);
+    // One <g> per series (path + markers) so hover dimming covers both.
+    const lineEls = new Map<string, SVGGElement>();
     parsedSeries.forEach(series => {
-      const el = linesG.append('path')
+      const sparse = series.pts.length <= SPARSE_MAX_POINTS;
+      const line = d3.line<{ parsed: Date; value: number }>()
+        .x(p => xScale(p.parsed))
+        .y(p => yScale(p.value))
+        .curve(sparse ? d3.curveLinear : d3.curveMonotoneX);
+      const sg = linesG.append('g');
+      sg.append('path')
         .datum(series.pts)
         .attr('fill', 'none')
         .attr('stroke', series.color)
         .attr('stroke-width', 2)
-        .attr('d', line(series.pts))
-        .node();
+        .attr('d', line(series.pts));
+      if (sparse) {
+        sg.selectAll('circle')
+          .data(series.pts)
+          .join('circle')
+          .attr('cx', p => xScale(p.parsed))
+          .attr('cy', p => yScale(p.value))
+          .attr('r', 2.5)
+          .attr('fill', series.color)
+          .attr('stroke', '#fff')
+          .attr('stroke-width', 1);
+      }
+      const el = sg.node();
       if (el) { lineEls.set(series.id, el); }
     });
 
@@ -241,7 +261,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
           crosshair.style('opacity', 0);
           hoverDots.forEach(dot => dot.style('opacity', 0));
           tooltip.style('opacity', '0');
-          lineEls.forEach(el => d3.select(el).attr('stroke-opacity', 1));
+          lineEls.forEach(el => d3.select(el).attr('opacity', 1));
           return;
         }
 
@@ -268,7 +288,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
 
         // Dim all lines except the closest.
         lineEls.forEach((el, id) => {
-          d3.select(el).attr('stroke-opacity', id === closestId ? 1 : 0.25);
+          d3.select(el).attr('opacity', id === closestId ? 1 : 0.25);
         });
 
         // Sort by value descending so highest series is at the top.
@@ -305,7 +325,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
         crosshair.style('opacity', 0);
         hoverDots.forEach(dot => dot.style('opacity', 0));
         tooltip.style('opacity', '0');
-        lineEls.forEach(el => d3.select(el).attr('stroke-opacity', 1));
+        lineEls.forEach(el => d3.select(el).attr('opacity', 1));
       });
 
   }, [parsedSeries, dims, label, unit]);
@@ -314,7 +334,10 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
     <div className="relative w-full h-full flex flex-col">
 
       {/* Legend — visibility toggles; end-of-line labels handle identification */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 flex-shrink-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 flex-shrink-0">
+        {unit && label && (
+          <span className="text-xs font-semibold text-slate-700 mr-1">{label}</span>
+        )}
         {data.map(series => {
           const color = colorMap.get(series.id) ?? '#888';
           const on    = visible[series.id] !== false;

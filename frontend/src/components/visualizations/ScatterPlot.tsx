@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import type { ScalarDatasetResult } from '@/datasets/types';
+import { COUNTY_NAMES } from '@/datasets/adminLevels';
 import { useChartBase } from '@/hooks/useChartBase';
 import { CT } from './chartTokens';
 import { formatCompact, formatWithUnit } from '@/utils/format';
@@ -54,6 +55,17 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
   onFeatureSelectRef.current  = onFeatureSelect;
   const onComparisonSelectRef = useRef(onComparisonSelect);
   onComparisonSelectRef.current = onComparisonSelect;
+
+  // Counties present in the plot, for the colour legend.
+  const counties = useMemo(() => {
+    const present = new Set<string>();
+    for (const code of Object.keys(xData.values)) {
+      if (yData.values[code] !== undefined) { present.add(code.slice(0, 2)); }
+    }
+    return [...present]
+      .filter(c => COUNTY_NAMES[c])
+      .sort((a, b) => COUNTY_NAMES[a].localeCompare(COUNTY_NAMES[b], 'sv'));
+  }, [xData.values, yData.values]);
 
   useEffect(() => {
     if (!svgRef.current || !dimensions) { return; }
@@ -292,7 +304,19 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
   }, [xData, yData, dimensions, selectedFeature, comparisonFeature, svgRef]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-full">
+    <div className="w-full h-full flex flex-col">
+      {/* Point colour = county. Mirrors the MultiLineChart legend row. */}
+      {counties.length > 1 && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 px-3 py-2 flex-shrink-0">
+          {counties.map(c => (
+            <span key={c} className="flex items-center gap-1.5 text-[11px] text-slate-600 whitespace-nowrap">
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: countyColor(c) }} />
+              {COUNTY_NAMES[c]}
+            </span>
+          ))}
+        </div>
+      )}
+      <div ref={containerRef} className="relative flex-1 min-h-0">
       <svg ref={svgRef} className="w-full h-full" />
       {hovered && (
         <div
@@ -308,6 +332,7 @@ export const ScatterPlot: React.FC<Props> = ({ xData, yData, selectedFeature, on
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
