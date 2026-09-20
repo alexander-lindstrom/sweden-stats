@@ -20,7 +20,6 @@ const ShareBarChart  = lazy(() => import('@/components/visualizations/ShareBarCh
 const DonutChart     = lazy(() => import('@/components/visualizations/DonutChart').then(m => ({ default: m.DonutChart })));
 const ScatterPlot    = lazy(() => import('@/components/visualizations/ScatterPlot').then(m => ({ default: m.ScatterPlot })));
 const BoxPlot        = lazy(() => import('@/components/visualizations/BoxPlot').then(m => ({ default: m.BoxPlot })));
-import { FeatureSearch } from '@/components/ui/FeatureSearch';
 import YearSlider from '@/components/common/YearSlider';
 import {
   AdminLevel, ViewType, ScalarDatasetResult, FilterCriterion,
@@ -143,7 +142,6 @@ export default function MapPage() {
     drillStack, setDrillStack,
     selectedLan, setSelectedLan,
     selectedMuni, setSelectedMuni,
-    munLabels,
     pendingSelectionRef,
     userDismissedPanel,
     breadcrumbAncestors,
@@ -218,6 +216,15 @@ export default function MapPage() {
     scatterYDatasetId, setScatterYDatasetId,
     scatterableDatasets,
   } = view;
+
+  // The profile view relies on the panel for search and the numbers, so make
+  // sure it is visible when the user switches there.
+  useEffect(() => {
+    if (activeView === 'profile') {
+      userDismissedPanel.current = false;
+      setIsPanelOpen(true);
+    }
+  }, [activeView, userDismissedPanel]);
 
   // ── Breakdown dimension (e.g. consumer category vs fuel type) ────────
   const [activeBreakdownId, setActiveBreakdownId] = useState<string | null>(
@@ -446,24 +453,6 @@ export default function MapPage() {
     if (!bivariateMode || !scalarResult || !bivariateYScalar) { return null; }
     return buildBivariateColorFn(scalarResult.values, bivariateYScalar.values);
   }, [bivariateMode, scalarResult, bivariateYScalar]);
-
-  // ── Profile search items ──────────────────────────────────────────────────
-  // Reuses searchItems; falls back to munLabels so the profile search is always populated.
-  const profileSearchItems = useMemo(() => {
-    if (activeView !== 'profile') { return []; }
-    if (searchItems.length > 0) { return searchItems; }
-    if (selectedLevel === 'Region') {
-      return Object.entries(COUNTY_NAMES)
-        .map(([code, label]) => ({ code, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
-    }
-    if (selectedLevel === 'Municipality' && munLabels) {
-      return Object.entries(munLabels)
-        .map(([code, label]) => ({ code, label }))
-        .sort((a, b) => a.label.localeCompare(b.label, 'sv'));
-    }
-    return [];
-  }, [activeView, selectedLevel, searchItems, munLabels]);
 
   // Year slider lives in the context strip so it stays visible with the sidebar collapsed.
   const showYearSlider =
@@ -838,20 +827,6 @@ export default function MapPage() {
             </div>
           )}
 
-          {/* Profile area search */}
-          {activeView === 'profile' &&
-           selectedLevel !== 'Country' &&
-           profileSearchItems.length > 0 && (
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-slate-50 flex-shrink-0">
-              <div className="w-64">
-                <FeatureSearch
-                  items={profileSearchItems}
-                  onSelect={selectFeature}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Y-axis dataset selector for bivariate map */}
           {activeView === 'map' && bivariateMode && bivariateDatasets.length > 0 && (
             <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-100 bg-violet-50/60 flex-shrink-0">
@@ -1055,7 +1030,7 @@ export default function MapPage() {
               )}
 
               {activeView === 'profile' && (
-                <FeatureProfile selectedFeature={selectedFeature} adminLevel={selectionLevel} />
+                <FeatureProfile selectedFeature={selectedFeature} comparisonFeature={comparisonFeature} adminLevel={selectionLevel} />
               )}
             </div>
           </div>
@@ -1071,6 +1046,7 @@ export default function MapPage() {
             selectedFeature={selectedFeature}
             adminLevel={selectionLevel}
             activeStat={activeStatSource}
+            onOpenProfile={selectedLevel !== 'Country' && activeView !== 'profile' ? () => setActiveView('profile') : undefined}
             comparePickMode={comparePickMode}
             onCompareRequest={() => setComparePickMode(true)}
             onCancelCompare={() => setComparePickMode(false)}

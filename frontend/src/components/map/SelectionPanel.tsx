@@ -1,64 +1,17 @@
-import { useEffect, useRef, useState } from 'react';
-import { GitCompareArrows } from 'lucide-react';
-import { AdminLevel, ElectionDatasetResult, ScalarDatasetResult } from '@/datasets/types';
+import { useState } from 'react';
+import { GitCompareArrows, LayoutDashboard } from 'lucide-react';
+import { AdminLevel, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
-import { fetchCached } from '@/datasets/cache';
-import { fetchPopulationMultiYear } from '@/datasets/scb/population';
-import { DATASETS } from '@/datasets/registry';
 import { Spinner } from '@/components/ui/Spinner';
 import { SectionLabel } from '@/components/ui/SectionLabel';
 import { FeatureSearch, FeatureSearchItem } from '@/components/ui/FeatureSearch';
-import { ElectionDonut } from '@/components/visualizations/ElectionDonut';
 import { ProfileSection } from '@/components/profile/ProfileSection';
-import { UI } from '@/theme';
-import { useAreaStats, AREA_STATS_YEAR } from '@/hooks/useAreaStats';
+import { useAreaStats, AREA_STATS_YEAR, toStat, toPanelStats, type StatData } from '@/hooks/useAreaStats';
 import { formatNumber, formatSigned } from '@/utils/format';
 
-const riksdagsvalDescriptor = DATASETS.find(d => d.id === 'riksdagsval')!;
-
-const STAT_YEAR     = AREA_STATS_YEAR;
-const ELECTION_YEAR = 2022;
-const ELECTION_LEVELS: AdminLevel[] = ['Region', 'Municipality', 'RegSO', 'DeSO'];
-
-const SPARKLINE_YEARS  = [2000, 2004, 2008, 2012, 2016, 2020, 2024];
-const SPARKLINE_LEVELS: AdminLevel[] = ['Country', 'Region', 'Municipality'];
-
-interface StatData {
-  value:      number | null;
-  unit:       string;
-  rank:       number | null;
-  total:      number | null;
-  /** Fraction of peer areas with a strictly lower value (0 = lowest, 1 = highest). */
-  percentile: number | null;
-}
-
-function toStat(result: ScalarDatasetResult, code: string): StatData {
-  const value = result.values[code] ?? null;
-  const all   = Object.values(result.values).filter(Number.isFinite) as number[];
-  const rank  = value !== null ? all.filter(v => v > value).length + 1 : null;
-  const percentile =
-    value !== null && all.length > 1
-      ? all.filter(v => v < value).length / (all.length - 1)
-      : null;
-  return { value, unit: result.unit, rank, total: all.length, percentile };
-}
-
-function toPanelStats(results: { population: ScalarDatasetResult | null; income: ScalarDatasetResult | null; age: ScalarDatasetResult | null; foreignBg: ScalarDatasetResult | null; employment: ScalarDatasetResult | null }, code: string): PanelStats | null {
-  if (!results.population) { return null; }
-  return {
-    population: toStat(results.population, code),
-    income:     results.income     ? toStat(results.income, code)     : null,
-    age:        results.age        ? toStat(results.age, code)        : null,
-    foreignBg:  results.foreignBg  ? toStat(results.foreignBg, code)  : null,
-    employment: results.employment ? toStat(results.employment, code) : null,
-  };
-}
+const STAT_YEAR = AREA_STATS_YEAR;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-function ChartCard({ children }: { children: React.ReactNode }) {
-  return <div className={UI.cardCompact}>{children}</div>;
-}
 
 /**
  * Thin horizontal bar showing where a value sits relative to all peers.
@@ -120,219 +73,6 @@ function StatRow({ label, stat, accent = false }: { label: string; stat: StatDat
   );
 }
 
-function Sparkline({
-  data,
-  comparisonData,
-}: {
-  data: Array<{ year: number; value: number }>;
-  comparisonData?: Array<{ year: number; value: number }>;
-}) {
-  if (data.length < 2) { return null; }
-
-  const W = 220, H = 56, pad = 4;
-  const isComparing = !!comparisonData && comparisonData.length >= 2;
-  const allVals = [...data.map(d => d.value), ...(comparisonData?.map(d => d.value) ?? [])];
-  const minV   = Math.min(...allVals);
-  const maxV   = Math.max(...allVals);
-  const range  = maxV - minV || 1;
-  const innerH = H - pad * 2;
-
-  const toXY = (d: { value: number }, i: number, len: number): [number, number] => [
-    (i / (len - 1)) * W,
-    pad + innerH - ((d.value - minV) / range) * innerH,
-  ];
-
-  const toPoints = (series: Array<{ year: number; value: number }>) =>
-    series.map((d, i) => {
-      const [x, y] = toXY(d, i, series.length);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-
-  const trend  = data[data.length - 1].value > data[0].value ? 'up' : data[data.length - 1].value < data[0].value ? 'down' : 'flat';
-  const primaryStroke = isComparing ? '#3b82f6' : (trend === 'up' ? '#22c55e' : trend === 'down' ? '#ef4444' : '#9ca3af');
-
-  const lastPrimary = toXY(data[data.length - 1], data.length - 1, data.length);
-  const lastComp    = isComparing ? toXY(comparisonData![comparisonData!.length - 1], comparisonData!.length - 1, comparisonData!.length) : null;
-
-  const midY = pad + innerH / 2;
-
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} className="block overflow-visible">
-      {/* Midrange reference line */}
-      <line x1={0} y1={midY} x2={W} y2={midY} stroke="#e2e8f0" strokeWidth={0.75} strokeDasharray="3 3" />
-
-      {/* Comparison line (orange, dashed) */}
-      {isComparing && (
-        <>
-          <polyline
-            points={toPoints(comparisonData!)}
-            fill="none"
-            stroke="#f97316"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            strokeDasharray="4 2"
-          />
-          {lastComp && (
-            <circle cx={lastComp[0].toFixed(1)} cy={lastComp[1].toFixed(1)} r={3} fill="#f97316" />
-          )}
-        </>
-      )}
-
-      {/* Primary line */}
-      <polyline
-        points={toPoints(data)}
-        fill="none"
-        stroke={primaryStroke}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-      {/* Primary endpoint dot */}
-      <circle cx={lastPrimary[0].toFixed(1)} cy={lastPrimary[1].toFixed(1)} r={3} fill={primaryStroke} />
-    </svg>
-  );
-}
-
-interface RadarAxis {
-  label:      string;
-  percentile: number;
-  value?:     number | null;
-  unit?:      string;
-  rank?:      number | null;
-  total?:     number | null;
-}
-
-const RADAR_WEB = [0.25, 0.5, 0.75, 1] as const;
-
-/**
- * Spider/radar chart showing percentile scores across multiple axes.
- * Optionally overlays a second set of axes (comparison, in orange).
- * Hover a vertex dot to see the exact value, percentile, and rank.
- */
-function RadarChart({ axes, comparisonAxes }: { axes: RadarAxis[]; comparisonAxes?: RadarAxis[] }) {
-  const [hovered, setHovered] = useState<number | null>(null);
-
-  const N  = axes.length;
-  const CX = 108, CY = 80, R = 52;
-  const H  = 142;
-
-  const angle = (i: number) => (2 * Math.PI * i / N) - Math.PI / 2;
-  const pt = (v: number, i: number): [number, number] => [
-    CX + R * v * Math.cos(angle(i)),
-    CY + R * v * Math.sin(angle(i)),
-  ];
-  const ring = (v: number) =>
-    axes.map((_, i) => pt(v, i))
-      .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-      .join(' ') + 'Z';
-
-  const valuePath = axes
-    .map((a, i) => pt(a.percentile, i))
-    .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-    .join(' ') + 'Z';
-
-  const compPath = comparisonAxes && comparisonAxes.length === N
-    ? comparisonAxes
-        .map((a, i) => pt(a.percentile, i))
-        .map(([x, y], j) => `${j === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-        .join(' ') + 'Z'
-    : null;
-
-  // Build tooltip data when a vertex is hovered.
-  const tooltip = hovered !== null ? (() => {
-    const axis = axes[hovered];
-    const [vx, vy] = pt(axis.percentile, hovered);
-    const lines: Array<{ text: string; bold?: boolean }> = [];
-    if (axis.value != null) {
-      lines.push({ text: `${formatNumber(axis.value)} ${axis.unit ?? ''}`.trim(), bold: true });
-    }
-    lines.push({ text: `Percentil: ${Math.round(axis.percentile * 100)}%` });
-    if (axis.rank != null && axis.total != null) {
-      lines.push({ text: `#${axis.rank} av ${axis.total}` });
-    }
-    const lineH = 11, padX = 6, padY = 4, boxW = 94;
-    const boxH = lines.length * lineH + padY * 2;
-    const above = vy >= CY;
-    const tx = Math.max(2, Math.min(CX * 2 - boxW - 2, vx - boxW / 2));
-    const ty = above ? vy - boxH - 7 : vy + 7;
-    return { lines, lineH, padX, padY, boxW, boxH, tx, ty };
-  })() : null;
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${CX * 2} ${H}`} className="block overflow-visible">
-      {/* Web grid */}
-      {RADAR_WEB.map(v => (
-        <path key={v} d={ring(v)} fill="none"
-          stroke={v === 0.5 ? '#94a3b8' : '#e2e8f0'}
-          strokeWidth={v === 0.5 ? 1 : 0.75}
-          strokeDasharray={v === 0.5 ? '3 3' : undefined}
-        />
-      ))}
-      {/* Axis spokes */}
-      {axes.map((_, i) => {
-        const [x2, y2] = pt(1, i);
-        return <line key={i} x1={CX} y1={CY} x2={x2.toFixed(1)} y2={y2.toFixed(1)} stroke="#e2e8f0" strokeWidth={0.75} />;
-      })}
-      {/* Comparison polygon (orange, behind primary) */}
-      {compPath && (
-        <>
-          <path d={compPath} fill="rgba(249,115,22,0.12)" stroke="#f97316" strokeWidth={1.5} strokeLinejoin="round" />
-          {comparisonAxes!.map((a, i) => {
-            const [cx, cy] = pt(a.percentile, i);
-            return <circle key={`comp-${i}`} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={2.5} fill="#f97316" />;
-          })}
-        </>
-      )}
-      {/* Primary value polygon (blue) */}
-      <path d={valuePath} fill="rgba(59,130,246,0.15)" stroke="#3b82f6" strokeWidth={1.5} strokeLinejoin="round" />
-      {/* Vertex dots */}
-      {axes.map((a, i) => {
-        const [cx, cy] = pt(a.percentile, i);
-        return <circle key={i} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={2.5} fill="#3b82f6" />;
-      })}
-      {/* Large transparent hit areas for hover */}
-      {axes.map((a, i) => {
-        const [cx, cy] = pt(a.percentile, i);
-        return (
-          <circle key={`hit-${i}`} cx={cx.toFixed(1)} cy={cy.toFixed(1)} r={10}
-            fill="transparent" style={{ cursor: 'default' }}
-            onMouseEnter={() => setHovered(i)}
-            onMouseLeave={() => setHovered(null)}
-          />
-        );
-      })}
-      {/* Axis labels — anchor direction follows which side of centre the label is on */}
-      {axes.map(({ label }, i) => {
-        const [x, y] = pt(1.28, i);
-        const anchor = x < CX - 4 ? 'end' : x > CX + 4 ? 'start' : 'middle';
-        return (
-          <text key={i} x={x.toFixed(1)} y={y.toFixed(1)} textAnchor={anchor} dominantBaseline="middle"
-            fontSize={9} fontWeight={600} fill={hovered === i ? '#3b82f6' : '#64748b'}>
-            {label}
-          </text>
-        );
-      })}
-      <circle cx={CX} cy={CY} r={2} fill="#e2e8f0" />
-      {/* Tooltip */}
-      {tooltip && (
-        <g style={{ pointerEvents: 'none' }}>
-          <rect x={tooltip.tx} y={tooltip.ty} width={tooltip.boxW} height={tooltip.boxH}
-            rx={3} fill="white" stroke="#cbd5e1" strokeWidth={0.75} />
-          {tooltip.lines.map(({ text, bold }, li) => (
-            <text key={li}
-              x={tooltip.tx + tooltip.padX}
-              y={tooltip.ty + tooltip.padY + li * tooltip.lineH + tooltip.lineH * 0.75}
-              fontSize={8.5} fontWeight={bold ? 600 : 400} fill="#475569">
-              {text}
-            </text>
-          ))}
-        </g>
-      )}
-    </svg>
-  );
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 /** Scalar result for the dataset currently being explored, shown as the first stat row. */
@@ -369,17 +109,16 @@ export interface SelectionPanelProps {
   comparePickMode?:          boolean;
   onCompareRequest?:         () => void;
   onCancelCompare?:          () => void;
+  /** Switches to the profile view (charts, pyramid). Omit when unavailable. */
+  onOpenProfile?:            () => void;
 }
 
-interface PanelStats {
-  population:  StatData;
-  income:      StatData | null;
-  age:         StatData | null;
-  foreignBg:   StatData | null;
-  employment:  StatData | null;
-}
-
-export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect, activeStat, comparePickMode = false, onCompareRequest, onCancelCompare }: SelectionPanelProps) {
+/**
+ * Compact companion to the map: the numbers for the selected area (active
+ * dataset first, then the fixed demographics) and comparison. Charts live in
+ * the profile view.
+ */
+export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect, activeStat, comparePickMode = false, onCompareRequest, onCancelCompare, onOpenProfile }: SelectionPanelProps) {
   // ── Stats (via shared hook) ───────────────────────────────────────────────
   const primaryAreaStats = useAreaStats(selectedFeature,         adminLevel, STAT_YEAR);
   const compAreaStats    = useAreaStats(comparisonFeature ?? null, adminLevel, STAT_YEAR);
@@ -417,172 +156,7 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
     }
   }
 
-  // ── Sparkline state ───────────────────────────────────────────────────────
-  const [sparkline,     setSparkline]     = useState<Array<{ year: number; value: number }>>([]);
-  const [sparkLoading,  setSparkLoading]  = useState(false);
-  const [compSparkline, setCompSparkline] = useState<Array<{ year: number; value: number }>>([]);
-  const [compSparkLoading, setCompSparkLoading] = useState(false);
-
-  // ── Election state ────────────────────────────────────────────────────────
-  const [electionVotes,       setElectionVotes]       = useState<Record<string, number> | null>(null);
-  const [electionLoading,     setElectionLoading]     = useState(false);
-  const [compElectionVotes,   setCompElectionVotes]   = useState<Record<string, number> | null>(null);
-  const [compElectionLoading, setCompElectionLoading] = useState(false);
-
-  const fetchIdRef     = useRef(0);
-  const compFetchIdRef = useRef(0);
-
-  // ── Sparkline + election for primary feature ──────────────────────────────
-  useEffect(() => {
-    if (!selectedFeature) {
-      setSparkline([]);
-      setElectionVotes(null);
-      return;
-    }
-
-    const id   = ++fetchIdRef.current;
-    const code = selectedFeature.code;
-
-    setSparkline([]);
-    setElectionVotes(null);
-
-    if (SPARKLINE_LEVELS.includes(adminLevel)) {
-      setSparkLoading(true);
-      fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
-        .then(multiYear => {
-          if (id !== fetchIdRef.current) { return; }
-          const points = SPARKLINE_YEARS
-            .map(year => {
-              const v = multiYear[year]?.[code];
-              return Number.isFinite(v) ? { year, value: v as number } : null;
-            })
-            .filter((r): r is { year: number; value: number } => r !== null);
-          setSparkline(points);
-          setSparkLoading(false);
-        })
-        .catch(() => { if (id === fetchIdRef.current) { setSparkLoading(false); } });
-    }
-
-    if (ELECTION_LEVELS.includes(adminLevel)) {
-      setElectionLoading(true);
-      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
-        .then(r => {
-          if (id !== fetchIdRef.current) { return; }
-          if (r.kind === 'election') {
-            setElectionVotes((r as ElectionDatasetResult).partyVotes[code] ?? null);
-          }
-          setElectionLoading(false);
-        })
-        .catch(() => { if (id === fetchIdRef.current) { setElectionLoading(false); } });
-    }
-  }, [selectedFeature, adminLevel]);
-
-  // ── Sparkline + election for comparison feature ───────────────────────────
-  useEffect(() => {
-    if (!comparisonFeature) {
-      setCompSparkline([]);
-      setCompElectionVotes(null);
-      return;
-    }
-
-    const id   = ++compFetchIdRef.current;
-    const code = comparisonFeature.code;
-
-    setCompSparkline([]);
-    setCompElectionVotes(null);
-
-    if (SPARKLINE_LEVELS.includes(adminLevel)) {
-      setCompSparkLoading(true);
-      fetchPopulationMultiYear(adminLevel as 'Country' | 'Region' | 'Municipality', SPARKLINE_YEARS)
-        .then(multiYear => {
-          if (id !== compFetchIdRef.current) { return; }
-          const points = SPARKLINE_YEARS
-            .map(year => {
-              const v = multiYear[year]?.[code];
-              return Number.isFinite(v) ? { year, value: v as number } : null;
-            })
-            .filter((r): r is { year: number; value: number } => r !== null);
-          setCompSparkline(points);
-          setCompSparkLoading(false);
-        })
-        .catch(() => { if (id === compFetchIdRef.current) { setCompSparkLoading(false); } });
-    }
-
-    if (ELECTION_LEVELS.includes(adminLevel)) {
-      setCompElectionLoading(true);
-      fetchCached(riksdagsvalDescriptor, adminLevel, ELECTION_YEAR)
-        .then(r => {
-          if (id !== compFetchIdRef.current) { return; }
-          if (r.kind === 'election') {
-            setCompElectionVotes((r as ElectionDatasetResult).partyVotes[code] ?? null);
-          }
-          setCompElectionLoading(false);
-        })
-        .catch(() => { if (id === compFetchIdRef.current) { setCompElectionLoading(false); } });
-    }
-  }, [comparisonFeature, adminLevel]);
-
   const isComparing = !!comparisonFeature;
-
-  // Build radar axes from whatever stats are available (need ≥3 for a meaningful chart).
-  const radarAxes: RadarAxis[] = [];
-  if (stats) {
-    if (stats.population.percentile !== null) {
-      radarAxes.push({ label: 'Befolkning', percentile: stats.population.percentile,
-        value: stats.population.value, unit: stats.population.unit,
-        rank: stats.population.rank, total: stats.population.total });
-    }
-    if (stats.income != null && stats.income.percentile !== null) {
-      radarAxes.push({ label: 'Inkomst', percentile: stats.income.percentile,
-        value: stats.income.value, unit: stats.income.unit,
-        rank: stats.income.rank, total: stats.income.total });
-    }
-    if (stats.age != null && stats.age.percentile !== null) {
-      radarAxes.push({ label: 'Ålder', percentile: stats.age.percentile,
-        value: stats.age.value, unit: stats.age.unit,
-        rank: stats.age.rank, total: stats.age.total });
-    }
-    if (stats.foreignBg != null && stats.foreignBg.percentile !== null) {
-      radarAxes.push({ label: 'Utländsk', percentile: stats.foreignBg.percentile,
-        value: stats.foreignBg.value, unit: stats.foreignBg.unit,
-        rank: stats.foreignBg.rank, total: stats.foreignBg.total });
-    }
-    if (stats.employment != null && stats.employment.percentile !== null) {
-      radarAxes.push({ label: 'Syssels.', percentile: stats.employment.percentile,
-        value: stats.employment.value, unit: stats.employment.unit,
-        rank: stats.employment.rank, total: stats.employment.total });
-    }
-  }
-
-  // Comparison radar axes — same labels as primary so axes align.
-  const compRadarAxes: RadarAxis[] = [];
-  if (compStats && radarAxes.length > 0) {
-    if (compStats.population.percentile !== null) {
-      compRadarAxes.push({ label: 'Befolkning', percentile: compStats.population.percentile,
-        value: compStats.population.value, unit: compStats.population.unit,
-        rank: compStats.population.rank, total: compStats.population.total });
-    }
-    if (compStats.income != null && compStats.income.percentile !== null) {
-      compRadarAxes.push({ label: 'Inkomst', percentile: compStats.income.percentile,
-        value: compStats.income.value, unit: compStats.income.unit,
-        rank: compStats.income.rank, total: compStats.income.total });
-    }
-    if (compStats.age != null && compStats.age.percentile !== null) {
-      compRadarAxes.push({ label: 'Ålder', percentile: compStats.age.percentile,
-        value: compStats.age.value, unit: compStats.age.unit,
-        rank: compStats.age.rank, total: compStats.age.total });
-    }
-    if (compStats.foreignBg != null && compStats.foreignBg.percentile !== null) {
-      compRadarAxes.push({ label: 'Utländsk', percentile: compStats.foreignBg.percentile,
-        value: compStats.foreignBg.value, unit: compStats.foreignBg.unit,
-        rank: compStats.foreignBg.rank, total: compStats.foreignBg.total });
-    }
-    if (compStats.employment != null && compStats.employment.percentile !== null) {
-      compRadarAxes.push({ label: 'Syssels.', percentile: compStats.employment.percentile,
-        value: compStats.employment.value, unit: compStats.employment.unit,
-        rank: compStats.employment.rank, total: compStats.employment.total });
-    }
-  }
 
   return (
     <div
@@ -705,32 +279,6 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
 
         {selectedFeature && (
           <>
-            {/* Radar profile */}
-            {!primaryAreaStats.loading && radarAxes.length >= 3 && (
-              <ProfileSection title="Profil">
-                <ChartCard>
-                  <RadarChart
-                    axes={radarAxes}
-                    comparisonAxes={isComparing && compRadarAxes.length === radarAxes.length ? compRadarAxes : undefined}
-                  />
-                  {isComparing && (
-                    <div className="flex items-center gap-3 mt-1.5 justify-center">
-                      <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                        <span className="w-2 h-0.5 rounded bg-blue-500 inline-block" />
-                        {selectedFeature.label}
-                      </span>
-                      {compRadarAxes.length > 0 && (
-                        <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                          <span className="w-2 h-0.5 rounded bg-orange-500 inline-block" />
-                          {comparisonFeature!.label}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </ChartCard>
-              </ProfileSection>
-            )}
-
             {/* Key stats */}
             <ProfileSection title={`Nyckeltal ${STAT_YEAR}`}>
               {statRows.length > 0 && !isComparing && (
@@ -747,59 +295,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
               )}
             </ProfileSection>
 
-            {/* Population sparkline */}
-            {adminLevel !== 'RegSO' && adminLevel !== 'DeSO' && (
-              <ProfileSection title="Befolkningstrend">
-                {(sparkLoading || (isComparing && compSparkLoading)) && <Spinner />}
-                {!sparkLoading && sparkline.length >= 2 && (
-                  <ChartCard>
-                    <Sparkline
-                      data={sparkline}
-                      comparisonData={isComparing && !compSparkLoading && compSparkline.length >= 2 ? compSparkline : undefined}
-                    />
-                    <div className="flex justify-between text-xs text-slate-400 mt-1">
-                      <span>{sparkline[0].year}</span>
-                      <span>{sparkline[sparkline.length - 1].year}</span>
-                    </div>
-                  </ChartCard>
-                )}
-                {!sparkLoading && sparkline.length < 2 && (
-                  <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
-                )}
-              </ProfileSection>
-            )}
-
-            {/* Election donut */}
-            {ELECTION_LEVELS.includes(adminLevel) && (
-              <ProfileSection title={`Riksdagsval ${ELECTION_YEAR}`}>
-                {(electionLoading || (isComparing && compElectionLoading)) && <Spinner />}
-                {!isComparing && (
-                  <>
-                    {!electionLoading && !electionVotes && (
-                      <p className="text-sm text-slate-400">Ingen data tillgänglig.</p>
-                    )}
-                    {!electionLoading && electionVotes && (
-                      <ChartCard><ElectionDonut votes={electionVotes} /></ChartCard>
-                    )}
-                  </>
-                )}
-                {isComparing && !electionLoading && !compElectionLoading && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <ChartCard>
-                      <div className="text-[11px] font-semibold text-slate-400 mb-1.5 truncate">{selectedFeature.label}</div>
-                      {electionVotes
-                        ? <ElectionDonut votes={electionVotes} />
-                        : <p className="text-xs text-slate-400">Ingen data</p>}
-                    </ChartCard>
-                    <ChartCard>
-                      <div className="text-[11px] font-semibold text-orange-400 mb-1.5 truncate">{comparisonFeature!.label}</div>
-                      {compElectionVotes
-                        ? <ElectionDonut votes={compElectionVotes} />
-                        : <p className="text-xs text-slate-400">Ingen data</p>}
-                    </ChartCard>
-                  </div>
-                )}
-              </ProfileSection>
+            {/* Deep dive lives in the profile view */}
+            {onOpenProfile && (
+              <button
+                onClick={onOpenProfile}
+                className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg py-2 border border-slate-200 transition-colors"
+              >
+                <LayoutDashboard className="w-3.5 h-3.5" strokeWidth={2} />
+                Visa profil{isComparing ? ' och jämförelse' : ''}
+              </button>
             )}
 
             {/* Comparison hint — shown only when a single area is selected */}
@@ -871,7 +375,7 @@ function ComparisonStatRow({
             <span className="text-[11px] text-slate-500 flex-shrink-0">{a.unit}</span>
           </div>
           {a.rank !== null && a.total !== null && (
-            <div className="text-[11px] text-slate-500 tabular-nums pl-2.5">#{a.rank}/{a.total}</div>
+            <div className="text-[11px] text-slate-400 tabular-nums pl-2.5">#{a.rank}/{a.total}</div>
           )}
         </div>
 
@@ -894,7 +398,7 @@ function ComparisonStatRow({
                 <span className="w-1.5 h-1.5 rounded-full bg-orange-500 flex-shrink-0 self-center" />
               </div>
               {b.rank !== null && b.total !== null && (
-                <div className="text-[11px] text-slate-500 tabular-nums pr-2.5">#{b.rank}/{b.total}</div>
+                <div className="text-[11px] text-slate-400 tabular-nums pr-2.5">#{b.rank}/{b.total}</div>
               )}
             </>
           ) : (
