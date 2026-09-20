@@ -205,7 +205,7 @@ export function MultiLineChart({ data, label, unit, colorOverrides }: Props) {
 
     // ── End-of-line labels ────────────────────────────────────────────────────
     // Only truncate when a label would exceed the (already widened) margin.
-    const labelMax = Math.floor((rightMargin - 12) / LABEL_CHAR_W);
+    const labelMax = Math.round((rightMargin - 12) / LABEL_CHAR_W);
     const truncate = (s: string) => s.length > labelMax ? s.slice(0, labelMax - 1) + '…' : s;
     // Build positions from each series' last point.
     const labelPos = parsedSeries
