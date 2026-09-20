@@ -1,4 +1,5 @@
 import { Fragment, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CircleHelp } from 'lucide-react';
 import { FeatureProfile } from '@/components/profile/FeatureProfile';
 import { MapLegend } from '@/components/map/MapLegend';
 import { MapSidebar } from '@/components/map/MapSidebar';
@@ -115,6 +116,9 @@ export default function MapPage() {
   const [mapResetToken,       setMapResetToken]       = useState(0);
   const [selectedBase,        setSelectedBase]        = useState<BaseMapKey>('None');
   const [fillOpacity,         setFillOpacity]         = useState(1.0);
+  const [shortcutsOpen,       setShortcutsOpen]       = useState(false);
+  /** "Jämför" was pressed: the next selection anywhere becomes the comparison area. */
+  const [comparePickMode,     setComparePickMode]     = useState(false);
 
   // ── Filter state ───────────────────────────────────────────────────────
   /** Whether threshold filter mode is active. */
@@ -148,6 +152,25 @@ export default function MapPage() {
     handleDrillDown,
     handleBreadcrumbGoto,
   } = nav;
+
+  // Comparison pick mode routes the next ordinary click to the comparison slot,
+  // so mouse and touch users get the same result as shift-click.
+  const pickComparison = useCallback((feature: SelectedFeature | null) => {
+    handleComparisonSelect(feature);
+    setComparePickMode(false);
+  }, [handleComparisonSelect]);
+  const selectFeature = comparePickMode ? pickComparison : handleFeatureSelect;
+
+  useEffect(() => {
+    if (!selectedFeature) { setComparePickMode(false); }
+  }, [selectedFeature]);
+
+  useEffect(() => {
+    if (!shortcutsOpen) { return; }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setShortcutsOpen(false); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [shortcutsOpen]);
 
   // ── Dataset (year, party, descriptor) ─────────────────────────────────
   const ds = useDatasetState(
@@ -595,6 +618,47 @@ export default function MapPage() {
             </div>
           )}
 
+          {/* Interaction help */}
+          <div className="relative self-center ml-3">
+            <button
+              onClick={() => setShortcutsOpen(o => !o)}
+              aria-label="Så här navigerar du"
+              aria-expanded={shortcutsOpen}
+              title="Så här navigerar du"
+              className={[
+                'flex items-center justify-center w-7 h-7 rounded-lg transition-colors border',
+                shortcutsOpen
+                  ? 'bg-blue-50 border-blue-200 text-blue-600'
+                  : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
+              ].join(' ')}
+            >
+              <CircleHelp className="w-4 h-4" strokeWidth={1.75} />
+            </button>
+            {shortcutsOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShortcutsOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 z-40 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3">
+                  <SectionLabel className="block mb-2">Så här navigerar du</SectionLabel>
+                  <dl className="space-y-1.5 text-xs">
+                    {[
+                      ['Klick',                    'Välj område'],
+                      ['Skift + klick',            'Jämför med det valda området'],
+                      ['Dubbelklick på delområde', 'Gå ner en nivå'],
+                      ['Esc',                      'Gå upp en nivå, eller avmarkera'],
+                      ['Skift + Enter i sökfältet', 'Lägg till träffen som jämförelse'],
+                      ['Reglaget År',              'Byt år utan att tappa urvalet'],
+                    ].map(([key, what]) => (
+                      <div key={key} className="flex items-baseline gap-2">
+                        <dt className="flex-shrink-0 font-mono text-[11px] text-slate-700 bg-slate-100 rounded px-1.5 py-0.5 whitespace-nowrap">{key}</dt>
+                        <dd className="text-slate-500">{what}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Panel toggle */}
           <button
             onClick={() => {
@@ -782,7 +846,7 @@ export default function MapPage() {
               <div className="w-64">
                 <FeatureSearch
                   items={profileSearchItems}
-                  onSelect={handleFeatureSelect}
+                  onSelect={selectFeature}
                 />
               </div>
             </div>
@@ -833,7 +897,7 @@ export default function MapPage() {
                     subTooltipData={subElectionTooltip}
                     resetToken={mapResetToken}
                     selectedFeature={selectedFeature}
-                    onFeatureSelect={handleFeatureSelect}
+                    onFeatureSelect={selectFeature}
                     onDrillDown={handleDrillDown}
                     comparisonFeature={comparisonFeature}
                     onComparisonSelect={handleComparisonSelect}
@@ -860,7 +924,7 @@ export default function MapPage() {
               <Suspense fallback={<Spinner />}>
                 {activeView === 'chart' && activeChartType === 'bar' && scalarResult && (
                   <div className="w-full p-6">
-                    <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
+                    <RankedBarChart data={scalarResult} colorScale={colorScale} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                   </div>
                 )}
                 {activeView === 'chart' && activeChartType === 'histogram' && scalarResult && (
@@ -870,7 +934,7 @@ export default function MapPage() {
                 )}
                 {activeView === 'chart' && activeChartType === 'diverging' && filteredForDiverging && (
                   <div className="w-full p-6">
-                    <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
+                    <DivergingBarChart data={filteredForDiverging} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} />
                   </div>
                 )}
                 {activeView === 'chart' && activeChartType === 'election-bar' && partyShareData && (
@@ -879,7 +943,7 @@ export default function MapPage() {
                       data={partyShareData}
                       sort="none"
                       selectedCode={selectedFeature?.code ?? null}
-                      onSelect={handleFeatureSelect}
+                      onSelect={selectFeature}
                     />
                   </div>
                 )}
@@ -937,7 +1001,7 @@ export default function MapPage() {
                       colorFn={rankingColorFn}
                       rowMeta={rankingRowMeta}
                       selectedFeature={selectedFeature}
-                      onFeatureSelect={handleFeatureSelect}
+                      onFeatureSelect={selectFeature}
                       comparisonFeature={comparisonFeature}
                       onComparisonSelect={handleComparisonSelect}
                     />
@@ -949,7 +1013,7 @@ export default function MapPage() {
                       xData={scalarResult}
                       yData={scatterYScalar}
                       selectedFeature={selectedFeature}
-                      onFeatureSelect={handleFeatureSelect}
+                      onFeatureSelect={selectFeature}
                       comparisonFeature={comparisonFeature}
                       onComparisonSelect={handleComparisonSelect}
                     />
@@ -976,12 +1040,12 @@ export default function MapPage() {
 
               {activeView === 'table' && scalarResult && (
                 <div className="w-full h-full p-6">
-                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
+                  <DatasetTable data={scalarResult} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} comparisonFeature={comparisonFeature} onComparisonSelect={handleComparisonSelect} matchingAreas={matchingAreas} />
                 </div>
               )}
               {activeView === 'table' && electionResult && (
                 <div className="w-full h-full p-6">
-                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={handleFeatureSelect} />
+                  <ElectionTable data={electionResult} selectedFeature={selectedFeature} onFeatureSelect={selectFeature} />
                 </div>
               )}
               {activeView === 'table' && !datasetResult && (
@@ -1007,6 +1071,9 @@ export default function MapPage() {
             selectedFeature={selectedFeature}
             adminLevel={selectionLevel}
             activeStat={activeStatSource}
+            comparePickMode={comparePickMode}
+            onCompareRequest={() => setComparePickMode(true)}
+            onCancelCompare={() => setComparePickMode(false)}
             isOpen={isPanelOpen}
             onClose={() => { userDismissedPanel.current = true; setIsPanelOpen(false); }}
             comparisonFeature={comparisonFeature}
@@ -1018,7 +1085,7 @@ export default function MapPage() {
               // in election results at Country level).
               if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }
               else if (/^\d{2}$/.test(item.code)) { setSelectionLevel('Region'); }
-              handleFeatureSelect(item);
+              selectFeature(item);
             }}
             onSearchComparisonSelect={(item) => {
               if (/^\d{4}$/.test(item.code))      { setSelectionLevel('Municipality'); }

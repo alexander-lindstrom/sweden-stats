@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { GitCompareArrows } from 'lucide-react';
 import { AdminLevel, ElectionDatasetResult, ScalarDatasetResult } from '@/datasets/types';
 import { LEVEL_LABELS, LEVEL_BADGE } from '@/datasets/adminLevels';
 import { fetchCached } from '@/datasets/cache';
@@ -364,6 +365,10 @@ export interface SelectionPanelProps {
   onSearchComparisonSelect?: (f: FeatureSearchItem) => void;
   /** The dataset currently shown on the map/chart. Rendered as the first key stat. */
   activeStat?:               ActiveStatSource | null;
+  /** "Jämför" pressed: the next click picks the comparison area. */
+  comparePickMode?:          boolean;
+  onCompareRequest?:         () => void;
+  onCancelCompare?:          () => void;
 }
 
 interface PanelStats {
@@ -374,7 +379,7 @@ interface PanelStats {
   employment:  StatData | null;
 }
 
-export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect, activeStat }: SelectionPanelProps) {
+export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, comparisonFeature, onClearComparison, searchItems, onSearchSelect, onSearchComparisonSelect, activeStat, comparePickMode = false, onCompareRequest, onCancelCompare }: SelectionPanelProps) {
   // ── Stats (via shared hook) ───────────────────────────────────────────────
   const primaryAreaStats = useAreaStats(selectedFeature,         adminLevel, STAT_YEAR);
   const compAreaStats    = useAreaStats(comparisonFeature ?? null, adminLevel, STAT_YEAR);
@@ -633,6 +638,22 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           </div>
         )}
         <div className="flex items-center gap-1 flex-shrink-0">
+          {selectedFeature && !isComparing && onCompareRequest && (
+            <button
+              onClick={comparePickMode ? onCancelCompare : onCompareRequest}
+              aria-pressed={comparePickMode}
+              title="Jämför med ett annat område"
+              className={[
+                'flex items-center gap-1 text-xs font-semibold px-1.5 py-0.5 rounded transition-colors',
+                comparePickMode
+                  ? 'bg-orange-50 text-orange-600'
+                  : 'text-slate-500 hover:text-orange-600 hover:bg-orange-50',
+              ].join(' ')}
+            >
+              <GitCompareArrows className="w-3.5 h-3.5" strokeWidth={2} />
+              Jämför
+            </button>
+          )}
           {isComparing && (
             <button
               onClick={onClearComparison}
@@ -652,6 +673,15 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
           </button>
         </div>
       </div>
+
+      {/* Comparison pick banner */}
+      {comparePickMode && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-orange-50 border-b border-orange-100 text-xs text-orange-700 flex-shrink-0">
+          <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />
+          <span className="flex-1">Klicka på ett annat område, eller sök nedan, för att jämföra.</span>
+          <button onClick={onCancelCompare} className="font-semibold hover:underline">Avbryt</button>
+        </div>
+      )}
 
       {/* Search */}
       {searchItems && searchItems.length > 0 && onSearchSelect && (
@@ -773,9 +803,9 @@ export function SelectionPanel({ selectedFeature, adminLevel, isOpen, onClose, c
             )}
 
             {/* Comparison hint — shown only when a single area is selected */}
-            {!isComparing && (
+            {!isComparing && !comparePickMode && (
               <p className="text-[11px] text-slate-400 text-center hidden sm:block">
-                Shift-klicka ett annat område för att jämföra
+                Skift-klicka ett annat område, eller tryck Jämför, för att jämföra
               </p>
             )}
           </>
