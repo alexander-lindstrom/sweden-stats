@@ -8,10 +8,15 @@ export const ELECTION_YEARS = [
 export const PARTY_CODES = ['S', 'M', 'SD', 'C', 'V', 'KD', 'MP', 'L', 'ÖVRIGA'] as const;
 export type PartyCode = (typeof PARTY_CODES)[number];
 
-/** Official party colors. */
+/**
+ * Party colors. Moderaterna's official light blue (#52BDEC) is almost the
+ * water colour on the no-basemap background, so M-won municipalities around
+ * Stockholm vanished into the sea; a slightly darker blue keeps them visible
+ * and still reads as M.
+ */
 export const PARTY_COLORS: Record<string, string> = {
   S:      '#E8112d',
-  M:      '#52BDEC',
+  M:      '#2C9BD6',
   SD:     '#DDDD00',
   C:      '#009933',
   V:      '#AF0000',
