@@ -22,6 +22,16 @@ import type { AdminLevel, ScalarDatasetResult } from '../types';
 
 const BASE_URL = '/api/kolada';
 
+// Kolada can stall for minutes on a slow KPI. Give up after this long so the
+// user gets an error notice instead of an endless loading bar.
+const REQUEST_TIMEOUT_MS = 30_000;
+
+async function koladaFetch(url: string, what: string): Promise<Response> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+  if (!res.ok) { throw new Error(`Kolada ${what} failed: ${res.status}`); }
+  return res;
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface KoladaValue {
@@ -75,8 +85,7 @@ async function fetchAllMunicipalityLabels(): Promise<Record<string, string>> {
   let url: string | null = `${BASE_URL}/municipality?per_page=500`;
 
   while (url) {
-    const res = await fetch(url);
-    if (!res.ok) { throw new Error(`Kolada municipality fetch failed: ${res.status}`); }
+    const res = await koladaFetch(url, 'municipality fetch');
     const page: KoladaMunicipalityPage = await res.json();
     for (const m of page.values) {
       if (m.type === 'K') {
@@ -122,8 +131,7 @@ async function fetchKoladaKpiData(
   let url: string | null = `${BASE_URL}/data/kpi/${kpiId}/year/${year}?per_page=1000`;
 
   while (url) {
-    const res = await fetch(url);
-    if (!res.ok) { throw new Error(`Kolada data fetch failed (${kpiId}/${year}): ${res.status}`); }
+    const res = await koladaFetch(url, `data fetch (${kpiId}/${year})`);
     const page: KoladaPage = await res.json();
 
     for (const entry of page.values) {
@@ -206,8 +214,7 @@ export async function fetchAllKoladaKpis(): Promise<KoladaKpiMeta[]> {
   let url: string | null = `${BASE_URL}/kpi?per_page=500`;
 
   while (url) {
-    const res = await fetch(url);
-    if (!res.ok) { throw new Error(`Kolada KPI catalog fetch failed: ${res.status}`); }
+    const res = await koladaFetch(url, 'KPI catalog fetch');
     const page: KoladaKpiPage = await res.json();
     kpis.push(...page.values);
     url = proxyUrl(page.next_url);

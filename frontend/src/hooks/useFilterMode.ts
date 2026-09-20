@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AdminLevel, FilterCriterion, ScalarDatasetResult } from '@/datasets/types';
 import { DATASETS } from '@/datasets/registry';
 import { fetchCached } from '@/datasets/cache';
+import { describeFetchError } from '@/datasets/fetchErrors';
+import { showToast } from '@/components/ui/toast';
 
 interface FilterModeResult {
   matchingAreas: Set<string> | null;
@@ -54,8 +56,12 @@ export function useFilterMode(
       }
       setFetchedDatasets(map);
       setLoading(false);
-    }).catch(() => {
-      if (gen === fetchGenRef.current) { setLoading(false); }
+    }).catch(err => {
+      if (gen !== fetchGenRef.current) { return; }
+      setLoading(false);
+      // Let the same combination be retried once the user changes anything.
+      lastFetchKeyRef.current = '';
+      showToast(describeFetchError('filterunderlaget', 'källan', err));
     });
   }, [enabled, criteria, level, year]);
 

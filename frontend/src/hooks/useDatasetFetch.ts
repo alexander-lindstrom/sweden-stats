@@ -5,6 +5,8 @@ import { DATASETS } from '@/datasets/registry';
 import { fetchCached, isCached, preload } from '@/datasets/cache';
 import { ADMIN_LEVELS } from '@/datasets/adminLevels';
 import { PARTY_COLORS } from '@/datasets/parties';
+import { describeFetchError } from '@/datasets/fetchErrors';
+import { showToast } from '@/components/ui/toast';
 
 /** Describes the active colour scale so the legend can draw it. */
 export type ColorLegendSpec =
@@ -55,6 +57,9 @@ export function useDatasetFetch(
   const [colorLegend,   setColorLegend]   = useState<ColorLegendSpec | null>(null);
   const [mapColorFn,    setMapColorFn]    = useState<((code: string) => string) | null>(null);
   const [loading,       setLoading]       = useState(false);
+  // Bumped by the "Försök igen" toast action; failures are never cached, so
+  // re-running the effect is a real retry.
+  const [retryToken,    setRetryToken]    = useState(0);
   const fetchGenRef    = useRef(0);
   // Ref so the clearing effect can read the current year without adding it to
   // its deps (year changes intentionally keep old data visible until new data arrives).
@@ -161,9 +166,12 @@ export function useDatasetFetch(
         if (gen === fetchGenRef.current) {
           console.error('Dataset fetch failed:', err);
           setLoading(false);
+          showToast(describeFetchError(descriptor.label, descriptor.source, err), {
+            action: { label: 'Försök igen', onClick: () => setRetryToken(t => t + 1) },
+          });
         }
       });
-  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId]);
+  }, [selectedDatasetId, selectedLevel, selectedYear, activeParty, allDatasets, activeBreakdownId, retryToken]);
 
   return { datasetResult, colorScale, colorLegend, mapColorFn, loading };
 }

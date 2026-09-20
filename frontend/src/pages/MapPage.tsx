@@ -44,6 +44,7 @@ import { useAreaFilterDerivedData } from '@/hooks/useAreaFilterDerivedData';
 import { useElectionDerivedData } from '@/hooks/useElectionDerivedData';
 import { stripLanSuffix } from '@/utils/labelFormatting';
 import { TopLoadingBar } from '@/components/ui/TopLoadingBar';
+import { Toaster } from '@/components/ui/Toaster';
 import { Spinner } from '@/components/ui/Spinner';
 import { Dropdown } from '@/components/ui/Dropdown';
 import { SectionLabel } from '@/components/ui/SectionLabel';
@@ -477,6 +478,7 @@ export default function MapPage() {
   return (
     <main className="flex h-screen overflow-hidden bg-white">
       <TopLoadingBar loading={loading || hierarchyLoading || timeSeriesLoading} />
+      <Toaster />
 
       {/* Sidebar backdrop — visible below lg where sidebar is an overlay */}
       {mobileSidebarOpen && (

@@ -1,6 +1,6 @@
 import os
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from state_expenses_api import router as state_expenses_router
@@ -23,9 +23,15 @@ async def kolada_proxy(path: str, request: Request) -> Response:
     url = f"https://api.kolada.se/v3/{path}"
     if request.url.query:
         url += f"?{request.url.query}"
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.get(url)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(url)
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Kolada did not respond in time")
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Kolada request failed: {exc}")
     return Response(
         content=resp.content,
+        status_code=resp.status_code,
         media_type=resp.headers.get("content-type", "application/json"),
     )
