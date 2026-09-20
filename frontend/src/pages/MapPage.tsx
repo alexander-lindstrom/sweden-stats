@@ -503,7 +503,7 @@ export default function MapPage() {
           {/* Sidebar toggle — md+ only */}
           <button
             onClick={() => setDesktopSidebarOpen(o => !o)}
-            title={desktopSidebarOpen ? 'Dölj sidopanel' : 'Visa sidopanel'}
+            title={desktopSidebarOpen ? 'Dölj meny' : 'Visa meny'}
             className={[
               'hidden md:flex self-center mr-2 items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
               desktopSidebarOpen
@@ -515,7 +515,7 @@ export default function MapPage() {
               <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" />
               <line x1="5.5" y1="1.5" x2="5.5" y2="14.5" />
             </svg>
-            <span className="hidden lg:inline">{desktopSidebarOpen ? 'Dölj' : 'Meny'}</span>
+            <span className="hidden lg:inline">Meny</span>
           </button>
 
           {/* View tabs */}
@@ -573,7 +573,7 @@ export default function MapPage() {
             <div className="hidden md:flex items-center self-center pl-3 border-l border-slate-200">
               <button
                 onClick={() => setBivariateMode(m => !m)}
-                title={bivariateMode ? 'Stäng 2D-läge' : 'Visa två variabler på kartan (bivariat)'}
+                title={bivariateMode ? 'Visa en variabel' : 'Visa två variabler på kartan (bivariat)'}
                 className={[
                   'flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
                   bivariateMode
@@ -581,7 +581,7 @@ export default function MapPage() {
                     : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700',
                 ].join(' ')}
               >
-                2D
+                Två variabler
               </button>
             </div>
           )}
@@ -593,7 +593,7 @@ export default function MapPage() {
               userDismissedPanel.current = !opening;
               setIsPanelOpen(opening);
             }}
-            title={isPanelOpen ? 'Dölj panel' : 'Visa detaljpanel'}
+            title={isPanelOpen ? 'Dölj panel' : 'Visa panel'}
             className={[
               'self-center ml-3 flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors border',
               isPanelOpen
@@ -607,12 +607,12 @@ export default function MapPage() {
             </svg>
             <span className="hidden sm:inline">
               {isPanelOpen
-                ? 'Dölj'
+                ? 'Panel'
                 : selectedFeature
                   ? comparisonFeature
                     ? `${selectedFeature.label} +1`
                     : selectedFeature.label
-                  : 'Detaljer'}
+                  : 'Panel'}
             </span>
           </button>
         </div>
