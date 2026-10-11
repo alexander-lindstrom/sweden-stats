@@ -1,8 +1,4 @@
 datamedmera.se {
-    handle /geoserver/web/* {
-        respond 403
-    }
-
     # More specific rule first — /api/kolada/* proxied to Kolada v3 (no CORS headers on their end)
     # Strip X-Forwarded-Host so Kolada uses its own hostname in next_url pagination links,
     # not our domain.
@@ -17,8 +13,27 @@ datamedmera.se {
         reverse_proxy backend:3001
     }
 
+    # Only what the map uses: WMTS vector tiles and the WFS lookup that zooms to an area.
+    # An allowlist, since Tomcat ignores ";..." path parameters that a blocklist would
+    # match literally (/geoserver/web;x/ got past a /geoserver/web/* block to GeoServer).
     handle /geoserver/* {
-        reverse_proxy geoserver:8080
+        @tiles {
+            method GET
+            path /geoserver/gwc/service/wmts
+        }
+        @wfs {
+            method GET
+            path /geoserver/wfs
+        }
+        handle @tiles {
+            reverse_proxy geoserver:8080
+        }
+        handle @wfs {
+            reverse_proxy geoserver:8080
+        }
+        handle {
+            respond 404
+        }
     }
 
     handle /assets/* {
