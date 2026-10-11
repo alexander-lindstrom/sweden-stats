@@ -1,8 +1,14 @@
-datamedmera.se {
-    handle /geoserver/web/* {
-        respond 403
+# Plain HTTP inside the Docker network. The edge proxy (alexander-lindstrom/server) owns
+# ports 80/443, terminates TLS for datamedmera.se, compresses, and forwards here.
+{
+    servers {
+        # Keep the edge's X-Forwarded-For/-Proto (the client's IP, https) instead of
+        # replacing them with the edge's own address and http.
+        trusted_proxies static private_ranges
     }
+}
 
+:80 {
     # More specific rule first — /api/kolada/* proxied to Kolada v3 (no CORS headers on their end)
     # Strip X-Forwarded-Host so Kolada uses its own hostname in next_url pagination links,
     # not our domain.
@@ -17,8 +23,39 @@ datamedmera.se {
         reverse_proxy backend:3001
     }
 
+    # Only what the map uses: WMTS vector tiles and the WFS lookup that zooms to an area.
+    # An allowlist, since Tomcat ignores ";..." path parameters that a blocklist would
+    # match literally (/geoserver/web;x/ got past a /geoserver/web/* block to GeoServer).
     handle /geoserver/* {
-        reverse_proxy geoserver:8080
+        @tiles {
+            method GET
+            path /geoserver/gwc/service/wmts
+        }
+        @wfs {
+            method GET
+            path /geoserver/wfs
+        }
+        # Vector tiles are not on Caddy's default list of types to compress (gzip saves ~40%),
+        # and GeoWebCache marks them no-store although they only change with a geodata
+        # release (restore_geodata.sh clears its cache then).
+        handle @tiles {
+            encode zstd gzip {
+                match {
+                    header Content-Type application/vnd.mapbox-vector-tile
+                }
+            }
+            reverse_proxy geoserver:8080 {
+                header_down Cache-Control "public, max-age=86400"
+                header_down -Pragma
+                header_down -Expires
+            }
+        }
+        handle @wfs {
+            reverse_proxy geoserver:8080
+        }
+        handle {
+            respond 404
+        }
     }
 
     handle /assets/* {
@@ -27,8 +64,11 @@ datamedmera.se {
         file_server
     }
 
+    # no-cache: revalidate index.html on every load, so a browser never keeps one that
+    # points at hashed assets a deploy has removed.
     handle {
         root * /var/www/html
+        header Cache-Control "no-cache"
         try_files {path} /index.html
         file_server
     }
