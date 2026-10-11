@@ -25,8 +25,20 @@ datamedmera.se {
             method GET
             path /geoserver/wfs
         }
+        # Vector tiles are not on Caddy's default list of types to compress (gzip saves ~40%),
+        # and GeoWebCache marks them no-store although they only change with a geodata
+        # release (restore_geodata.sh clears its cache then).
         handle @tiles {
-            reverse_proxy geoserver:8080
+            encode zstd gzip {
+                match {
+                    header Content-Type application/vnd.mapbox-vector-tile
+                }
+            }
+            reverse_proxy geoserver:8080 {
+                header_down Cache-Control "public, max-age=86400"
+                header_down -Pragma
+                header_down -Expires
+            }
         }
         handle @wfs {
             reverse_proxy geoserver:8080
@@ -42,8 +54,11 @@ datamedmera.se {
         file_server
     }
 
+    # no-cache: revalidate index.html on every load, so a browser never keeps one that
+    # points at hashed assets a deploy has removed.
     handle {
         root * /var/www/html
+        header Cache-Control "no-cache"
         try_files {path} /index.html
         file_server
     }
