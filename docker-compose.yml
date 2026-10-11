@@ -3,11 +3,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - caddy_data:/data
+    # No published ports: the edge proxy (alexander-lindstrom/server) reaches this
+    # container on the shared `edge` network as sweden-stats-web:80.
+    networks:
+      default:
+      edge:
+        aliases:
+          - sweden-stats-web
     depends_on:
       - backend
       - geoserver
@@ -32,6 +34,10 @@ services:
       - .env.production
     restart: unless-stopped
 
+networks:
+  # Created by the server repo's compose; start that first.
+  edge:
+    external: true
+
 volumes:
   geoserver_data:
-  caddy_data:

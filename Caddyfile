@@ -1,4 +1,14 @@
-datamedmera.se {
+# Plain HTTP inside the Docker network. The edge proxy (alexander-lindstrom/server) owns
+# ports 80/443, terminates TLS for datamedmera.se, compresses, and forwards here.
+{
+    servers {
+        # Keep the edge's X-Forwarded-For/-Proto (the client's IP, https) instead of
+        # replacing them with the edge's own address and http.
+        trusted_proxies static private_ranges
+    }
+}
+
+:80 {
     # More specific rule first — /api/kolada/* proxied to Kolada v3 (no CORS headers on their end)
     # Strip X-Forwarded-Host so Kolada uses its own hostname in next_url pagination links,
     # not our domain.
