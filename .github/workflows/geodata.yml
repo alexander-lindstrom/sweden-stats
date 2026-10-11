@@ -1,0 +1,58 @@
+name: Geodata
+
+# Builds every GeoPackage from scratch on a clean runner and publishes them as the
+# release geodata-<version>. To deploy it, put the printed lock in data/geodata.lock.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish, e.g. 2025.1 (release geodata-<version>)'
+        required: true
+
+permissions:
+  contents: write
+
+# Explicit bash runs steps with pipefail, so a failing pack is not hidden by tee.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: processing/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r processing/requirements.txt
+
+      - name: Build
+        run: python processing/build_geodata.py
+
+      - name: Pack
+        run: processing/pack_geodata.sh "$VERSION" | tee pack.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "GeoPackages built from scratch by run ${{ github.run_id }} of ${{ github.sha }}."
+            echo
+            echo '```'
+            sed -n '/^data\/geodata.lock:/,$p' pack.txt
+            echo
+            cat data/geopackage/MANIFEST.json
+            echo '```'
+          } > notes.md
+          gh release create "geodata-$VERSION" "dist/geodata-$VERSION.tar.gz" \
+            --target "$GITHUB_SHA" --title "geodata $VERSION" --notes-file notes.md --latest=false
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"

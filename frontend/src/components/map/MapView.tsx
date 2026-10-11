@@ -29,6 +29,8 @@ import {
   createSubBoundaryLayer,
   createVectorTileLayer,
   createVectorTileSource,
+  isMapLevel,
+  type MapLevel,
   SUB_LEVEL,
   SUB_LEVEL_CODE_PROP,
   SUB_LEVEL_FILTER_PROP,
@@ -43,8 +45,7 @@ import { formatWithUnit } from '@/utils/format';
 
 // Maximum zoom applied when fitting a feature's extent into view.
 // Prevents tiny features (a small DeSO) from zooming in absurdly close.
-const LEVEL_MAX_ZOOM: Record<AdminLevel, number> = {
-  Country:      7,
+const LEVEL_MAX_ZOOM: Record<MapLevel, number> = {
   Region:       9,
   Municipality: 13,
   RegSO:        15,
@@ -549,6 +550,16 @@ const MapView: React.FC<MapViewProps> = ({
     extentCacheRef.current    = subExtentCacheRef.current;
     subExtentCacheRef.current = new Map();
 
+    // Nationell has no boundary layer, so nothing will load to replace the outgoing ones.
+    if (!isMapLevel(adminLevel)) {
+      for (const ref of [outgoingFillLayerRef, outgoingBoundaryLayerRef]) {
+        if (ref.current) { map.removeLayer(ref.current); ref.current = null; }
+      }
+      sourceRef.current    = null;
+      subSourceRef.current = null;
+      return;
+    }
+
     const { url } = adminVectorTileLayers[adminLevel];
     const source = createVectorTileSource(url);
     sourceRef.current = source;
@@ -628,7 +639,7 @@ const MapView: React.FC<MapViewProps> = ({
     hoveredSubCodeRef.current = null;
     selectedCodeRef.current   = selectedFeature?.code ?? null;
 
-    if (!selectedFeature || !sourceRef.current) {return;}
+    if (!selectedFeature || !sourceRef.current || !isMapLevel(adminLevel)) {return;}
 
     // Zoom the view to the selected feature. AbortController in the cleanup
     // cancels any in-flight WFS request when this effect re-runs or when React

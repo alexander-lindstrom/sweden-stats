@@ -35,6 +35,7 @@ Requires Python with `fastapi`, `uvicorn`, `httpx` installed.
 ```bash
 python parse_esv_utgifter.py   # Parse ESV expenses CSV → expenses_by_year.json
 python parse_esv_inkomster.py  # Parse ESV revenue CSV
+python build_geodata.py        # Build the boundary GeoPackages GeoServer serves (README: Geodata)
 ```
 Output JSON files are copied to `data/economy/` for the backend to serve.
 

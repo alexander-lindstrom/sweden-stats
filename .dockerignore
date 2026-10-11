@@ -5,6 +5,7 @@ frontend/dist/
 # Large gitignored data files — provision separately on the server
 data/geopackage/
 data/SCB boundaries/
+dist/
 data/valmyndigheten/
 processing/data/
 
