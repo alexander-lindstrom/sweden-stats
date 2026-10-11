@@ -14,6 +14,7 @@ Inputs (data/SCB boundaries/):
   - LanSweref99TM.zip       -- SCB county (lan) boundaries (used for names only)
   - RegSO_2025.gpkg         -- SCB RegSO boundaries (base geometry for all levels)
   - DeSO_2025.gpkg          -- SCB DeSO boundaries
+  (both downloaded and prepared by build_geodata.py, which also runs this script)
 
 Processing:
   1. Dissolve SCB Kommuner -> land mask

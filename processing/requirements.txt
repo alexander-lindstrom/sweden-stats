@@ -1,0 +1,8 @@
+# For build_geodata.py and clip_regso_deso.py. Pinned, since the geometry the
+# build writes depends on GEOS/GDAL (bundled in the shapely and pyogrio wheels).
+geopandas==1.1.4
+pyogrio==0.13.0
+shapely==2.1.2
+pyproj==3.8.0
+pandas==3.0.6
+numpy==2.5.3

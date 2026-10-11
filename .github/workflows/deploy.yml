@@ -39,6 +39,8 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -e
             cd /opt/sweden-data
             git pull
+            scripts/restore_geodata.sh
             docker compose up --build -d

@@ -3,9 +3,11 @@ node_modules/
 .env.local
 .env.production
 
-# GeoPackage files — large binaries, regenerate with processing/clip_regso_deso.py
+# GeoPackage files — large binaries, built by processing/build_geodata.py and
+# restored on the server from a release by scripts/restore_geodata.sh
 data/geopackage/
 data/SCB boundaries/*.gpkg
+dist/
 
 # Raw election source data — large files, obtain from Valmyndigheten
 data/valmyndigheten/

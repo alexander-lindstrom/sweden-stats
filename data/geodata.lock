@@ -1,0 +1,4 @@
+# The GeoPackages the server runs: release geodata-<version> of this repository,
+# put in place by scripts/restore_geodata.sh. Printed by processing/pack_geodata.sh.
+GEODATA_VERSION=2025.0
+GEODATA_SHA256=0391ed1714c3d0647a23e98820f77837e4c0e7e76ee4cd51c1885c5f3bd0b1f8
