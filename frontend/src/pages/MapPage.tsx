@@ -31,6 +31,7 @@ import { preload } from '@/datasets/cache';
 import { COUNTY_NAMES, LEVEL_LABELS } from '@/datasets/adminLevels';
 import { PARTY_CODES, PARTY_LABELS } from '@/datasets/parties';
 import { BaseMapKey } from '@/components/map/BaseMaps';
+import { isMapLevel, type MapLevel } from '@/components/map/VectorTiles';
 import { useDatasetFetch } from '@/hooks/useDatasetFetch';
 import { useHierarchyFetch } from '@/hooks/useHierarchyFetch';
 import { useTimeSeriesFetch } from '@/hooks/useTimeSeriesFetch';
@@ -60,16 +61,14 @@ const SUB_LEVEL_FOR_FETCH: Partial<Record<AdminLevel, AdminLevel>> = {
 
 // Feature property used for choropleth lookup — matches the direct boundary
 // layer shown for each admin level.
-const FEATURE_CODE_PROP: Record<AdminLevel, string> = {
-  Country:      'sovereignt',
+const FEATURE_CODE_PROP: Record<MapLevel, string> = {
   Region:       'county_code',
   Municipality: 'municipality_code',
   RegSO:        'regsokod',
   DeSO:         'desokod',
 };
 
-const FEATURE_LABEL_PROP: Record<AdminLevel, string> = {
-  Country:      'name',
+const FEATURE_LABEL_PROP: Record<MapLevel, string> = {
   Region:       'county_name',
   Municipality: 'municipality_name',
   RegSO:        'regsonamn',
@@ -866,8 +865,9 @@ export default function MapPage() {
                     mapColorFn={bivariateFn ?? mapColorFn}
                     tooltipData={tooltipData}
                     featureLabels={resultLabels}
-                    featureCodeProperty={FEATURE_CODE_PROP[selectedLevel]}
-                    featureLabelProperty={FEATURE_LABEL_PROP[selectedLevel]}
+                    // Nationell draws no boundaries, so it has no feature properties.
+                    featureCodeProperty={isMapLevel(selectedLevel) ? FEATURE_CODE_PROP[selectedLevel] : ''}
+                    featureLabelProperty={isMapLevel(selectedLevel) ? FEATURE_LABEL_PROP[selectedLevel] : ''}
                     featureParentProperty={FEATURE_PARENT_PROP[selectedLevel]}
                     unit={activeParty ? '%' : (datasetResult?.unit ?? '')}
                     subChoroplethData={subScalarResult?.values ?? null}

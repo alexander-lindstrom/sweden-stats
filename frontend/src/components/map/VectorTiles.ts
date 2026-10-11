@@ -221,11 +221,15 @@ export function buildFilteredChoroplethStyle(
   };
 }
 
-export const adminVectorTileLayers = {
-  Country: {
-    id: "country_mvt",
-    url: "/geoserver/gwc/service/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&LAYER=ne:countries&STYLE=&TILEMATRIXSET=EPSG:900913&FORMAT=application/vnd.mapbox-vector-tile&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}"
-  },
+// Levels with a boundary layer. Nationell is one area, shown in charts only, so the
+// map draws no boundaries for it.
+export type MapLevel = Exclude<AdminLevel, 'Country'>;
+
+export function isMapLevel(level: AdminLevel): level is MapLevel {
+  return level !== 'Country';
+}
+
+export const adminVectorTileLayers: Record<MapLevel, { id: string; url: string }> = {
   Region: {
     id: "region_mvt",
     url: "/geoserver/gwc/service/wmts?REQUEST=GetTile&SERVICE=WMTS&VERSION=1.0.0&LAYER=sweden:lan&STYLE=&TILEMATRIXSET=EPSG:900913&FORMAT=application/vnd.mapbox-vector-tile&TILEMATRIX=EPSG:900913:{z}&TILECOL={x}&TILEROW={y}"
@@ -247,8 +251,7 @@ export const adminVectorTileLayers = {
 };
 
 // WFS layer names per admin level — used to fetch full feature geometry for true centroid.
-export const adminWfsLayers: Record<AdminLevel, string> = {
-  Country:      'ne:countries',
+export const adminWfsLayers: Record<MapLevel, string> = {
   Region:       'sweden:lan',
   Municipality: 'sweden:kommuner',
   RegSO:        'sweden:regso',
@@ -260,7 +263,7 @@ export const adminWfsLayers: Record<AdminLevel, string> = {
 // RegSO→DeSO sub-boundary preview is intentionally omitted: urban RegSO
 // enclaves inside rural RegSOs make the overlay unreadably cluttered.
 // DeSO is reached by switching level explicitly, not as a passive overlay.
-export const SUB_LEVEL: Partial<Record<AdminLevel, AdminLevel>> = {
+export const SUB_LEVEL: Partial<Record<AdminLevel, MapLevel>> = {
   Region:       'Municipality',
   Municipality: 'RegSO',
 };
