@@ -42,5 +42,4 @@ jobs:
             set -e
             cd /opt/sweden-data
             git pull
-            scripts/restore_geodata.sh
-            docker compose up --build -d
+            scripts/deploy.sh

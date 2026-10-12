@@ -1,0 +1,6 @@
+# GeoServer with this repository's catalog, put in place at every start by
+# geoserver/apply-config.sh. The image sets up the rest of the data directory and the
+# admin login (GEOSERVER_ADMIN_USER/PASSWORD in .env.production).
+FROM kartoza/geoserver:2.26.0
+COPY geoserver/data_dir/ /opt/geoserver-config/
+COPY geoserver/apply-config.sh /docker-entrypoint-geoserver.d/

@@ -24,7 +24,14 @@ services:
     restart: unless-stopped
 
   geoserver:
-    image: kartoza/geoserver:2.26.0
+    # kartoza/geoserver with the catalog in geoserver/data_dir (README: Deployment)
+    build:
+      context: .
+      dockerfile: Dockerfile.geoserver
+    environment:
+      # The image defaults to a 2-4 GB heap; GeoServer has used about 1.6 GB in all.
+      - INITIAL_MEMORY=512M
+      - MAXIMUM_MEMORY=1536M
     volumes:
       - geoserver_data:/opt/geoserver/data_dir
       - ./data/geopackage:/opt/geopackage:ro

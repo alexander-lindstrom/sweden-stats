@@ -1,0 +1,22 @@
+<dataStore>
+  <id>DataStoreInfoImpl--46f315c3:19cd899148d:-7ffa</id>
+  <name>lan</name>
+  <description>Svenska län</description>
+  <type>GeoPackage</type>
+  <enabled>true</enabled>
+  <workspace>
+    <id>WorkspaceInfoImpl--46f315c3:19cd899148d:-7ffc</id>
+  </workspace>
+  <connectionParameters>
+    <entry key="fetch size">1000</entry>
+    <entry key="Expose primary keys">false</entry>
+    <entry key="Batch insert size">1</entry>
+    <entry key="database">file:///opt/geopackage/sveriges_lan_sf_simple.gpkg</entry>
+    <entry key="read_only">false</entry>
+    <entry key="dbtype">geopkg</entry>
+    <entry key="namespace">http://sweden</entry>
+  </connectionParameters>
+  <__default>false</__default>
+  <dateCreated>2026-03-10 16:57:01.5 UTC</dateCreated>
+  <disableOnConnFailure>false</disableOnConnFailure>
+</dataStore>
