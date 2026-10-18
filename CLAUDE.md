@@ -40,7 +40,7 @@ python build_geodata.py        # Build the boundary GeoPackages GeoServer serves
 Output JSON files are copied to `data/economy/` for the backend to serve.
 
 ### Map Tiles
-Vector tile layers (Region, Municipality, RegSO, DeSO) are served by a local GeoServer instance at `http://localhost:8080`.
+Vector tile layers (Region, Municipality, RegSO, DeSO) are served by a local GeoServer instance at `http://localhost:8080`. GeoServer's catalog (workspace, stores, layers, tile settings) is versioned in `geoserver/data_dir/` and applied at every start (README: Deployment).
 
 ## Architecture
 

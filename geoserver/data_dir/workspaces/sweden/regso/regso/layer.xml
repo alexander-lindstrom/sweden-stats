@@ -1,0 +1,16 @@
+<layer>
+  <name>regso</name>
+  <id>LayerInfoImpl--46f315c3:19cd899148d:-7ff2</id>
+  <type>VECTOR</type>
+  <defaultStyle>
+    <id>StyleInfoImpl-534aa119:19cd890a225:-7ffe</id>
+  </defaultStyle>
+  <resource class="featureType">
+    <id>FeatureTypeInfoImpl--46f315c3:19cd899148d:-7ff3</id>
+  </resource>
+  <attribution>
+    <logoWidth>0</logoWidth>
+    <logoHeight>0</logoHeight>
+  </attribution>
+  <dateCreated>2026-03-10 17:00:13.9 UTC</dateCreated>
+</layer>

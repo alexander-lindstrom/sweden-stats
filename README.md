@@ -54,6 +54,26 @@ the change, then update `SCB_SOURCES` in `processing/build_geodata.py`.
 SCB's `2025_v1` release, which SCB no longer serves; the build reproduces it apart
 from SCB's later corrections.
 
+## Deployment
+
+The server runs this repository as one tenant of
+[alexander-lindstrom/server](https://github.com/alexander-lindstrom/server), whose
+Install workflow sets up a clean server or updates a running one. On the server,
+`scripts/deploy.sh` brings a checkout up: the pinned geodata, then
+`docker compose up --build`. The Deploy workflow runs it after every push to main.
+
+GeoServer's catalog is in git, in `geoserver/data_dir/`: the `sweden` workspace, its
+four GeoPackage stores and layers, the vector-tile settings and the default styles
+the layers use. The GeoServer image (`Dockerfile.geoserver`) puts it into the data
+directory at every start (`geoserver/apply-config.sh`), and clears the tile cache
+when it has changed, so a new server needs nothing from an old one. Change the
+catalog in git, not in GeoServer's web interface, which is closed to the internet
+anyway and whose changes the next start would overwrite.
+
+The admin login comes from `GEOSERVER_ADMIN_USER` and `GEOSERVER_ADMIN_PASSWORD` in
+`.env.production` on the server, which the install writes from the server
+repository's `SWEDEN_STATS_ENV` secret.
+
 ## Conventions
 
 See `CLAUDE.md` for architecture, UI patterns and the working rules that apply
