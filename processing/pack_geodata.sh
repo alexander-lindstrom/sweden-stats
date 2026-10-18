@@ -1,21 +1,18 @@
 #!/usr/bin/env bash
-# Packs the GeoPackages in a directory (default data/geopackage) into
+# Packs what processing/build_geodata.py wrote to data/geopackage into
 # dist/geodata-<version>.tar.gz, the asset of the GitHub release geodata-<version>,
 # and prints the data/geodata.lock that pins it.
 #
 #   processing/pack_geodata.sh 2025.1
-#   processing/pack_geodata.sh 2025.0 ~/geodata-live
 set -euo pipefail
 
-version=${1:?usage: pack_geodata.sh <version> [dir]}
-src=$(realpath "${2:-data/geopackage}")
+version=${1:?usage: pack_geodata.sh <version>}
 [[ $version =~ ^[0-9]{4}\.[0-9]+$ ]] || { echo "version must look like 2025.1" >&2; exit 1; }
 cd "$(dirname "$0")/.."
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-cp "$src"/*.gpkg "$work"/
-[[ -f $src/MANIFEST.json ]] && cp "$src/MANIFEST.json" "$work"/
+cp data/geopackage/*.gpkg data/geopackage/MANIFEST.json "$work"/
 (cd "$work" && sha256sum -- *.gpkg > SHA256SUMS)
 
 mkdir -p dist

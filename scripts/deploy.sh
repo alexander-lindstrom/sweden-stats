@@ -8,3 +8,4 @@ cd "$(dirname "$0")/.."
 scripts/restore_geodata.sh
 docker compose up --build -d
 docker image prune -f > /dev/null  # the images this build replaced
+docker builder prune -f --filter until=168h > /dev/null  # build cache unused for a week

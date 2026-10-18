@@ -31,14 +31,18 @@ services:
       context: .
       dockerfile: Dockerfile.geoserver
     environment:
-      # The image defaults to a 2-4 GB heap; GeoServer has used about 1.6 GB in all.
-      - INITIAL_MEMORY=512M
-      - MAXIMUM_MEMORY=1536M
+      # The image defaults to a 2-4 GB heap; GeoServer uses about 150 MB of it, and
+      # 0.9 GB in all.
+      - INITIAL_MEMORY=256M
+      - MAXIMUM_MEMORY=1G
     volumes:
       - geoserver_data:/opt/geoserver/data_dir
       - ./data/geopackage:/opt/geopackage:ro
     env_file:
       - .env.production
+      # GEODATA_VERSION: a new version recreates the container, and its start clears
+      # the tiles cut from the old GeoPackages (geoserver/apply-config.sh).
+      - data/geodata.lock
     restart: unless-stopped
 
 networks:
