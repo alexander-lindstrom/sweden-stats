@@ -3,8 +3,8 @@
 # GitHub release geodata-<version>. Does nothing when that version is already there,
 # so every deploy runs it. Run from anywhere; it works on the checkout it lives in.
 #
-# When files change under a running GeoServer, its tile cache for them is cleared
-# and it is restarted, since cached tiles were cut from the old files.
+# GeoServer reads the lock too (docker-compose.yml), so a new version recreates it at
+# the next `docker compose up`, and its start clears the tiles cut from the old files.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -36,11 +36,4 @@ for f in "$stage"/files/*.gpkg; do
   echo "  $dest/$(basename "$f")"
 done
 echo "$GEODATA_VERSION" > "$marker"
-
-if docker compose ps --status running --services 2>/dev/null | grep -qx geoserver; then
-  echo "Clearing GeoServer's tile cache and restarting it ..."
-  docker compose exec -T geoserver sh -c \
-    'cd /opt/geoserver/data_dir/gwc && for d in sweden_*; do [ -d "$d" ] && echo "  gwc/$d" && rm -rf "$d"; done; true'
-  docker compose restart geoserver
-fi
 echo "geodata $GEODATA_VERSION restored"

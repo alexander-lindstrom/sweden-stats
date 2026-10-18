@@ -10,10 +10,13 @@
 # container stops instead of serving no layers.
 apply_config() {
   local src=/opt/geoserver-config dst=${GEOSERVER_DATA_DIR:?} sum path name
-  sum=$(cd "$src" && find . -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum) || return 1
+  # The catalog and the GeoPackages' version (GEODATA_VERSION, from data/geodata.lock)
+  sum=$( (cd "$src" && find . -type f -print0 | sort -z | xargs -0 sha256sum &&
+    echo "geodata ${GEODATA_VERSION:-}") | sha256sum) || return 1
   sum=${sum%% *}
 
-  # Tiles cut with an older catalog are stale; GeoWebCache keeps them per layer.
+  # Tiles cut with an older catalog or from older GeoPackages are stale; GeoWebCache
+  # keeps them per layer.
   if [[ ! -f $dst/.config-sha256 || $(<"$dst/.config-sha256") != "$sum" ]]; then
     rm -rf "${GEOWEBCACHE_CACHE_DIR:-$dst/gwc}"/sweden_* || return 1
   fi
